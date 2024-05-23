@@ -133,6 +133,7 @@ module {
     /// 2) The index of next upcoming journal log. Use this value as "startFrom" in your next journal query to fetch next entries
     public func queryJournal(startFrom : ?Nat) : ([Journal.JournalRecord], Nat) = journal.queryJournal(startFrom);
 
+    /// Returns the current `TokenHandler` state.
     public func state() : {
       journalLength : Nat;
       balance : {
@@ -184,32 +185,93 @@ module {
 
     /// Adds amount to P’s credit.
     /// With checking the availability of sufficient funds.
+    ///
+    /// Example:
+    /// ```motoko
+    /// let userPrincipal = ...;
+    /// let amount: Nat = 100_000; // Amount to credit
+    /// let success = creditUser(userPrincipal, amount);
+    /// if (success) {
+    ///   // Handle success
+    /// } else {
+    ///   // Handle fail
+    /// };
+    /// ```
     public func creditUser(p : Principal, amount : Nat) : Bool = creditRegistry.creditUser(p, amount);
 
     /// Deducts amount from P’s credit.
     /// With checking the availability of sufficient funds in the pool.
+    ///
+    /// Example:
+    /// ```motoko
+    /// let userPrincipal = ...;
+    /// let amount: Nat = 100_000; // Amount to debit
+    /// let success = debitUser(userPrincipal, amount);
+    /// if (success) {
+    ///   // Handle success
+    /// } else {
+    ///   // Handle fail
+    /// };
+    /// ```
     public func debitUser(p : Principal, amount : Nat) : Bool = creditRegistry.debitUser(p, amount);
 
-    // For debug and testing purposes only.
-    // Issue credit directly to a principal or burn from a principal.
-    // A negative amount means burn.
-    // Without checking the availability of sufficient funds.
+    /// For debug and testing purposes only.
+    /// Issue credit directly to a principal or burn from a principal.
+    /// A negative amount means burn.
+    /// Without checking the availability of sufficient funds.
     public func issue_(account : CreditRegistry.Account, amount : Int) = creditRegistry.issue(account, amount);
 
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit and credit funds if successful, otherwise `null`.
+    ///
+    /// Example:
+    /// ```motoko
+    /// let userPrincipal = ...; // The principal of the user making the deposit
+    /// let (depositDelta, credit) = await* notify(userPrincipal);
+    /// ```
     public func notify(p : Principal) : async* ?(Nat, Int) {
       if isFrozen_ return null;
       let ?depositDelta = await* accountManager.notify(p) else return null;
       ?(depositDelta, creditRegistry.userBalance(p));
     };
 
+    /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.
+    /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
+    /// principal as the spender and then calling this method to transfer the allowed tokens.
+    ///
+    /// Example:
+    /// ```motoko
+    /// // Set up an allowance on the user's account and then call depositFromAllowance
+    /// let userPrincipal = ...; // The principal of the user making the deposit
+    /// let userAccount = { owner = userPrincipal; subaccount = ?subaccountBlob };
+    /// let amount: Nat = 100_000; // Amount to deposit
+    ///
+    /// let response = await* handler.depositFromAllowance(userAccount, amount);
+    /// switch (response) {
+    ///   case (#ok credit_inc) {
+    ///     // Handle successful deposit
+    ///   };
+    ///   case (#err err) {
+    ///     // Handle error cases
+    ///     switch (err) {
+    ///       case (#CallIcrc1LedgerError) { ... };
+    ///       ...
+    ///     }
+    ///   };
+    /// };
+    /// ```
     public func depositFromAllowance(account : ICRC1.Account, amount : Nat) : async* AccountManager.DepositFromAllowanceResponse {
       await* accountManager.depositFromAllowance(account, amount);
     };
 
     /// Triggers the proccessing deposits.
     /// n - desired number of potential consolidations.
+    ///
+    /// Example:
+    /// ```motoko
+    /// await* handler.trigger(1); // trigger 1 potential consolidation
+    /// await* handler.trigger(10); // trigger 10 potential consolidation
+    /// ```
     public func trigger(n : Nat) : async* () {
       if isFrozen_ return;
       await* accountManager.trigger(n);
@@ -217,6 +279,25 @@ module {
 
     /// Initiates a withdrawal by transferring tokens to another account.
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
+    ///
+    /// Example:
+    /// ```motoko
+    /// let recipientAccount = { owner = recipientPrincipal; subaccount = ?subaccountBlob };
+    /// let amount: Nat = 100_000; // Amount to withdraw
+    ///
+    /// let response = await* tokenHandler.withdrawFromCredit(recipientAccount, amount);
+    /// switch(response) {
+    ///   case (#ok (transactionIndex, withdrawnAmount)) {
+    ///     // Handle successful withdrawal
+    ///   };
+    ///   case (#err err) {
+    ///     // Handle error cases
+    ///     switch (err) {
+    ///       case (#CallIcrc1LedgerError) { ... };
+    ///       ...
+    ///     }
+    ///   };
+    /// ```
     public func withdrawFromPool(to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
       // try to burn from pool
       let success = creditRegistry.burn(#pool, amount);
@@ -232,6 +313,26 @@ module {
     /// Initiates a withdrawal by transferring tokens to another account.
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
     /// At the same time, it reduces the user's credit. Accordingly, amount <= credit should be satisfied.
+    ///
+    /// Example:
+    /// ```motoko
+    /// let userPrincipal = ...; // The principal of the user transferring tokens
+    /// let recipientAccount = { owner = recipientPrincipal; subaccount = ?subaccountBlob };
+    /// let amount: Nat = 100_000; // Amount to withdraw
+    ///
+    /// let response = await* tokenHandler.withdrawFromCredit(userPrincipal, recipientAccount, amount);
+    /// switch(response) {
+    ///   case (#ok (transactionIndex, withdrawnAmount)) {
+    ///     // Handle successful withdrawal
+    ///   };
+    ///   case (#err err) {
+    ///     // Handle error cases
+    ///     switch (err) {
+    ///       case (#CallIcrc1LedgerError) { ... };
+    ///       ...
+    ///     }
+    ///   };
+    /// ```
     public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
       // try to burn from user
       creditRegistry.burn(#user p, amount)
