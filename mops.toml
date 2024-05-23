@@ -2,7 +2,7 @@
 name = ""
 version = "0.0.1"
 description = ""
-repository = "https://github.com/research-ag/..."
+repository = "https://github.com/research-ag/token-handler"
 keywords = [ ]
 license = "Apache-2.0"
 
