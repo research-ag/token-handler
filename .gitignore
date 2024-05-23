@@ -5,6 +5,6 @@
 .vscode/
 .DS_Store
 *.wasm
-dfx.json
+./dfx.json
 package-set.dhall
 vessel.dhall

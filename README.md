@@ -39,7 +39,7 @@ import TokenHandler "mo:token-handler";
 
 ### Example
 
-To see token-handler package in action, check out the [example code](https://github.com/research-ag/icrcX/blob/main/example/main.mo).
+To see token-handler package in action, check out the [example code](https://github.com/research-ag/token-handler/blob/main/example).
 
 ### Build & test
 
