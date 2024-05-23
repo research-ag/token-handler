@@ -28,6 +28,7 @@ module {
     credit : Int;
   };
 
+  /// Returns default stable data for `TokenHandler`.
   public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0), ([var], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
@@ -38,6 +39,10 @@ module {
 
   public type LedgerAPI = ICRC1.LedgerAPI;
 
+  /// Class `TokenHandler` provides mechanisms to facilitate the deposit and withdrawal management on an ICRC-1 ledger.
+  ///
+  /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
+  /// providing a comprehensive solution for handling ICRC-1 token transactions.
   public class TokenHandler(
     ledgerApi : LedgerAPI,
     ownPrincipal : Principal,
@@ -168,7 +173,7 @@ module {
       };
     };
 
-    /// Query the "length" of the journal (total number of entries ever pushed)
+    /// Query the "length" of the journal (total number of entries ever pushed).
     public func journalLength() : Nat = journal.length();
 
     /// Gets the current credit amount associated with a specific principal.
@@ -192,7 +197,7 @@ module {
     public func issue_(account : CreditRegistry.Account, amount : Int) = creditRegistry.issue(account, amount);
 
     /// Notifies of a deposit and schedules consolidation process.
-    /// Returns the newly detected deposit and credit funds if successful, otherwise null.
+    /// Returns the newly detected deposit and credit funds if successful, otherwise `null`.
     public func notify(p : Principal) : async* ?(Nat, Int) {
       if isFrozen_ return null;
       let ?depositDelta = await* accountManager.notify(p) else return null;
@@ -245,7 +250,7 @@ module {
       result;
     };
 
-    /// For testing purposes
+    /// For testing purposes.
     public func assertIntegrity() { accountManager.assertIntegrity() };
 
     /// Serializes the token handler data.
