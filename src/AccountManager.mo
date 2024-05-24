@@ -7,7 +7,7 @@ import Iter "mo:base/Iter";
 
 import ICRC1 "ICRC1";
 import NatMap "NatMapWithLock";
-import Mapping "Mapping";
+import Util "util";
 
 module {
   public type StableData = (
@@ -409,7 +409,7 @@ module {
 
       let transferResult = try {
         await icrc1Ledger.transfer({
-          from_subaccount = ?Mapping.toSubaccount(p);
+          from_subaccount = ?Util.toSubaccount(p);
           to = { owner = ownPrincipal; subaccount = null };
           amount = transferAmount;
           fee = ?ledgerFee_;
@@ -562,7 +562,7 @@ module {
     func loadDeposit(p : Principal) : async* Nat {
       await icrc1Ledger.balance_of({
         owner = ownPrincipal;
-        subaccount = ?Mapping.toSubaccount(p);
+        subaccount = ?Util.toSubaccount(p);
       });
     };
 
