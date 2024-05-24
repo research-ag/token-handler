@@ -1,33 +1,18 @@
 import Array "mo:base/Array";
 import Error "mo:base/Error";
 import Int "mo:base/Int";
-import Iter "mo:base/Iter";
 import Prim "mo:prim";
 import Principal "mo:base/Principal";
-import RBTree "mo:base/RBTree";
 import Text "mo:base/Text";
 import Timer "mo:base/Timer";
-
-import ICRC1 "mo:mrr/TokenHandler/ICRC1";
-import TokenHandler "mo:mrr/TokenHandler";
 import Vec "mo:vector";
 
-actor class Example(adminPrincipal_ : ?Principal) = self {
+import ICRC1 "../src/ICRC1";
+import TokenHandler "../src";
+
+actor class Example() = self {
 
   stable var assetsData : Vec.Vector<StableAssetInfo> = Vec.new();
-
-  stable var stableAdminsMap = RBTree.RBTree<Principal, ()>(Principal.compare).share();
-  switch (RBTree.size(stableAdminsMap)) {
-    case (0) {
-      let adminsMap = RBTree.RBTree<Principal, ()>(Principal.compare);
-      let ?ap = adminPrincipal_ else Prim.trap("Admin not provided");
-      adminsMap.put(ap, ());
-      stableAdminsMap := adminsMap.share();
-    };
-    case (_) {};
-  };
-  let adminsMap = RBTree.RBTree<Principal, ()>(Principal.compare);
-  adminsMap.unshare(stableAdminsMap);
 
   type AssetInfo = {
     ledgerPrincipal : Principal;
@@ -87,10 +72,11 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
           balance_of = _.icrc1_balance_of;
           fee = _.icrc1_fee;
           transfer = _.icrc1_transfer;
+          transfer_from = _.icrc2_transfer_from;
         }
         |> {
           ledgerPrincipal = x.ledgerPrincipal;
-          handler = TokenHandler.TokenHandler(_, Principal.fromActor(self), JOURNAL_SIZE, 0);
+          handler = TokenHandler.TokenHandler(_, Principal.fromActor(self), JOURNAL_SIZE, 0, true);
         };
         r.handler.unshare(x.handler);
         r;
@@ -113,11 +99,11 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
     assertInitialized();
     for ((assetInfo, i) in Vec.items(assets)) {
       if (Principal.equal(assetInfo.ledgerPrincipal, token)) {
-        return assetInfo.handler.fee() |> {
-          min_deposit = _ + 1;
-          min_withdrawal = _ + 1;
-          deposit_fee = _;
-          withdrawal_fee = _;
+        return {
+          min_deposit = assetInfo.handler.minimum(#deposit);
+          min_withdrawal = assetInfo.handler.minimum(#withdrawal);
+          deposit_fee = assetInfo.handler.fee(#deposit);
+          withdrawal_fee = assetInfo.handler.fee(#withdrawal);
         };
       };
     };
@@ -127,7 +113,7 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
   public shared query ({ caller }) func icrcX_credit(token : Principal) : async Int {
     assertInitialized();
     switch (getAssetInfo(token)) {
-      case (?info) info.handler.getCredit(caller);
+      case (?info) info.handler.userCredit(caller);
       case (_) 0;
     };
   };
@@ -136,7 +122,7 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
     assertInitialized();
     let res : Vec.Vector<(Principal, Int)> = Vec.new();
     for (assetInfo in Vec.vals(assets)) {
-      let credit = assetInfo.handler.getCredit(caller);
+      let credit = assetInfo.handler.userCredit(caller);
       if (credit != 0) {
         Vec.add(res, (assetInfo.ledgerPrincipal, credit));
       };
@@ -178,7 +164,7 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
     };
     switch (result) {
       case (?(delta, usableBalance)) {
-        await* assetInfo.handler.trigger();
+        await* assetInfo.handler.trigger(1);
         #Ok({ deposit_inc = delta; credit_inc = delta });
       };
       case (null) {
@@ -193,15 +179,12 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
   public shared ({ caller }) func icrcX_withdraw(args : { to_subaccount : ?Blob; amount : Nat; token : Principal }) : async WithdrawResult {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
-    if (not assetInfo.handler.debitStrict(caller, args.amount)) {
-      return #Err(#InsufficientCredit);
-    };
-    let res = await* assetInfo.handler.withdraw({ owner = caller; subaccount = args.to_subaccount }, args.amount);
+    let res = await* assetInfo.handler.withdrawFromCredit(caller, { owner = caller; subaccount = args.to_subaccount }, args.amount);
     switch (res) {
       case (#ok(txid, amount)) #Ok({ txid; amount });
       case (#err err) {
-        assetInfo.handler.credit(caller, args.amount);
         switch (err) {
+          case (#InsufficientCredit) #Err(#InsufficientCredit);
           case (#TooLowQuantity) #Err(#AmountBelowMinimum);
           case (#CallIcrc1LedgerError) #Err(#CallLedgerError("Call error"));
           case (_) #Err(#CallLedgerError("Try later"));
@@ -215,7 +198,7 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
     #seconds 60,
     func() : async () {
       for (asset in Vec.vals(assets)) {
-        await* asset.handler.trigger();
+        await* asset.handler.trigger(1);
       };
     },
   );
@@ -229,35 +212,11 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
     return null;
   };
 
-  public query func listAdmins() : async [Principal] = async adminsMap.entries()
-  |> Iter.map<(Principal, ()), Principal>(_, func((p, _)) = p)
-  |> Iter.toArray(_);
-
-  private func assertAdminAccess(principal : Principal) : async* () {
-    if (adminsMap.get(principal) == null) {
-      throw Error.reject("No Access for this principal " # Principal.toText(principal));
-    };
-  };
-
-  public shared ({ caller }) func addAdmin(principal : Principal) : async () {
-    await* assertAdminAccess(caller);
-    adminsMap.put(principal, ());
-  };
-
-  public shared ({ caller }) func removeAdmin(principal : Principal) : async () {
-    if (Principal.equal(principal, caller)) {
-      throw Error.reject("Cannot remove yourself from admins");
-    };
-    await* assertAdminAccess(caller);
-    adminsMap.delete(principal);
-  };
-
-  public shared ({ caller }) func registerAsset(ledger : Principal) : async {
+  public shared func registerAsset(ledger : Principal) : async {
     #Ok : Nat;
     #Err : { #AlreadyRegistered : Nat };
   } {
     assertInitialized();
-    await* assertAdminAccess(caller);
     // validate ledger
     let canister = actor (Principal.toText(ledger)) : (actor { icrc1_metadata : () -> async [Any] });
     try {
@@ -274,10 +233,11 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
       balance_of = _.icrc1_balance_of;
       fee = _.icrc1_fee;
       transfer = _.icrc1_transfer;
+      transfer_from = _.icrc2_transfer_from;
     }
     |> {
       ledgerPrincipal = ledger;
-      handler = TokenHandler.TokenHandler(_, Principal.fromActor(self), JOURNAL_SIZE, 0);
+      handler = TokenHandler.TokenHandler(_, Principal.fromActor(self), JOURNAL_SIZE, 0, true);
     }
     |> Vec.add<AssetInfo>(assets, _);
     #Ok(id);
@@ -291,7 +251,5 @@ actor class Example(adminPrincipal_ : ?Principal) = self {
         handler = x.handler.share();
       },
     );
-    stableAdminsMap := adminsMap.share();
   };
-
 };
