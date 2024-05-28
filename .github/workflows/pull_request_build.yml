@@ -3,11 +3,6 @@ on:
   pull_request:
     types: [synchronize, opened, reopened, ready_for_review, unlabeled]
 
-inputs:
-  mops-version:
-    description: "Mops CLI version to install"
-    default: "latest"
-
 jobs:
   build:
     runs-on: ubuntu-22.04
