@@ -7,7 +7,6 @@ import Text "mo:base/Text";
 import Timer "mo:base/Timer";
 import Vec "mo:vector";
 
-import ICRC1 "../src/ICRC1";
 import TokenHandler "../src";
 
 actor class Example() = self {
@@ -67,14 +66,7 @@ actor class Example() = self {
     assets := Vec.map<StableAssetInfo, AssetInfo>(
       assetsData,
       func(x) {
-        let r = (actor (Principal.toText(x.ledgerPrincipal)) : ICRC1.ICRC1Ledger)
-        |> {
-          balance_of = _.icrc1_balance_of;
-          fee = _.icrc1_fee;
-          transfer = _.icrc1_transfer;
-          transfer_from = _.icrc2_transfer_from;
-        }
-        |> {
+        let r = TokenHandler.buildLedgerApi(x.ledgerPrincipal) |> {
           ledgerPrincipal = x.ledgerPrincipal;
           handler = TokenHandler.TokenHandler(_, Principal.fromActor(self), JOURNAL_SIZE, 0, true);
         };
@@ -228,7 +220,7 @@ actor class Example() = self {
       if (Principal.equal(ledger, assetInfo.ledgerPrincipal)) return #Err(#AlreadyRegistered(i));
     };
     let id = Vec.size(assets);
-    (actor (Principal.toText(ledger)) : ICRC1.ICRC1Ledger)
+    (actor (Principal.toText(ledger)) : TokenHandler.ICRC1Ledger)
     |> {
       balance_of = _.icrc1_balance_of;
       fee = _.icrc1_fee;
