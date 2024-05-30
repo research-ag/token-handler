@@ -329,7 +329,7 @@ module {
       return ?inc;
     };
 
-    func processDepositTransfer(account : ICRC1.Account, amount : Nat) : async* {
+    func processAllowance(account : ICRC1.Account, amount : Nat) : async* {
       #Ok : Nat;
       #Err : ICRC1.TransferFromError or {
         #CallIcrc1LedgerError;
@@ -361,7 +361,7 @@ module {
     public func depositFromAllowance(account : ICRC1.Account, amount : Nat) : async* DepositFromAllowanceResponse {
       if (amount < minimum(#deposit)) return #err(#TooLowQuantity);
 
-      let transferResult = await* processDepositTransfer(account, amount);
+      let transferResult = await* processAllowance(account, amount);
 
       let p = account.owner;
 
@@ -378,7 +378,7 @@ module {
         case (#Err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
           let originalCredit_2 : Nat = Int.abs(Int.min(originalCredit, amount - fee(#deposit)));
-          let transferResult = await* processDepositTransfer(account, amount);
+          let transferResult = await* processAllowance(account, amount);
           switch (transferResult) {
             case (#Ok _) {
               log(p, #consolidated({ deducted = amount; credited = originalCredit_2 }));
