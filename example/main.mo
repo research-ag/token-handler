@@ -104,10 +104,8 @@ actor class Example() = self {
 
   public shared query ({ caller }) func icrcX_credit(token : Principal) : async Int {
     assertInitialized();
-    switch (getAssetInfo(token)) {
-      case (?info) info.handler.userCredit(caller);
-      case (_) 0;
-    };
+    let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
+    assetInfo.handler.userCredit(caller);
   };
 
   public shared query ({ caller }) func icrcX_all_credits() : async [(Principal, Int)] {
@@ -127,27 +125,16 @@ actor class Example() = self {
     #Err : { #NotAvailable : Text };
   } {
     assertInitialized();
-    (
-      switch (getAssetInfo(token)) {
-        case (?aid) aid;
-        case (_) return #Err(#NotAvailable("Unknown token"));
-      }
-    )
-    |> _.handler.trackedDeposit(caller)
-    |> (
-      switch (_) {
-        case (?d) #Ok(d);
-        case (null) #Err(#NotAvailable("Unknown caller"));
-      }
-    );
+    let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
+    switch (assetInfo.handler.trackedDeposit(caller)) {
+      case (?d) #Ok(d);
+      case (null) #Err(#NotAvailable("Unknown caller"));
+    };
   };
 
   public shared ({ caller }) func icrcX_notify(args : { token : Principal }) : async NotifyResult {
     assertInitialized();
-    let assetInfo = switch (getAssetInfo(args.token)) {
-      case (?aid) aid;
-      case (_) return #Err(#NotAvailable("Unknown token"));
-    };
+    let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let result = try {
       ignore await* assetInfo.handler.fetchFee();
       await* assetInfo.handler.notify(caller);
