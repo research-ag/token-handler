@@ -142,7 +142,6 @@ actor class Example() = self {
     };
     switch (result) {
       case (?(delta, usableBalance)) {
-        await* assetInfo.handler.trigger(1);
         #Ok({ deposit_inc = delta; credit_inc = delta });
       };
       case (null) {
