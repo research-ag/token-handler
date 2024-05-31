@@ -36,7 +36,7 @@ actor class Example() = self {
     };
     #Err : {
       #CallLedgerError : Text;
-      #NotAvailable : Text;
+      #NotAvailable;
     };
   };
 
@@ -146,10 +146,7 @@ actor class Example() = self {
         #Ok({ deposit_inc = delta; credit_inc = delta });
       };
       case (null) {
-        #Ok({
-          deposit_inc = 0;
-          credit_inc = 0;
-        });
+        #Err(#NotAvailable);
       };
     };
   };
