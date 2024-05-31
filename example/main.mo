@@ -6,12 +6,15 @@ import Principal "mo:base/Principal";
 import Text "mo:base/Text";
 import Timer "mo:base/Timer";
 import Vec "mo:vector";
+import Time "mo:base/Time";
 
 import TokenHandler "../src";
 
 actor class Example() = self {
-
+  stable var journalData : Journal = Vec.new();
   stable var assetsData : Vec.Vector<StableAssetInfo> = Vec.new();
+
+  type Journal = Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)>;
 
   type AssetInfo = {
     ledgerPrincipal : Principal;
@@ -52,23 +55,35 @@ actor class Example() = self {
     };
   };
 
-  let JOURNAL_SIZE = 1024;
-
   var initialized : Bool = false;
   var assets : Vec.Vector<AssetInfo> = Vec.new();
+  var journal : Journal = Vec.new();
 
   private func assertInitialized() = if (not initialized) {
     Prim.trap("Not initialized");
   };
 
+  private func createTokenHandler(ledgerPrincipal : Principal) : TokenHandler.TokenHandler {
+    TokenHandler.TokenHandler(
+      TokenHandler.buildLedgerApi(ledgerPrincipal),
+      Principal.fromActor(self),
+      0,
+      true,
+      func(logInfo : (Principal, TokenHandler.LogEvent)) {
+        Vec.add(journal, (Time.now(), logInfo.0, logInfo.1));
+      },
+    );
+  };
+
   public shared func init() : async () {
     assert not initialized;
+    journal := journalData;
     assets := Vec.map<StableAssetInfo, AssetInfo>(
       assetsData,
       func(x) {
-        let r = TokenHandler.buildLedgerApi(x.ledgerPrincipal) |> {
+        let r = {
           ledgerPrincipal = x.ledgerPrincipal;
-          handler = TokenHandler.TokenHandler(_, Principal.fromActor(self), JOURNAL_SIZE, 0, true);
+          handler = createTokenHandler(x.ledgerPrincipal);
         };
         r.handler.unshare(x.handler);
         r;
@@ -202,22 +217,16 @@ actor class Example() = self {
       if (Principal.equal(ledger, assetInfo.ledgerPrincipal)) return #Err(#AlreadyRegistered(i));
     };
     let id = Vec.size(assets);
-    (actor (Principal.toText(ledger)) : TokenHandler.ICRC1Ledger)
-    |> {
-      balance_of = _.icrc1_balance_of;
-      fee = _.icrc1_fee;
-      transfer = _.icrc1_transfer;
-      transfer_from = _.icrc2_transfer_from;
-    }
-    |> {
+    {
       ledgerPrincipal = ledger;
-      handler = TokenHandler.TokenHandler(_, Principal.fromActor(self), JOURNAL_SIZE, 0, true);
+      handler = createTokenHandler(ledger);
     }
     |> Vec.add<AssetInfo>(assets, _);
     #Ok(id);
   };
 
   system func preupgrade() {
+    journalData := journal;
     assetsData := Vec.map<AssetInfo, StableAssetInfo>(
       assets,
       func(x) = {

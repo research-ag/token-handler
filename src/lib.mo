@@ -12,7 +12,6 @@ import Result "mo:base/Result";
 
 import Util "util";
 import ICRC1 "ICRC1";
-import Journal "Journal";
 import AccountManager "AccountManager";
 import CreditRegistry "CreditRegistry";
 
@@ -20,8 +19,11 @@ module {
   public type StableData = (
     AccountManager.StableData, // account manager
     CreditRegistry.StableData, // credit registry
-    Journal.StableData // journal
   );
+
+  public type LogEvent = AccountManager.LogEvent or CreditRegistry.LogEvent or {
+    #error : Text;
+  };
 
   public type AccountInfo = {
     deposit : Nat;
@@ -29,7 +31,7 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0), ([var], 0, 0));
+  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = Util.toSubaccount(p);
@@ -59,9 +61,9 @@ module {
   public class TokenHandler(
     ledgerApi : LedgerAPI,
     ownPrincipal : Principal,
-    journalCapacity : Nat,
     initialFee : Nat,
     triggerOnNotifications : Bool,
+    log : (Principal, LogEvent) -> (),
   ) {
 
     /// Returns `true` when new notifications are paused.
@@ -86,22 +88,18 @@ module {
     /// Freezes the handler in case of unexpected errors and logs the error message to the journal.
     func freezeTokenHandler(errorText : Text) : () {
       isFrozen_ := true;
-      journal.push(ownPrincipal, #error(errorText));
+      log(ownPrincipal, #error(errorText));
     };
 
-    /// Collection of logs capturing events like deposits, withdrawals, fee updates, errors, etc.
-    /// The journal provides a chronological history of actions taken by the handler.
-    var journal = Journal.Journal(journalCapacity);
-
     /// Tracks credited funds (usable balance) associated with each principal.
-    let creditRegistry = CreditRegistry.CreditRegistry(journal.push);
+    let creditRegistry = CreditRegistry.CreditRegistry(log);
 
     /// Manages accounts and funds for users.
     /// Handles deposit, withdrawal, and consolidation operations.
     let accountManager = AccountManager.AccountManager(
       ledgerApi,
       ownPrincipal,
-      journal.push,
+      log,
       initialFee,
       triggerOnNotifications,
       freezeTokenHandler,
@@ -139,16 +137,8 @@ module {
     /// Null means the principal is locked, hence no value is available.
     public func trackedDeposit(p : Principal) : ?Nat = accountManager.getDeposit(p);
 
-    /// Queries the journal records starting from a specific index - for debug purposes.
-    ///
-    /// Returns:
-    /// 1) Array of all items in order, starting from the oldest record in journal, but no earlier than "startFrom" if provided
-    /// 2) The index of next upcoming journal log. Use this value as "startFrom" in your next journal query to fetch next entries
-    public func queryJournal(startFrom : ?Nat) : ([Journal.JournalRecord], Nat) = journal.queryJournal(startFrom);
-
     /// Returns the current `TokenHandler` state.
     public func state() : {
-      journalLength : Nat;
       balance : {
         deposited : Nat;
         underway : Nat;
@@ -167,7 +157,6 @@ module {
         queued : Nat;
       };
     } = {
-      journalLength = journal.length();
       balance = {
         deposited = accountManager.depositedFunds();
         underway = accountManager.underwayFunds();
@@ -186,9 +175,6 @@ module {
         queued = accountManager.depositsNumber();
       };
     };
-
-    /// Query the "length" of the journal (total number of entries ever pushed).
-    public func journalLength() : Nat = journal.length();
 
     /// Gets the current credit amount associated with a specific principal.
     public func userCredit(p : Principal) : Int = creditRegistry.userBalance(p);
@@ -352,7 +338,7 @@ module {
       |> (
         if (not _) {
           let err = #InsufficientCredit;
-          journal.push(ownPrincipal, #withdrawalError(err));
+          log(ownPrincipal, #withdrawalError(err));
           return #err(err);
         }
       );
@@ -371,14 +357,12 @@ module {
     public func share() : StableData = (
       accountManager.share(),
       creditRegistry.share(),
-      journal.share(),
     );
 
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
       accountManager.unshare(values.0);
       creditRegistry.unshare(values.1);
-      journal.unshare(values.2);
     };
   };
 
