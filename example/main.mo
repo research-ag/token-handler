@@ -136,7 +136,6 @@ actor class Example() = self {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let result = try {
-      ignore await* assetInfo.handler.fetchFee();
       await* assetInfo.handler.notify(caller);
     } catch (err) {
       return #Err(#CallLedgerError(Error.message(err)));
