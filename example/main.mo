@@ -43,6 +43,24 @@ actor class Example() = self {
     };
   };
 
+  type DepositArgs = {
+    token : Principal;
+    amount : Nat;
+    subaccount : ?Blob;
+  };
+
+  type DepositResponse = {
+    #Ok : {
+      txid : Nat;
+      credit_inc : Nat;
+    };
+    #Err : {
+      #AmountBelowMinimum;
+      #CallLedgerError : Text;
+      #TransferError : Text;
+    };
+  };
+
   type WithdrawResult = {
     #Ok : {
       txid : Nat;
@@ -161,6 +179,28 @@ actor class Example() = self {
       };
       case (null) {
         #Err(#NotAvailable);
+      };
+    };
+  };
+
+  public shared ({ caller }) func icrcX_deposit(args : DepositArgs) : async DepositResponse {
+    assertInitialized();
+    let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
+    let res = await* assetInfo.handler.depositFromAllowance(
+      {
+        owner = caller;
+        subaccount = args.subaccount;
+      },
+      args.amount,
+    );
+    switch (res) {
+      case (#ok(credit_inc, txid)) #Ok({ txid; credit_inc });
+      case (#err err) {
+        switch (err) {
+          case (#TooLowQuantity) #Err(#AmountBelowMinimum);
+          case (#CallIcrc1LedgerError) #Err(#CallLedgerError("Call error"));
+          case (_) #Err(#CallLedgerError("Try later"));
+        };
       };
     };
   };
