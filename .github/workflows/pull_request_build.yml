@@ -1,4 +1,6 @@
 name: App build
+env:
+  dfx_version: 0.20.1
 on:
   pull_request:
     types: [synchronize, opened, reopened, ready_for_review, unlabeled]
@@ -10,6 +12,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install dfx
+        uses: dfinity/setup-dfx@main
+        with:
+          dfx-version: ${{ env.dfx_version }}
+
+      - name: Confirm dfx version
+        run: dfx --version
 
       - name: Install mops
         uses: ZenVoich/setup-mops@v1.2.0
