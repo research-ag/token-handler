@@ -235,7 +235,7 @@ do {
 
   // user1 notify again
   ledger.balance_.stage(?6).0 ();
-  assert (await* handler.notify(user1)) == ?(6, 2);
+  assert (await* handler.notify(user1)) == ?(6, 1);
   assert state(handler) == (16, 1, 2);
   assert journal.hasSize(2); // #newDeposit, #credited
 
@@ -253,13 +253,13 @@ do {
 
   // user1 notify again
   ledger.balance_.stage(?6).0 ();
-  assert (await* handler.notify(user1)) == ?(6, 3);
+  assert (await* handler.notify(user1)) == ?(6, 1);
   assert state(handler) == (6, 7, 1);
   assert journal.hasSize(2); // #newDeposit, #credited
 
   // user2 notify again
   ledger.balance_.stage(?10).0 ();
-  assert (await* handler.notify(user2)) == ?(10, 10);
+  assert (await* handler.notify(user2)) == ?(10, 5);
   assert state(handler) == (16, 7, 2);
   assert journal.hasSize(2); // #newDeposit, #credited
 

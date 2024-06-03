@@ -228,10 +228,10 @@ module {
     /// let userPrincipal = ...; // The principal of the user making the deposit
     /// let (depositDelta, credit) = await* notify(userPrincipal);
     /// ```
-    public func notify(p : Principal) : async* ?(Nat, Int) {
+    public func notify(p : Principal) : async* ?(Nat, Nat) {
       if isFrozen_ return null;
-      let ?depositDelta = await* accountManager.notify(p) else return null;
-      ?(depositDelta, creditRegistry.userBalance(p));
+      let ?result = await* accountManager.notify(p) else return null;
+      ?result;
     };
 
     /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.

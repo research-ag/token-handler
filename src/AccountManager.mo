@@ -277,27 +277,28 @@ module {
     /// Retrieves the deposit of a principal.
     public func getDeposit(p : Principal) : ?Nat = depositRegistry.getOpt(p);
 
-    func process_deposit(p : Principal, deposit : Nat, release : ?Nat -> Int) : Nat {
+    func process_deposit(p : Principal, deposit : Nat, release : ?Nat -> Int) : (Nat, Nat) {
       if (deposit <= fee(#deposit)) {
         ignore release(null);
-        return 0;
+        return (0, 0);
       };
       let delta = release(?deposit);
       if (delta < 0) freezeCallback("latestDeposit < prevDeposit on notify");
-      if (delta == 0) return 0;
+      if (delta == 0) return (0, 0);
       let inc = Int.abs(delta);
 
-      if (deposit == inc) {
-        issue(p, deposit - fee(#deposit));
-      } else {
-        issue(p, inc);
+      let creditInc : Nat = switch (deposit == inc) {
+        case true { deposit - fee(#deposit) };
+        case false { inc };
       };
-      inc;
+
+      issue(p, creditInc);
+      (inc, creditInc);
     };
 
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit if successful.
-    public func notify(p : Principal) : async* ?Nat {
+    public func notify(p : Principal) : async* ?(Nat, Nat) {
       if (notificationsOnPause_) return null;
       let ?release = depositRegistry.obtainLock(p) else return null;
 
@@ -310,11 +311,11 @@ module {
 
       if (latestDeposit < minimum(#deposit)) {
         ignore release(null);
-        return ?0;
+        return ?(0, 0);
       };
 
       // This function calls release() to release the lock
-      let inc = process_deposit(p, latestDeposit, release);
+      let (inc, creditInc) = process_deposit(p, latestDeposit, release);
 
       if (inc > 0) {
         log(p, #newDeposit(inc));
@@ -326,7 +327,7 @@ module {
         };
       };
 
-      return ?inc;
+      return ?(inc, creditInc);
     };
 
     func processAllowance(account : ICRC1.Account, amount : Nat) : async* {
