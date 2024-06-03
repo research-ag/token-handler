@@ -156,8 +156,8 @@ actor class Example() = self {
       return #Err(#CallLedgerError(Error.message(err)));
     };
     switch (result) {
-      case (?(delta, usableBalance)) {
-        #Ok({ deposit_inc = delta; credit_inc = delta });
+      case (?(deposit_inc, credit_inc)) {
+        #Ok({ deposit_inc; credit_inc });
       };
       case (null) {
         #Err(#NotAvailable);
