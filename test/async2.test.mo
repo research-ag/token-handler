@@ -1,15 +1,10 @@
 import Principal "mo:base/Principal";
 import { print } "mo:base/Debug";
-import Vec "mo:vector";
-import Time "mo:base/Time";
-import Array "mo:base/Array";
-import Iter "mo:base/Iter";
 
 import TokenHandler "../src";
 import ICRC1 "../src/ICRC1";
 import Mock "mock";
-
-type Journal = Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)>;
+import TestJournal "test_journal";
 
 let ledger = object {
   public let fee_ = Mock.Method<Nat>();
@@ -45,12 +40,6 @@ let user1 = Principal.fromBlob("1");
 let user2 = Principal.fromBlob("2");
 let user3 = Principal.fromBlob("3");
 
-func create_inc() : (Nat -> Nat, () -> Nat) {
-  var ctr = 0;
-  func inc(n : Nat) : Nat { ctr += n; ctr };
-  (inc, func() { ctr });
-};
-
 func state(handler : TokenHandler.TokenHandler) : (Nat, Nat, Nat) {
   let s = handler.state();
   (
@@ -60,17 +49,18 @@ func state(handler : TokenHandler.TokenHandler) : (Nat, Nat, Nat) {
   );
 };
 
-func createHandler() : (TokenHandler.TokenHandler, Journal) {
-  let journal : Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)> = Vec.new();
-  TokenHandler.TokenHandler(
-    ledger,
-    anon_p,
-    0,
-    false,
-    func(logInfo : (Principal, TokenHandler.LogEvent)) {
-      Vec.add(journal, (Time.now(), logInfo.0, logInfo.1));
-    },
-  ) |> (_, journal);
+func createHandler() : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
+  TestJournal.TestJournal()
+  |> (
+    TokenHandler.TokenHandler(
+      ledger,
+      anon_p,
+      0,
+      false,
+      _.log,
+    ),
+    _,
+  );
 };
 
 module Debug {
@@ -79,22 +69,12 @@ module Debug {
       debug_show handler.state()
     );
   };
-  public func journal(journal : Journal, startFrom : Nat) {
-    print(
-      debug_show (
-        Vec.toArray(journal)
-        |> Array.slice(_, startFrom, _.size())
-        |> Iter.toArray(_)
-      )
-    );
-  };
 };
 
 do {
   print("new test: change fee plus notify");
   // fresh handler
   let (handler, journal) = createHandler();
-  let (inc, _) = create_inc();
   // stage a response
   let (release, status) = ledger.fee_.stage(?5);
   // trigger call
@@ -106,20 +86,20 @@ do {
   // release response
   release();
   assert (await fut1) == ?5;
-  assert Vec.size(journal) == inc(5); // #minimumUpdated, #depositFeeUpdated, #withdrawalFeeUpdated, #minimumWithdrawalUpdated, #feeUpdated
+  assert journal.hasSize(5); // #minimumUpdated, #depositFeeUpdated, #withdrawalFeeUpdated, #minimumWithdrawalUpdated, #feeUpdated
 
   // stage a response and release it immediately
   ledger.balance_.stage(?20).0 ();
   assert (await* handler.notify(user1)) == ?(20, 15); // (deposit, credit)
-  assert Vec.size(journal) == inc(2); // #issued, #newDeposit
+  assert journal.hasSize(2); // #issued, #newDeposit
   assert state(handler) == (20, 0, 1);
   ledger.transfer_.stage(null).0 (); // error response
   await* handler.trigger(1);
-  assert Vec.size(journal) == inc(3); // #consolidationError, #issued, #issued
+  assert journal.hasSize(3); // #consolidationError, #issued, #issued
   assert state(handler) == (20, 0, 1);
   ledger.transfer_.stage(?(#Ok 0)).0 ();
   await* handler.trigger(1);
-  assert Vec.size(journal) == inc(1); // #consolidated
+  assert journal.hasSize(1); // #consolidated
   assert state(handler) == (0, 15, 0);
 };
 
@@ -129,20 +109,19 @@ do {
   assert ledger.isEmpty();
   // fresh handler
   let (handler, journal) = createHandler();
-  let (inc, _) = create_inc();
   // giver user1 credit and put funds into the consolidated balance
   ledger.balance_.stage(?20).0 ();
   ledger.transfer_.stage(?(#Ok 0)).0 ();
   assert (await* handler.notify(user1)) == ?(20, 20); // (deposit, credit)
-  assert Vec.size(journal) == inc(2); // #issued, #newDeposit
+  assert journal.hasSize(2); // #issued, #newDeposit
   await* handler.trigger(1);
-  assert Vec.size(journal) == inc(1); // #consolidated
+  assert journal.hasSize(1); // #consolidated
   // stage a response
   let (release, state) = ledger.transfer_.stage(?(#Err(#BadFee { expected_fee = 10 })));
   assert handler.fee(#deposit) == 0;
   // transfer 20 credits from user to pool
   assert handler.debitUser(user1, 20);
-  assert Vec.size(journal) == inc(1); // debited
+  assert journal.hasSize(1); // debited
   // start withdrawal and move it to background task
   var has_started = false;
   let fut = async {
@@ -175,7 +154,7 @@ do {
   // the continuation runs to the end of the withdraw function
   // let's verify
   assert handler.state().flow.withdrawn == 0;
-  assert Vec.size(journal) == inc(8); // burned, feeUpdated, depositMinimumUpdated, withdrawalMinimumUpdated, depositFeeUpdated, withdrawalFeeUpdated, withdrawalError, , issued
+  assert journal.hasSize(8); // burned, feeUpdated, depositMinimumUpdated, withdrawalMinimumUpdated, depositFeeUpdated, withdrawalFeeUpdated, withdrawalError, , issued
   // we do not have to await fut anymore, but we can:
   assert (await fut) == #err(#TooLowQuantity);
 };
@@ -186,17 +165,16 @@ do {
   assert ledger.isEmpty();
   // fresh handler
   let (handler, journal) = createHandler();
-  let (inc, _) = create_inc();
   // give user1 20 credits
   handler.issue_(#user user1, 20);
-  assert Vec.size(journal) == inc(1); // #issued
+  assert journal.hasSize(1); // #issued
   // stage two responses
   let (release, state) = ledger.transfer_.stage(?(#Err(#BadFee { expected_fee = 10 })));
   let (release2, state2) = ledger.transfer_.stage(?(#Ok 0));
   assert handler.fee(#deposit) == 0;
   // transfer 20 credits from user to pool
   assert handler.debitUser(user1, 20);
-  assert Vec.size(journal) == inc(1); // debited
+  assert journal.hasSize(1); // debited
   // start withdrawal and move it to background task
   let fut = async {
     await* handler.withdrawFromPool({ owner = user1; subaccount = null }, 11);
@@ -208,8 +186,8 @@ do {
   // now the continuation in the withdraw call has executed to the second commit point
   // let's verify
   assert handler.fee(#deposit) == 10; // #BadFee has been processed
-  //assert Vec.size(journal) == inc(5); // feeUpdated, #depositFeeUpdated, #withdrawalFeeUpdated, depositMinimumUpdated, withdrawalMinimumUpdated
-  assert Vec.size(journal) == inc(6); // burned, feeUpdated, depositMinimumUpdated, withdrawalMinimumUpdated, depositFeeUpdated, withdrawalFeeUpdated
+  //assert journal.hasSize(5); // feeUpdated, #depositFeeUpdated, #withdrawalFeeUpdated, depositMinimumUpdated, withdrawalMinimumUpdated
+  assert journal.hasSize(6); // burned, feeUpdated, depositMinimumUpdated, withdrawalMinimumUpdated, depositFeeUpdated, withdrawalFeeUpdated
   // now everything is halted until we release the second response
   // we wait for the second response to be processed
   release2();
@@ -217,7 +195,7 @@ do {
   await async {};
   // now the second contination has executed and withdraw has run to the end
   // let's verify
-  assert Vec.size(journal) == inc(1); // #withdraw
+  assert journal.hasSize(1); // #withdraw
   // we do not have to await fut anymore, but we can:
   assert (await fut) == #ok(0, 1);
 };
@@ -226,25 +204,24 @@ do {
   print("new test: multiple consolidations trigger");
 
   let (handler, journal) = createHandler();
-  let (inc, _) = create_inc();
-
+  
   // update fee first time
   ledger.fee_.stage(?5).0 ();
   ignore await* handler.fetchFee();
   assert handler.fee(#deposit) == 5;
-  assert Vec.size(journal) == inc(5); // #feeUpdated, #depositFeeUpdated, #withdrawalFeeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
+  assert journal.hasSize(5); // #feeUpdated, #depositFeeUpdated, #withdrawalFeeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
 
   // user1 notify with balance > fee
   ledger.balance_.stage(?6).0 ();
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state(handler) == (6, 0, 1);
-  assert Vec.size(journal) == inc(2); // #newDeposit, #credited
+  assert journal.hasSize(2); // #newDeposit, #credited
 
   // user2 notify with balance > fee
   ledger.balance_.stage(?10).0 ();
   assert (await* handler.notify(user2)) == ?(10, 5);
   assert state(handler) == (16, 0, 2);
-  assert Vec.size(journal) == inc(2); // #newDeposit, #credited
+  assert journal.hasSize(2); // #newDeposit, #credited
 
   // trigger only 1 consolidation
   do {
@@ -253,14 +230,14 @@ do {
     await* handler.trigger(1);
     assert status() == #ready;
     assert state(handler) == (10, 1, 1); // user1 funds consolidated
-    assert Vec.size(journal) == inc(1); // #consolidated
+    assert journal.hasSize(1); // #consolidated
   };
 
   // user1 notify again
   ledger.balance_.stage(?6).0 ();
   assert (await* handler.notify(user1)) == ?(6, 2);
   assert state(handler) == (16, 1, 2);
-  assert Vec.size(journal) == inc(2); // #newDeposit, #credited
+  assert journal.hasSize(2); // #newDeposit, #credited
 
   // trigger consolidation of all the deposits
   // n >= deposit_number
@@ -271,26 +248,26 @@ do {
     await* handler.trigger(10);
     assert (status1(), status2()) == (#ready, #ready);
     assert state(handler) == (0, 7, 0); // all deposits consolidated
-    assert Vec.size(journal) == inc(2); // #consolidated, #consolidated
+    assert journal.hasSize(2); // #consolidated, #consolidated
   };
 
   // user1 notify again
   ledger.balance_.stage(?6).0 ();
   assert (await* handler.notify(user1)) == ?(6, 3);
   assert state(handler) == (6, 7, 1);
-  assert Vec.size(journal) == inc(2); // #newDeposit, #credited
+  assert journal.hasSize(2); // #newDeposit, #credited
 
   // user2 notify again
   ledger.balance_.stage(?10).0 ();
   assert (await* handler.notify(user2)) == ?(10, 10);
   assert state(handler) == (16, 7, 2);
-  assert Vec.size(journal) == inc(2); // #newDeposit, #credited
+  assert journal.hasSize(2); // #newDeposit, #credited
 
   // user3 notify with balance > fee
   ledger.balance_.stage(?8).0 ();
   assert (await* handler.notify(user3)) == ?(8, 3);
   assert state(handler) == (24, 7, 3);
-  assert Vec.size(journal) == inc(2); // #newDeposit, #credited
+  assert journal.hasSize(2); // #newDeposit, #credited
 
   // trigger consolidation of all the deposits (n >= deposit_number)
   // with error calling the ledger on the 2nd deposit
@@ -303,7 +280,7 @@ do {
     await* handler.trigger(10);
     assert (status1(), status2(), status3()) == (#ready, #ready, #staged);
     assert state(handler) == (18, 8, 2); // only user1 deposit consolidated
-    assert Vec.size(journal) == inc(4); // #consolidated, #consolidationError, #debited, #credited
+    assert journal.hasSize(4); // #consolidated, #consolidationError, #debited, #credited
   };
 
   handler.assertIntegrity();
