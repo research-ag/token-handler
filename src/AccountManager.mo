@@ -59,7 +59,7 @@ module {
 
   public type WithdrawResponse = Result.Result<WithdrawResult, WithdrawError>;
 
-  public type DepositFromAllowanceResult = (credited : Nat);
+  public type DepositFromAllowanceResult = (credited : Nat, txid : Nat);
 
   public type DepositFromAllowanceError = ICRC1.TransferFromError or {
     #CallIcrc1LedgerError;
@@ -369,24 +369,24 @@ module {
       let originalCredit : Nat = amount - fee(#deposit);
 
       switch (transferResult) {
-        case (#Ok _) {
+        case (#Ok txid) {
           log(p, #consolidated({ deducted = amount; credited = originalCredit }));
           log(p, #newDeposit(originalCredit));
           totalConsolidated_ += originalCredit;
           issue(p, originalCredit);
-          return #ok(originalCredit);
+          return #ok(originalCredit, txid);
         };
         case (#Err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
           let originalCredit_2 : Nat = Int.abs(Int.min(originalCredit, amount - fee(#deposit)));
           let transferResult = await* processAllowance(account, amount);
           switch (transferResult) {
-            case (#Ok _) {
+            case (#Ok txid) {
               log(p, #consolidated({ deducted = amount; credited = originalCredit_2 }));
               log(p, #newDeposit(originalCredit_2));
               totalConsolidated_ += originalCredit_2;
               issue(p, originalCredit_2);
-              return #ok(originalCredit_2);
+              return #ok(originalCredit_2, txid);
             };
             case (#Err err) {
               log(p, #consolidationError(err));
