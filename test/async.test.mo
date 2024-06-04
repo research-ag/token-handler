@@ -872,7 +872,7 @@ do {
 
   // deposit from allowance >= amount
   await ledger.mock.set_transfer_from_res([#Ok 42]);
-  assert (await* handler.depositFromAllowance(user1_account, 8)) == #ok(3);
+  assert (await* handler.depositFromAllowance(user1_account, 8)) == #ok(3, 42);
   assert handler.userCredit(user1) == 3;
   assert state(handler) == (0, 3, 0);
   assert journal.hasSize(3); // #consolidated, #newDeposit, #issued
@@ -896,7 +896,7 @@ do {
   await ledger.mock.set_fee(6);
   await ledger.mock.set_transfer_from_res([#Err(#BadFee { expected_fee = 6 }), #Ok 42]);
   await ledger.mock.release_transfer_from();
-  assert (await f1) == #ok(2);
+  assert (await f1) == #ok(2, 42);
   assert handler.userCredit(user1) == 5;
   assert state(handler) == (0, 5, 0);
   assert transfer_from_count + 2 == (await ledger.mock.transfer_from_count());
@@ -931,7 +931,7 @@ do {
   await ledger.mock.set_fee(8);
   await ledger.mock.set_transfer_from_res([#Err(#BadFee { expected_fee = 8 }), #Ok 42]);
   await ledger.mock.release_transfer_from();
-  assert (await f3) == #ok(1); // amount - old_fee
+  assert (await f3) == #ok(1, 42); // amount - old_fee
   assert handler.userCredit(user1) == 6;
   assert state(handler) == (0, 6, 0);
   assert transfer_from_count + 2 == (await ledger.mock.transfer_from_count());
