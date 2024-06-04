@@ -59,7 +59,7 @@ module {
 
   public type WithdrawResponse = Result.Result<WithdrawResult, WithdrawError>;
 
-  public type DepositFromAllowanceResult = (credited : Nat);
+  public type DepositFromAllowanceResult = (credited : Nat, txid : Nat);
 
   public type DepositFromAllowanceError = ICRC1.TransferFromError or {
     #CallIcrc1LedgerError;
@@ -277,27 +277,28 @@ module {
     /// Retrieves the deposit of a principal.
     public func getDeposit(p : Principal) : ?Nat = depositRegistry.getOpt(p);
 
-    func process_deposit(p : Principal, deposit : Nat, release : ?Nat -> Int) : Nat {
+    func process_deposit(p : Principal, deposit : Nat, release : ?Nat -> Int) : (Nat, Nat) {
       if (deposit <= fee(#deposit)) {
         ignore release(null);
-        return 0;
+        return (0, 0);
       };
       let delta = release(?deposit);
       if (delta < 0) freezeCallback("latestDeposit < prevDeposit on notify");
-      if (delta == 0) return 0;
+      if (delta == 0) return (0, 0);
       let inc = Int.abs(delta);
 
-      if (deposit == inc) {
-        issue(p, deposit - fee(#deposit));
-      } else {
-        issue(p, inc);
+      let creditInc : Nat = switch (deposit == inc) {
+        case true { deposit - fee(#deposit) };
+        case false { inc };
       };
-      inc;
+
+      issue(p, creditInc);
+      (inc, creditInc);
     };
 
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit if successful.
-    public func notify(p : Principal) : async* ?Nat {
+    public func notify(p : Principal) : async* ?(Nat, Nat) {
       if (notificationsOnPause_) return null;
       let ?release = depositRegistry.obtainLock(p) else return null;
 
@@ -310,11 +311,11 @@ module {
 
       if (latestDeposit < minimum(#deposit)) {
         ignore release(null);
-        return ?0;
+        return ?(0, 0);
       };
 
       // This function calls release() to release the lock
-      let inc = process_deposit(p, latestDeposit, release);
+      let (inc, creditInc) = process_deposit(p, latestDeposit, release);
 
       if (inc > 0) {
         log(p, #newDeposit(inc));
@@ -326,10 +327,10 @@ module {
         };
       };
 
-      return ?inc;
+      return ?(inc, creditInc);
     };
 
-    func processDepositTransfer(account : ICRC1.Account, amount : Nat) : async* {
+    func processAllowance(account : ICRC1.Account, amount : Nat) : async* {
       #Ok : Nat;
       #Err : ICRC1.TransferFromError or {
         #CallIcrc1LedgerError;
@@ -361,31 +362,31 @@ module {
     public func depositFromAllowance(account : ICRC1.Account, amount : Nat) : async* DepositFromAllowanceResponse {
       if (amount < minimum(#deposit)) return #err(#TooLowQuantity);
 
-      let transferResult = await* processDepositTransfer(account, amount);
+      let transferResult = await* processAllowance(account, amount);
 
       let p = account.owner;
 
       let originalCredit : Nat = amount - fee(#deposit);
 
       switch (transferResult) {
-        case (#Ok _) {
+        case (#Ok txid) {
           log(p, #consolidated({ deducted = amount; credited = originalCredit }));
           log(p, #newDeposit(originalCredit));
           totalConsolidated_ += originalCredit;
           issue(p, originalCredit);
-          return #ok(originalCredit);
+          return #ok(originalCredit, txid);
         };
         case (#Err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
           let originalCredit_2 : Nat = Int.abs(Int.min(originalCredit, amount - fee(#deposit)));
-          let transferResult = await* processDepositTransfer(account, amount);
+          let transferResult = await* processAllowance(account, amount);
           switch (transferResult) {
-            case (#Ok _) {
+            case (#Ok txid) {
               log(p, #consolidated({ deducted = amount; credited = originalCredit_2 }));
               log(p, #newDeposit(originalCredit_2));
               totalConsolidated_ += originalCredit_2;
               issue(p, originalCredit_2);
-              return #ok(originalCredit_2);
+              return #ok(originalCredit_2, txid);
             };
             case (#Err err) {
               log(p, #consolidationError(err));

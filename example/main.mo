@@ -6,13 +6,15 @@ import Principal "mo:base/Principal";
 import Text "mo:base/Text";
 import Timer "mo:base/Timer";
 import Vec "mo:vector";
+import Time "mo:base/Time";
 
-import ICRC1 "../src/ICRC1";
 import TokenHandler "../src";
 
 actor class Example() = self {
-
+  stable var journalData : Journal = Vec.new();
   stable var assetsData : Vec.Vector<StableAssetInfo> = Vec.new();
+
+  type Journal = Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)>;
 
   type AssetInfo = {
     ledgerPrincipal : Principal;
@@ -37,7 +39,25 @@ actor class Example() = self {
     };
     #Err : {
       #CallLedgerError : Text;
-      #NotAvailable : Text;
+      #NotAvailable;
+    };
+  };
+
+  type DepositArgs = {
+    token : Principal;
+    amount : Nat;
+    subaccount : ?Blob;
+  };
+
+  type DepositResponse = {
+    #Ok : {
+      txid : Nat;
+      credit_inc : Nat;
+    };
+    #Err : {
+      #AmountBelowMinimum;
+      #CallLedgerError : Text;
+      #TransferError : Text;
     };
   };
 
@@ -53,30 +73,35 @@ actor class Example() = self {
     };
   };
 
-  let JOURNAL_SIZE = 1024;
-
   var initialized : Bool = false;
   var assets : Vec.Vector<AssetInfo> = Vec.new();
+  var journal : Journal = Vec.new();
 
   private func assertInitialized() = if (not initialized) {
     Prim.trap("Not initialized");
   };
 
+  private func createTokenHandler(ledgerPrincipal : Principal) : TokenHandler.TokenHandler {
+    TokenHandler.TokenHandler(
+      TokenHandler.buildLedgerApi(ledgerPrincipal),
+      Principal.fromActor(self),
+      0,
+      true,
+      func(logInfo : (Principal, TokenHandler.LogEvent)) {
+        Vec.add(journal, (Time.now(), logInfo.0, logInfo.1));
+      },
+    );
+  };
+
   public shared func init() : async () {
     assert not initialized;
+    journal := journalData;
     assets := Vec.map<StableAssetInfo, AssetInfo>(
       assetsData,
       func(x) {
-        let r = (actor (Principal.toText(x.ledgerPrincipal)) : ICRC1.ICRC1Ledger)
-        |> {
-          balance_of = _.icrc1_balance_of;
-          fee = _.icrc1_fee;
-          transfer = _.icrc1_transfer;
-          transfer_from = _.icrc2_transfer_from;
-        }
-        |> {
+        let r = {
           ledgerPrincipal = x.ledgerPrincipal;
-          handler = TokenHandler.TokenHandler(_, Principal.fromActor(self), JOURNAL_SIZE, 0, true);
+          handler = createTokenHandler(x.ledgerPrincipal);
         };
         r.handler.unshare(x.handler);
         r;
@@ -112,10 +137,8 @@ actor class Example() = self {
 
   public shared query ({ caller }) func icrcX_credit(token : Principal) : async Int {
     assertInitialized();
-    switch (getAssetInfo(token)) {
-      case (?info) info.handler.userCredit(caller);
-      case (_) 0;
-    };
+    let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
+    assetInfo.handler.userCredit(caller);
   };
 
   public shared query ({ caller }) func icrcX_all_credits() : async [(Principal, Int)] {
@@ -135,43 +158,49 @@ actor class Example() = self {
     #Err : { #NotAvailable : Text };
   } {
     assertInitialized();
-    (
-      switch (getAssetInfo(token)) {
-        case (?aid) aid;
-        case (_) return #Err(#NotAvailable("Unknown token"));
-      }
-    )
-    |> _.handler.trackedDeposit(caller)
-    |> (
-      switch (_) {
-        case (?d) #Ok(d);
-        case (null) #Err(#NotAvailable("Unknown caller"));
-      }
-    );
+    let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
+    switch (assetInfo.handler.trackedDeposit(caller)) {
+      case (?d) #Ok(d);
+      case (null) #Err(#NotAvailable("Unknown caller"));
+    };
   };
 
   public shared ({ caller }) func icrcX_notify(args : { token : Principal }) : async NotifyResult {
     assertInitialized();
-    let assetInfo = switch (getAssetInfo(args.token)) {
-      case (?aid) aid;
-      case (_) return #Err(#NotAvailable("Unknown token"));
-    };
+    let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let result = try {
-      ignore await* assetInfo.handler.fetchFee();
       await* assetInfo.handler.notify(caller);
     } catch (err) {
       return #Err(#CallLedgerError(Error.message(err)));
     };
     switch (result) {
-      case (?(delta, usableBalance)) {
-        await* assetInfo.handler.trigger(1);
-        #Ok({ deposit_inc = delta; credit_inc = delta });
+      case (?(deposit_inc, credit_inc)) {
+        #Ok({ deposit_inc; credit_inc });
       };
       case (null) {
-        #Ok({
-          deposit_inc = 0;
-          credit_inc = 0;
-        });
+        #Err(#NotAvailable);
+      };
+    };
+  };
+
+  public shared ({ caller }) func icrcX_deposit(args : DepositArgs) : async DepositResponse {
+    assertInitialized();
+    let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
+    let res = await* assetInfo.handler.depositFromAllowance(
+      {
+        owner = caller;
+        subaccount = args.subaccount;
+      },
+      args.amount,
+    );
+    switch (res) {
+      case (#ok(credit_inc, txid)) #Ok({ txid; credit_inc });
+      case (#err err) {
+        switch (err) {
+          case (#TooLowQuantity) #Err(#AmountBelowMinimum);
+          case (#CallIcrc1LedgerError) #Err(#CallLedgerError("Call error"));
+          case (_) #Err(#CallLedgerError("Try later"));
+        };
       };
     };
   };
@@ -228,22 +257,16 @@ actor class Example() = self {
       if (Principal.equal(ledger, assetInfo.ledgerPrincipal)) return #Err(#AlreadyRegistered(i));
     };
     let id = Vec.size(assets);
-    (actor (Principal.toText(ledger)) : ICRC1.ICRC1Ledger)
-    |> {
-      balance_of = _.icrc1_balance_of;
-      fee = _.icrc1_fee;
-      transfer = _.icrc1_transfer;
-      transfer_from = _.icrc2_transfer_from;
-    }
-    |> {
+    {
       ledgerPrincipal = ledger;
-      handler = TokenHandler.TokenHandler(_, Principal.fromActor(self), JOURNAL_SIZE, 0, true);
+      handler = createTokenHandler(ledger);
     }
     |> Vec.add<AssetInfo>(assets, _);
     #Ok(id);
   };
 
   system func preupgrade() {
+    journalData := journal;
     assetsData := Vec.map<AssetInfo, StableAssetInfo>(
       assets,
       func(x) = {
