@@ -113,7 +113,7 @@ actor class Example() = self {
 
   public shared query func principalToSubaccount(p : Principal) : async ?Blob = async ?TokenHandler.toSubaccount(p);
 
-  public shared query func icrcX_supported_tokens() : async [Principal] {
+  public shared query func icrc84_supported_tokens() : async [Principal] {
     assertInitialized();
     Array.tabulate<Principal>(
       Vec.size(assets),
@@ -121,7 +121,7 @@ actor class Example() = self {
     );
   };
 
-  public shared query func icrcX_token_info(token : Principal) : async TokenInfo {
+  public shared query func icrc84_token_info(token : Principal) : async TokenInfo {
     assertInitialized();
     for ((assetInfo, i) in Vec.items(assets)) {
       if (Principal.equal(assetInfo.ledgerPrincipal, token)) {
@@ -136,13 +136,13 @@ actor class Example() = self {
     throw Error.reject("Unknown token");
   };
 
-  public shared query ({ caller }) func icrcX_credit(token : Principal) : async Int {
+  public shared query ({ caller }) func icrc84_credit(token : Principal) : async Int {
     assertInitialized();
     let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
     assetInfo.handler.userCredit(caller);
   };
 
-  public shared query ({ caller }) func icrcX_all_credits() : async [(Principal, Int)] {
+  public shared query ({ caller }) func icrc84_all_credits() : async [(Principal, Int)] {
     assertInitialized();
     let res : Vec.Vector<(Principal, Int)> = Vec.new();
     for (assetInfo in Vec.vals(assets)) {
@@ -154,7 +154,7 @@ actor class Example() = self {
     Vec.toArray(res);
   };
 
-  public shared query ({ caller }) func icrcX_trackedDeposit(token : Principal) : async {
+  public shared query ({ caller }) func icrc84_trackedDeposit(token : Principal) : async {
     #Ok : Nat;
     #Err : { #NotAvailable : Text };
   } {
@@ -166,7 +166,7 @@ actor class Example() = self {
     };
   };
 
-  public shared ({ caller }) func icrcX_notify(args : { token : Principal }) : async NotifyResult {
+  public shared ({ caller }) func icrc84_notify(args : { token : Principal }) : async NotifyResult {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let result = try {
@@ -184,7 +184,7 @@ actor class Example() = self {
     };
   };
 
-  public shared ({ caller }) func icrcX_deposit(args : DepositArgs) : async DepositResponse {
+  public shared ({ caller }) func icrc84_deposit(args : DepositArgs) : async DepositResponse {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let res = await* assetInfo.handler.depositFromAllowance(
@@ -206,7 +206,7 @@ actor class Example() = self {
     };
   };
 
-  public shared ({ caller }) func icrcX_withdraw(args : { to_subaccount : ?Blob; amount : Nat; token : Principal }) : async WithdrawResult {
+  public shared ({ caller }) func icrc84_withdraw(args : { to_subaccount : ?Blob; amount : Nat; token : Principal }) : async WithdrawResult {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
 

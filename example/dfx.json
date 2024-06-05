@@ -1,6 +1,6 @@
 {
   "canisters": {
-    "icrcX_example": {
+    "icrc84_example": {
       "main": "./main.mo",
       "type": "motoko"
     }
