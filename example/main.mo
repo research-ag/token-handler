@@ -38,8 +38,8 @@ actor class Example() = self {
       credit_inc : Nat;
     };
     #Err : {
-      #CallLedgerError : Text;
-      #NotAvailable;
+      #CallLedgerError : { message : Text };
+      #NotAvailable : {};
     };
   };
 
@@ -55,9 +55,9 @@ actor class Example() = self {
       credit_inc : Nat;
     };
     #Err : {
-      #AmountBelowMinimum;
-      #CallLedgerError : Text;
-      #TransferError : Text;
+      #AmountBelowMinimum : {};
+      #CallLedgerError : { message : Text };
+      #TransferError : { message : Text };
     };
   };
 
@@ -67,9 +67,9 @@ actor class Example() = self {
       amount : Nat;
     };
     #Err : {
-      #CallLedgerError : Text;
-      #InsufficientCredit;
-      #AmountBelowMinimum;
+      #CallLedgerError : { message : Text };
+      #InsufficientCredit : {};
+      #AmountBelowMinimum : {};
     };
   };
 
@@ -171,14 +171,14 @@ actor class Example() = self {
     let result = try {
       await* assetInfo.handler.notify(caller);
     } catch (err) {
-      return #Err(#CallLedgerError(Error.message(err)));
+      return #Err(#CallLedgerError({ message = Error.message(err) }));
     };
     switch (result) {
       case (?(deposit_inc, credit_inc)) {
         #Ok({ deposit_inc; credit_inc });
       };
       case (null) {
-        #Err(#NotAvailable);
+        #Err(#NotAvailable({}));
       };
     };
   };
@@ -197,9 +197,9 @@ actor class Example() = self {
       case (#ok(credit_inc, txid)) #Ok({ txid; credit_inc });
       case (#err err) {
         switch (err) {
-          case (#TooLowQuantity) #Err(#AmountBelowMinimum);
-          case (#CallIcrc1LedgerError) #Err(#CallLedgerError("Call error"));
-          case (_) #Err(#CallLedgerError("Try later"));
+          case (#TooLowQuantity) #Err(#AmountBelowMinimum({}));
+          case (#CallIcrc1LedgerError) #Err(#CallLedgerError({ message = "Call error" }));
+          case (_) #Err(#CallLedgerError({ message = "Try later" }));
         };
       };
     };
@@ -213,10 +213,10 @@ actor class Example() = self {
       case (#ok(txid, amount)) #Ok({ txid; amount });
       case (#err err) {
         switch (err) {
-          case (#InsufficientCredit) #Err(#InsufficientCredit);
-          case (#TooLowQuantity) #Err(#AmountBelowMinimum);
-          case (#CallIcrc1LedgerError) #Err(#CallLedgerError("Call error"));
-          case (_) #Err(#CallLedgerError("Try later"));
+          case (#InsufficientCredit) #Err(#InsufficientCredit({}));
+          case (#TooLowQuantity) #Err(#AmountBelowMinimum({}));
+          case (#CallIcrc1LedgerError) #Err(#CallLedgerError({ message = "Call error" }));
+          case (_) #Err(#CallLedgerError({ message = "Try later" }));
         };
       };
     };
