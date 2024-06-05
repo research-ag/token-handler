@@ -82,15 +82,15 @@ actor class Example() = self {
   };
 
   private func createTokenHandler(ledgerPrincipal : Principal) : TokenHandler.TokenHandler {
-    TokenHandler.TokenHandler(
-      TokenHandler.buildLedgerApi(ledgerPrincipal),
-      Principal.fromActor(self),
-      0,
-      true,
-      func(logInfo : (Principal, TokenHandler.LogEvent)) {
-        Vec.add(journal, (Time.now(), logInfo.0, logInfo.1));
-      },
-    );
+    TokenHandler.TokenHandler({
+      ledgerApi = TokenHandler.buildLedgerApi(ledgerPrincipal);
+      ownPrincipal = Principal.fromActor(self);
+      initialFee = 0;
+      triggerOnNotifications = true;
+      log = func(p : Principal, event : TokenHandler.LogEvent) {
+        Vec.add(journal, (Time.now(), p, event));
+      };
+    });
   };
 
   public shared func init() : async () {

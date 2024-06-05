@@ -52,13 +52,13 @@ func state(handler : TokenHandler.TokenHandler) : (Nat, Nat, Nat) {
 func createHandler() : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
   TestJournal.TestJournal()
   |> (
-    TokenHandler.TokenHandler(
-      ledger,
-      anon_p,
-      0,
-      false,
-      _.log,
-    ),
+    TokenHandler.TokenHandler({
+      ledgerApi = ledger;
+      ownPrincipal = anon_p;
+      initialFee = 0;
+      triggerOnNotifications = false;
+      log = _.log;
+    }),
     _,
   );
 };
@@ -204,7 +204,7 @@ do {
   print("new test: multiple consolidations trigger");
 
   let (handler, journal) = createHandler();
-  
+
   // update fee first time
   ledger.fee_.stage(?5).0 ();
   ignore await* handler.fetchFee();
