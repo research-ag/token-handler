@@ -7,6 +7,7 @@ import Text "mo:base/Text";
 import Timer "mo:base/Timer";
 import Vec "mo:vector";
 import Time "mo:base/Time";
+import Blob "mo:base/Blob";
 
 import TokenHandler "../src";
 
@@ -208,6 +209,15 @@ actor class Example() = self {
   public shared ({ caller }) func icrcX_withdraw(args : { to_subaccount : ?Blob; amount : Nat; token : Principal }) : async WithdrawResult {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
+
+    switch (args.to_subaccount) {
+      case (?to_subaccount) {
+        let bytes = Blob.toArray(to_subaccount);
+        if (bytes.size() != 32) throw Error.reject("Invalid subaccount");
+      };
+      case (null) {};
+    };
+
     let res = await* assetInfo.handler.withdrawFromCredit(caller, { owner = caller; subaccount = args.to_subaccount }, args.amount);
     switch (res) {
       case (#ok(txid, amount)) #Ok({ txid; amount });
