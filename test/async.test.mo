@@ -35,13 +35,13 @@ func state(handler : TokenHandler.TokenHandler) : (Nat, Nat, Nat) {
 func createHandler(triggerOnNotifications : Bool) : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
   TestJournal.TestJournal()
   |> (
-    TokenHandler.TokenHandler(
-      ledger,
-      anon_p,
-      0,
-      triggerOnNotifications,
-      _.log,
-    ),
+    TokenHandler.TokenHandler({
+      ledgerApi = ledger;
+      ownPrincipal = anon_p;
+      initialFee = 0;
+      triggerOnNotifications;
+      log = _.log;
+    }),
     _,
   );
 };
