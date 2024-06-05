@@ -227,7 +227,7 @@ actor class Example() = self {
     #seconds 60,
     func() : async () {
       for (asset in Vec.vals(assets)) {
-        await* asset.handler.trigger(1);
+        await* asset.handler.trigger(10);
       };
     },
   );
