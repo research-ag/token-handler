@@ -37,6 +37,7 @@ actor class Example() = self {
     #Ok : {
       deposit_inc : Nat;
       credit_inc : Nat;
+      credit : Int;
     };
     #Err : {
       #CallLedgerError : { message : Text };
@@ -54,6 +55,7 @@ actor class Example() = self {
     #Ok : {
       txid : Nat;
       credit_inc : Nat;
+      credit : Int;
     };
     #Err : {
       #AmountBelowMinimum : {};
@@ -176,7 +178,11 @@ actor class Example() = self {
     };
     switch (result) {
       case (?(deposit_inc, credit_inc)) {
-        #Ok({ deposit_inc; credit_inc });
+        #Ok({
+          deposit_inc;
+          credit_inc;
+          credit = assetInfo.handler.userCredit(caller);
+        });
       };
       case (null) {
         #Err(#NotAvailable({}));
@@ -195,7 +201,11 @@ actor class Example() = self {
       args.amount,
     );
     switch (res) {
-      case (#ok(credit_inc, txid)) #Ok({ txid; credit_inc });
+      case (#ok(credit_inc, txid)) #Ok({
+        txid;
+        credit_inc;
+        credit = assetInfo.handler.userCredit(caller);
+      });
       case (#err err) {
         switch (err) {
           case (#TooLowQuantity) #Err(#AmountBelowMinimum({}));
