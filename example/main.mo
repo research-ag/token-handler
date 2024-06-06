@@ -7,6 +7,7 @@ import Text "mo:base/Text";
 import Timer "mo:base/Timer";
 import Vec "mo:vector";
 import Time "mo:base/Time";
+import Blob "mo:base/Blob";
 
 import TokenHandler "../src";
 
@@ -36,10 +37,11 @@ actor class Example() = self {
     #Ok : {
       deposit_inc : Nat;
       credit_inc : Nat;
+      credit : Int;
     };
     #Err : {
-      #CallLedgerError : Text;
-      #NotAvailable;
+      #CallLedgerError : { message : Text };
+      #NotAvailable : {};
     };
   };
 
@@ -53,11 +55,12 @@ actor class Example() = self {
     #Ok : {
       txid : Nat;
       credit_inc : Nat;
+      credit : Int;
     };
     #Err : {
-      #AmountBelowMinimum;
-      #CallLedgerError : Text;
-      #TransferError : Text;
+      #AmountBelowMinimum : {};
+      #CallLedgerError : { message : Text };
+      #TransferError : { message : Text };
     };
   };
 
@@ -67,9 +70,9 @@ actor class Example() = self {
       amount : Nat;
     };
     #Err : {
-      #CallLedgerError : Text;
-      #InsufficientCredit;
-      #AmountBelowMinimum;
+      #CallLedgerError : { message : Text };
+      #InsufficientCredit : {};
+      #AmountBelowMinimum : {};
     };
   };
 
@@ -82,15 +85,15 @@ actor class Example() = self {
   };
 
   private func createTokenHandler(ledgerPrincipal : Principal) : TokenHandler.TokenHandler {
-    TokenHandler.TokenHandler(
-      TokenHandler.buildLedgerApi(ledgerPrincipal),
-      Principal.fromActor(self),
-      0,
-      true,
-      func(logInfo : (Principal, TokenHandler.LogEvent)) {
-        Vec.add(journal, (Time.now(), logInfo.0, logInfo.1));
-      },
-    );
+    TokenHandler.TokenHandler({
+      ledgerApi = TokenHandler.buildLedgerApi(ledgerPrincipal);
+      ownPrincipal = Principal.fromActor(self);
+      initialFee = 0;
+      triggerOnNotifications = true;
+      log = func(p : Principal, event : TokenHandler.LogEvent) {
+        Vec.add(journal, (Time.now(), p, event));
+      };
+    });
   };
 
   public shared func init() : async () {
@@ -112,7 +115,7 @@ actor class Example() = self {
 
   public shared query func principalToSubaccount(p : Principal) : async ?Blob = async ?TokenHandler.toSubaccount(p);
 
-  public shared query func icrcX_supported_tokens() : async [Principal] {
+  public shared query func icrc84_supported_tokens() : async [Principal] {
     assertInitialized();
     Array.tabulate<Principal>(
       Vec.size(assets),
@@ -120,7 +123,7 @@ actor class Example() = self {
     );
   };
 
-  public shared query func icrcX_token_info(token : Principal) : async TokenInfo {
+  public shared query func icrc84_token_info(token : Principal) : async TokenInfo {
     assertInitialized();
     for ((assetInfo, i) in Vec.items(assets)) {
       if (Principal.equal(assetInfo.ledgerPrincipal, token)) {
@@ -135,13 +138,13 @@ actor class Example() = self {
     throw Error.reject("Unknown token");
   };
 
-  public shared query ({ caller }) func icrcX_credit(token : Principal) : async Int {
+  public shared query ({ caller }) func icrc84_credit(token : Principal) : async Int {
     assertInitialized();
     let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
     assetInfo.handler.userCredit(caller);
   };
 
-  public shared query ({ caller }) func icrcX_all_credits() : async [(Principal, Int)] {
+  public shared query ({ caller }) func icrc84_all_credits() : async [(Principal, Int)] {
     assertInitialized();
     let res : Vec.Vector<(Principal, Int)> = Vec.new();
     for (assetInfo in Vec.vals(assets)) {
@@ -153,7 +156,7 @@ actor class Example() = self {
     Vec.toArray(res);
   };
 
-  public shared query ({ caller }) func icrcX_trackedDeposit(token : Principal) : async {
+  public shared query ({ caller }) func icrc84_trackedDeposit(token : Principal) : async {
     #Ok : Nat;
     #Err : { #NotAvailable : Text };
   } {
@@ -165,25 +168,29 @@ actor class Example() = self {
     };
   };
 
-  public shared ({ caller }) func icrcX_notify(args : { token : Principal }) : async NotifyResult {
+  public shared ({ caller }) func icrc84_notify(args : { token : Principal }) : async NotifyResult {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let result = try {
       await* assetInfo.handler.notify(caller);
     } catch (err) {
-      return #Err(#CallLedgerError(Error.message(err)));
+      return #Err(#CallLedgerError({ message = Error.message(err) }));
     };
     switch (result) {
       case (?(deposit_inc, credit_inc)) {
-        #Ok({ deposit_inc; credit_inc });
+        #Ok({
+          deposit_inc;
+          credit_inc;
+          credit = assetInfo.handler.userCredit(caller);
+        });
       };
       case (null) {
-        #Err(#NotAvailable);
+        #Err(#NotAvailable({}));
       };
     };
   };
 
-  public shared ({ caller }) func icrcX_deposit(args : DepositArgs) : async DepositResponse {
+  public shared ({ caller }) func icrc84_deposit(args : DepositArgs) : async DepositResponse {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let res = await* assetInfo.handler.depositFromAllowance(
@@ -194,29 +201,42 @@ actor class Example() = self {
       args.amount,
     );
     switch (res) {
-      case (#ok(credit_inc, txid)) #Ok({ txid; credit_inc });
+      case (#ok(credit_inc, txid)) #Ok({
+        txid;
+        credit_inc;
+        credit = assetInfo.handler.userCredit(caller);
+      });
       case (#err err) {
         switch (err) {
-          case (#TooLowQuantity) #Err(#AmountBelowMinimum);
-          case (#CallIcrc1LedgerError) #Err(#CallLedgerError("Call error"));
-          case (_) #Err(#CallLedgerError("Try later"));
+          case (#TooLowQuantity) #Err(#AmountBelowMinimum({}));
+          case (#CallIcrc1LedgerError) #Err(#CallLedgerError({ message = "Call error" }));
+          case (_) #Err(#CallLedgerError({ message = "Try later" }));
         };
       };
     };
   };
 
-  public shared ({ caller }) func icrcX_withdraw(args : { to_subaccount : ?Blob; amount : Nat; token : Principal }) : async WithdrawResult {
+  public shared ({ caller }) func icrc84_withdraw(args : { to_subaccount : ?Blob; amount : Nat; token : Principal }) : async WithdrawResult {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
+
+    switch (args.to_subaccount) {
+      case (?to_subaccount) {
+        let bytes = Blob.toArray(to_subaccount);
+        if (bytes.size() != 32) throw Error.reject("Invalid subaccount");
+      };
+      case (null) {};
+    };
+
     let res = await* assetInfo.handler.withdrawFromCredit(caller, { owner = caller; subaccount = args.to_subaccount }, args.amount);
     switch (res) {
       case (#ok(txid, amount)) #Ok({ txid; amount });
       case (#err err) {
         switch (err) {
-          case (#InsufficientCredit) #Err(#InsufficientCredit);
-          case (#TooLowQuantity) #Err(#AmountBelowMinimum);
-          case (#CallIcrc1LedgerError) #Err(#CallLedgerError("Call error"));
-          case (_) #Err(#CallLedgerError("Try later"));
+          case (#InsufficientCredit) #Err(#InsufficientCredit({}));
+          case (#TooLowQuantity) #Err(#AmountBelowMinimum({}));
+          case (#CallIcrc1LedgerError) #Err(#CallLedgerError({ message = "Call error" }));
+          case (_) #Err(#CallLedgerError({ message = "Try later" }));
         };
       };
     };

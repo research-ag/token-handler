@@ -30,6 +30,14 @@ module {
     credit : Int;
   };
 
+  public type TokenHandlerOptions = {
+    ledgerApi : LedgerAPI;
+    ownPrincipal : Principal;
+    initialFee : Nat;
+    triggerOnNotifications : Bool;
+    log : (Principal, LogEvent) -> ();
+  };
+
   /// Returns default stable data for `TokenHandler`.
   public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0));
 
@@ -58,13 +66,7 @@ module {
   ///
   /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
   /// providing a comprehensive solution for handling ICRC-1 token transactions.
-  public class TokenHandler(
-    ledgerApi : LedgerAPI,
-    ownPrincipal : Principal,
-    initialFee : Nat,
-    triggerOnNotifications : Bool,
-    log : (Principal, LogEvent) -> (),
-  ) {
+  public class TokenHandler({ ledgerApi; ownPrincipal; initialFee; triggerOnNotifications; log } : TokenHandlerOptions) {
 
     /// Returns `true` when new notifications are paused.
     public func notificationsOnPause() : Bool = accountManager.notificationsOnPause();
