@@ -198,7 +198,7 @@ actor class Example() = self {
   public shared ({ caller }) func icrc84_deposit(args : DepositArgs) : async DepositResponse {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
-    let res = await* assetInfo.handler.depositFromAllowance(args.from, args.amount);
+    let res = await* assetInfo.handler.depositFromAllowance(caller, args.from, args.amount);
     switch (res) {
       case (#ok(credit_inc, txid)) #Ok({
         txid;

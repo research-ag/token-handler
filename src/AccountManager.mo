@@ -330,7 +330,7 @@ module {
       return ?(inc, creditInc);
     };
 
-    func processAllowance(account : ICRC1.Account, amount : Nat) : async* {
+    func processAllowance(p : Principal, account : ICRC1.Account, amount : Nat) : async* {
       #Ok : Nat;
       #Err : ICRC1.TransferFromError or {
         #CallIcrc1LedgerError;
@@ -341,7 +341,7 @@ module {
 
       let transferResult = try {
         await icrc1Ledger.transfer_from({
-          spender_subaccount = ?Util.toSubaccount(account.owner);
+          spender_subaccount = ?Util.toSubaccount(p);
           from = account;
           to = { owner = ownPrincipal; subaccount = null };
           amount = amount;
@@ -359,12 +359,10 @@ module {
     /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
-    public func depositFromAllowance(account : ICRC1.Account, amount : Nat) : async* DepositFromAllowanceResponse {
+    public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat) : async* DepositFromAllowanceResponse {
       if (amount < minimum(#deposit)) return #err(#TooLowQuantity);
 
-      let transferResult = await* processAllowance(account, amount);
-
-      let p = account.owner;
+      let transferResult = await* processAllowance(p, account, amount);
 
       let originalCredit : Nat = amount - fee(#deposit);
 
@@ -379,7 +377,7 @@ module {
         case (#Err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
           let originalCredit_2 : Nat = Int.abs(Int.min(originalCredit, amount - fee(#deposit)));
-          let transferResult = await* processAllowance(account, amount);
+          let transferResult = await* processAllowance(p, account, amount);
           switch (transferResult) {
             case (#Ok txid) {
               log(p, #consolidated({ deducted = amount; credited = originalCredit_2 }));
