@@ -341,7 +341,7 @@ module {
 
       let transferResult = try {
         await icrc1Ledger.transfer_from({
-          spender_subaccount = null;
+          spender_subaccount = ?Util.toSubaccount(account.owner);
           from = account;
           to = { owner = ownPrincipal; subaccount = null };
           amount = amount;
