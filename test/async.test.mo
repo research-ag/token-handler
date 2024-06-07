@@ -33,7 +33,7 @@ func state(handler : TokenHandler.TokenHandler) : (Nat, Nat, Nat) {
   );
 };
 
-func createHandler(triggerOnNotifications : Bool) : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
+func createHandler(triggerOnNotifications : Bool, traceableWithdrawal : Bool) : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
   TestJournal.TestJournal()
   |> (
     TokenHandler.TokenHandler({
@@ -41,6 +41,7 @@ func createHandler(triggerOnNotifications : Bool) : (TokenHandler.TokenHandler, 
       ownPrincipal = anon_p;
       initialFee = 0;
       triggerOnNotifications;
+      traceableWithdrawal;
       log = _.log;
     }),
     _,
@@ -56,7 +57,7 @@ module Debug {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // init state
@@ -179,7 +180,7 @@ do {
 do {
   // Test credit inc from notify()
 
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -204,7 +205,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -310,7 +311,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -394,7 +395,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -462,7 +463,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -532,7 +533,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -558,7 +559,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -630,7 +631,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -710,7 +711,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // credit pool
@@ -756,7 +757,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -853,7 +854,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -962,7 +963,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -1001,7 +1002,7 @@ do {
 do {
   // Check whether the consolidation planned after the notification is successful.
 
-  let (handler, journal) = createHandler(true);
+  let (handler, journal) = createHandler(true, false);
   await ledger.mock.reset_state();
 
   // update fee first time

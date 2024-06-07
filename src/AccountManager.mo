@@ -55,9 +55,15 @@ module {
     #CallIcrc1LedgerError;
     #TooLowQuantity;
     #InsufficientCredit;
+    #NotAvailable;
   };
 
   public type WithdrawResponse = Result.Result<WithdrawResult, WithdrawError>;
+
+  type ProcessWithdrawTransferError = ICRC1.TransferError or {
+    #CallIcrc1LedgerError;
+    #TooLowQuantity;
+  };
 
   public type DepositFromAllowanceResult = (credited : Nat, txid : Nat);
 
@@ -471,15 +477,15 @@ module {
     };
 
     /// Processes the transfer of funds for withdrawal.
-    func processWithdrawTransfer(to : ICRC1.Account, amount : Nat) : async* {
+    func processWithdrawTransfer(from_subaccount : ?Blob, to : ICRC1.Account, amount : Nat) : async* {
       #Ok : Nat;
-      #Err : ICRC1.TransferError or { #CallIcrc1LedgerError; #TooLowQuantity };
+      #Err : ProcessWithdrawTransferError;
     } {
       if (amount < minimum(#withdrawal)) return #Err(#TooLowQuantity);
 
       try {
         await icrc1Ledger.transfer({
-          from_subaccount = null;
+          from_subaccount;
           to = to;
           amount = Int.abs(amount - ledgerFee_);
           fee = ?ledgerFee_;
@@ -491,40 +497,95 @@ module {
       };
     };
 
-    /// Initiates a withdrawal by transferring tokens to another account.
+    func handleWithdrawal(
+      from_subaccount : ?Blob,
+      to : ICRC1.Account,
+      amount : Nat,
+      onSuccess : (txIdx : Nat) -> async* WithdrawResponse,
+      onError : (err : ProcessWithdrawTransferError) -> async* WithdrawResponse,
+    ) : async* WithdrawResponse {
+      let callResult = await* processWithdrawTransfer(from_subaccount, to, amount);
+
+      switch (callResult) {
+        case (#Ok txIdx) { await* onSuccess(txIdx) };
+        case (#Err(#BadFee { expected_fee })) {
+          updateFee(expected_fee);
+          let retryResult = await* processWithdrawTransfer(from_subaccount, to, amount);
+          switch (retryResult) {
+            case (#Ok txIdx) { await* onSuccess(txIdx) };
+            case (#Err err) { await* onError(err) };
+          };
+        };
+        case (#Err err) { await* onError(err) };
+      };
+    };
+
+    /// Initiates a direct withdrawal by transferring tokens to another account.
+    /// The transfer is made directly from the main account to the specified account indirectly.
+    /// In order to make the transfer traceable, the deposit account is used as an intermediary (fee x2).
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
-    public func withdraw(to : ICRC1.Account, amount : Nat) : async* WithdrawResponse {
+    public func withdrawTraceably(p : Principal, to : ICRC1.Account, amount : Nat) : async* WithdrawResponse {
+      let ?release = depositRegistry.obtainLock(p) else return #err(#NotAvailable);
+
+      let depositAccount = {
+        owner = ownPrincipal;
+        subaccount = ?Util.toSubaccount(p);
+      };
+
+      let deposit = depositRegistry.get(p);
 
       totalWithdrawn_ += amount;
 
-      let callResult = await* processWithdrawTransfer(to, amount);
-
-      switch (callResult) {
-        case (#Ok txIdx) {
-          log(ownPrincipal, #withdraw({ to = to; amount = amount }));
-          #ok(txIdx, amount - fee(#withdrawal));
-        };
-        case (#Err(#BadFee { expected_fee })) {
-          updateFee(expected_fee);
-          let retryResult = await* processWithdrawTransfer(to, amount);
-          switch (retryResult) {
-            case (#Ok txIdx) {
+      await* handleWithdrawal(
+        null,
+        depositAccount,
+        amount,
+        func(txIdx : Nat) : async* WithdrawResponse {
+          await* handleWithdrawal(
+            ?Util.toSubaccount(p),
+            to,
+            amount,
+            func(txIdx : Nat) : async* WithdrawResponse {
+              ignore release(null);
               log(ownPrincipal, #withdraw({ to = to; amount = amount }));
-              #ok(txIdx, amount - fee(#withdrawal));
-            };
-            case (#Err err) {
+              #ok(txIdx, amount - 2 * fee(#withdrawal));
+            },
+            func(err : ProcessWithdrawTransferError) : async* WithdrawResponse {
+              ignore release(?(deposit + amount - fee(#withdrawal)));
               totalWithdrawn_ -= amount;
               log(ownPrincipal, #withdrawalError(err));
               #err(err);
-            };
-          };
-        };
-        case (#Err err) {
+            },
+          );
+        },
+        func(err : ProcessWithdrawTransferError) : async* WithdrawResponse {
+          ignore release(null);
           totalWithdrawn_ -= amount;
           log(ownPrincipal, #withdrawalError(err));
           #err(err);
-        };
-      };
+        },
+      );
+    };
+
+    /// Initiates a direct withdrawal by transferring tokens to another account.
+    /// The transfer is made directly from the main account to the specified account.
+    /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
+    public func withdrawDirectly(to : ICRC1.Account, amount : Nat) : async* WithdrawResponse {
+      totalWithdrawn_ += amount;
+      await* handleWithdrawal(
+        null,
+        to,
+        amount,
+        func(txIdx : Nat) : async* WithdrawResponse {
+          log(ownPrincipal, #withdraw({ to = to; amount = amount }));
+          #ok(txIdx, amount - fee(#withdrawal));
+        },
+        func(err : ProcessWithdrawTransferError) : async* WithdrawResponse {
+          totalWithdrawn_ -= amount;
+          log(ownPrincipal, #withdrawalError(err));
+          #err(err);
+        },
+      );
     };
 
     /// Increases the credit amount associated with a specific principal.
