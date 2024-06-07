@@ -1,0 +1,33 @@
+name: Notify on Tag Commit
+
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - migrate-to-new-repo
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get commit info
+        id: get_info
+        run: |
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+          TAG_NAME="${GITHUB_REF##*/}"
+          echo "::set-output name=commit_url::$COMMIT_URL"
+          echo "::set-output name=tag_name::$TAG_NAME"
+
+      - name: Send POST request
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: https://hook.eu2.make.com/sg1xhhlvnp4314llgde92csqgjrpm42e
+          method: POST
+          contentType: application/json
+          body: |
+            {
+              "tag_name": "${{ steps.get_info.outputs.tag_name }}",
+              "commit_url": "${{ steps.get_info.outputs.commit_url }}"
+            }
