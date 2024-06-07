@@ -22,6 +22,7 @@ let user1 = Principal.fromBlob("1");
 let user2 = Principal.fromBlob("2");
 let account = { owner = Principal.fromBlob("o"); subaccount = null };
 let user1_account = { owner = user1; subaccount = null };
+let user2_account = { owner = user2; subaccount = null };
 
 func state(handler : TokenHandler.TokenHandler) : (Nat, Nat, Nat) {
   let s = handler.state();
@@ -945,6 +946,15 @@ do {
   // #depositFeeUpdated, #withdrawalFeeUpdated, #consolidated
   // #newDeposit, #credited
   assert journal.hasSize(8);
+  print("tree lookups = " # debug_show handler.lookups_());
+
+  // deposit from allowance >= amount
+  // caller principal != account owner
+  await ledger.mock.set_transfer_from_res([#Ok 42]);
+  assert (await* handler.depositFromAllowance(user1, user2_account, 9)) == #ok(1, 42);
+  assert handler.userCredit(user1) == 7;
+  assert state(handler) == (0, 7, 0);
+  assert journal.hasSize(3); // #consolidated, #newDeposit, #issued
   print("tree lookups = " # debug_show handler.lookups_());
 
   handler.assertIntegrity();
