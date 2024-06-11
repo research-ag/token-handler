@@ -73,35 +73,30 @@ do {
   assert (await* handler.notify(user1)) == ?(0, 0);
   assert state(handler) == (0, 0, 0);
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // notify with balance <= fee
   await ledger.mock.set_balance(5);
   assert (await* handler.notify(user1)) == ?(0, 0);
   assert state(handler) == (0, 0, 0);
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // notify with balance > fee
   await ledger.mock.set_balance(6);
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state(handler) == (6, 0, 1);
   assert journal.hasSize(2); // #newDeposit, #issued
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase fee while item still in queue (trigger did not run yet)
   await ledger.mock.set_fee(6);
   ignore await* handler.fetchFee();
   assert state(handler) == (0, 0, 0); // recalculation after fee update
   assert journal.hasSize(6); // #feeUpdated, #issued, #depositMinimumUpdated, #withdrawalMinimumUpdated, #depositFeeUpdated, #withdrawalFeeUpdated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase deposit again
   await ledger.mock.set_balance(7);
   assert (await* handler.notify(user1)) == ?(7, 1);
   assert state(handler) == (7, 0, 1);
   assert journal.hasSize(2); // #newDeposit, #issued
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase fee while notify is underway (and item still in queue)
   // scenario 1: old_fee < previous = latest <= new_fee
@@ -116,14 +111,12 @@ do {
   await ledger.mock.release_balance(); // let notify return
   assert (await f1) == ?(0, 0); // deposit <= new fee
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase deposit again
   await ledger.mock.set_balance(15);
   assert (await* handler.notify(user1)) == ?(15, 5);
   assert state(handler) == (15, 0, 1);
   assert journal.hasSize(2); // #newDeposit, #issued
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase fee while notify is underway (and item still in queue)
   // scenario 2: old_fee < previous <= new_fee < latest
@@ -139,7 +132,6 @@ do {
   assert (await f2) == ?(20, 5); // credit = latest - new_fee
   assert state(handler) == (20, 0, 1); // state should have changed
   assert journal.hasSize(2); // #newDeposit, #issued
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // decrease fee while notify is underway (and item still in queue)
   // new_fee < old_fee < previous == latest
@@ -154,7 +146,6 @@ do {
   assert (await f3) == ?(0, 0);
   assert handler.userCredit(user1) == 10; // credit increased
   assert state(handler) == (20, 0, 1); // state unchanged
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // call multiple notify() simultaneously
   // only the first should return state, the rest should not be executed
@@ -169,7 +160,6 @@ do {
   assert handler.userCredit(user1) == 10; // credit unchanged
   assert state(handler) == (20, 0, 1); // state unchanged because deposit has not changed
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
@@ -228,7 +218,6 @@ do {
   assert state(handler) == (0, 0, 0); // consolidation failed with deposit reset
   assert journal.hasSize(7); // #consolidationError, #issued, #feeUpdated, #depositFeeUpdated, #withdrawalFeeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
   assert handler.userCredit(user1) == 0; // credit has been corrected after consolidation
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase fee while deposit is being consolidated (implicitly)
   // scenario 2: old_fee < new_fee < deposit
@@ -246,7 +235,6 @@ do {
   assert state(handler) == (20, 0, 1); // consolidation failed with updated deposit scheduled
   assert journal.hasSize(8); // #consolidationError, #issued, #feeUpdated, #depositFeeUpdated, #withdrawalFeeUpdated, #issued, #depositMinimumUpdated, #withdrawalMinimumUpdated
   assert handler.userCredit(user1) == 5; // credit has been corrected after consolidation
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase fee while deposit is being consolidated (explicitly)
   // scenario 1: old_fee < deposit <= new_fee
@@ -265,7 +253,6 @@ do {
   assert state(handler) == (0, 0, 0); // consolidation failed with deposit reset
   assert journal.hasSize(2); // #consolidationError, #issued
   assert handler.userCredit(user1) == 0; // credit has been corrected
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase fee while deposit is being consolidated (explicitly)
   // scenario 2: old_fee < new_fee < deposit
@@ -287,7 +274,6 @@ do {
   assert state(handler) == (20, 0, 1); // consolidation failed with updated deposit scheduled
   assert journal.hasSize(3); // #consolidationError, #issued, #issued
   assert handler.userCredit(user1) == 14; // credit has been corrected
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // only 1 consolidation process can be triggered for same user at same time
   // consolidation with deposit > fee should be successful
@@ -302,7 +288,6 @@ do {
   assert state(handler) == (0, 14, 0); // consolidation successful
   assert journal.hasSize(1); // #consolidated
   assert handler.userCredit(user1) == 14; // credit unchanged
-  print("tree lookups = " # debug_show handler.lookups_());
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
@@ -323,7 +308,6 @@ do {
   assert (await* handler.notify(user1)) == ?(20, 15);
   assert state(handler) == (20, 0, 1);
   assert journal.hasSize(2); // #newDeposit, #issued
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // trigger consolidation again
   await ledger.mock.set_response([#Ok 42]);
@@ -331,7 +315,6 @@ do {
   await ledger.mock.set_balance(0);
   assert state(handler) == (0, 15, 0); // consolidation successful
   assert journal.hasSize(1); // #consolidated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // withdraw (fee < amount < consolidated_funds)
   // should be successful
@@ -411,14 +394,12 @@ do {
   await ledger.mock.set_balance(0);
   assert state(handler) == (0, 295, 0); // consolidation successful
   assert journal.hasSize(1); // #consolidated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase deposit
   await ledger.mock.set_balance(20);
   assert (await* handler.notify(user1)) == ?(20, 15);
   assert state(handler) == (20, 295, 1);
   assert journal.hasSize(2); // #newDeposit, #issued
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // trigger consolidation
   await ledger.mock.set_response([#Ok 42]);
@@ -426,7 +407,6 @@ do {
   await ledger.mock.set_balance(0);
   assert state(handler) == (0, 310, 0); // consolidation successful
   assert journal.hasSize(1); // #consolidated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // withdraw from credit (fee < amount =< credit)
   // should be successful
@@ -486,7 +466,6 @@ do {
   assert state(handler) == (0, 0, 0); // state unchanged because deposit has not changed
   assert handler.userCredit(user1) == 0; // credit should not be corrected
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // scenario 2: decrease fee
   await ledger.mock.lock_balance("CHANGE_FEE_WHILE_NOTIFY_IS_UNDERWAY_WITH_LOCKED_0_DEPOSIT_SCENARIO_2");
@@ -500,7 +479,6 @@ do {
   assert state(handler) == (5, 0, 1); // state unchanged because deposit has not changed
   assert handler.userCredit(user1) == 3; // credit should not be corrected
   assert journal.hasSize(2); // #issued, #newDeposit
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // Recalculate credits related to deposits when fee changes
 
@@ -510,21 +488,17 @@ do {
   assert journal.hasSize(6); // #feeUpdated, #issued, #depositMinimumUpdated, #withdrawalMinimumUpdated, #depositFeeUpdated, #withdrawalFeeUpdated
   assert handler.userCredit(user1) == 4; // credit corrected
 
-  print("tree lookups = " # debug_show handler.lookups_());
-
   // scenario 2: prev_fee < new_fee < deposit
   await ledger.mock.set_fee(3);
   ignore await* handler.fetchFee();
   assert journal.hasSize(6); // #feeUpdated, #issued, #depositMinimumUpdated, #withdrawalMinimumUpdated, #depositFeeUpdated, #withdrawalFeeUpdated
   assert handler.userCredit(user1) == 2; // credit corrected
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // scenario 3: prev_fee < deposit <= new_fee
   await ledger.mock.set_fee(5);
   ignore await* handler.fetchFee();
   assert journal.hasSize(6); // #feeUpdated, #issued, #depositMinimumUpdated, #withdrawalMinimumUpdated, #depositFeeUpdated, #withdrawalFeeUpdated
   assert handler.userCredit(user1) == 0; // credit corrected
-  print("tree lookups = " # debug_show handler.lookups_());
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
@@ -539,7 +513,6 @@ do {
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 5;
   assert journal.hasSize(5); // #feeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated, #depositFeeUpdated, #withdrawalFeeUpdated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // fetching fee should not overlap
   await ledger.mock.lock_fee("FETCHING_FEE_SHOULD_NOT_OVERLAP");
@@ -550,7 +523,6 @@ do {
   await ledger.mock.release_fee();
   assert (await f1) == ?6;
   assert journal.hasSize(5); // #feeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated, #depositFeeUpdated, #withdrawalFeeUpdated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
@@ -567,7 +539,6 @@ do {
   assert handler.minimum(#deposit) == 6;
   assert handler.minimum(#withdrawal) == 6;
   assert journal.hasSize(5); // #feeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated, #depositFeeUpdated, #withdrawalFeeUpdated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // set deposit minimum
   // case: min > fee
@@ -580,21 +551,18 @@ do {
   handler.setMinimum(#deposit, 12);
   assert handler.minimum(#deposit) == 12;
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // set deposit minimum
   // case: min < fee
   handler.setMinimum(#deposit, 4);
   assert handler.minimum(#deposit) == 6; // fee + 1
   assert journal.hasSize(1); // #depositMinimumUpdated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // set deposit minimum
   // case: min == fee
   handler.setMinimum(#deposit, 5);
   assert handler.minimum(#deposit) == 6;
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // notify
   // case: fee < balance < min
@@ -604,14 +572,12 @@ do {
   await ledger.mock.set_balance(8);
   assert (await* handler.notify(user1)) == ?(0, 0);
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // notify
   // case: fee < min <= balance
   await ledger.mock.set_balance(9);
   assert (await* handler.notify(user1)) == ?(9, 4);
   assert journal.hasSize(2); // #issued, #newDeposit
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // notify
   // case: fee < balance < min, old deposit exists
@@ -622,7 +588,6 @@ do {
   await ledger.mock.set_balance(12);
   assert (await* handler.notify(user1)) == ?(0, 0); // deposit not updated
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
@@ -645,7 +610,6 @@ do {
   assert (await* handler.notify(user1)) == ?(20, 15);
   assert state(handler) == (20, 0, 1);
   assert journal.hasSize(2); // #newDeposit, #issued
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // trigger consolidation again
   await ledger.mock.set_response([#Ok 42]);
@@ -653,7 +617,6 @@ do {
   await ledger.mock.set_balance(0);
   assert state(handler) == (0, 15, 0); // consolidation successful
   assert journal.hasSize(1); // #consolidated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // set withdrawal minimum
   // case: min > fee
@@ -666,21 +629,18 @@ do {
   handler.setMinimum(#withdrawal, 12);
   assert handler.minimum(#withdrawal) == 12;
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // set withdrawal minimum
   // case: min < fee
   handler.setMinimum(#withdrawal, 4);
   assert handler.minimum(#withdrawal) == 6; // fee + 1
   assert journal.hasSize(1); // #depositMinimumUpdated
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // set withdrawal minimum
   // case: min == fee
   handler.setMinimum(#withdrawal, 5);
   assert handler.minimum(#withdrawal) == 6;
   assert journal.hasSize(0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // increase withdrawal minimum
   handler.setMinimum(#withdrawal, 11);
@@ -695,7 +655,6 @@ do {
   assert (await ledger.mock.transfer_count()) == transfer_count; // no transfer call
   assert state(handler) == (0, 15, 0); // state unchanged
   assert journal.hasSize(3); // #burned, #withdrawError, #issued
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // withdraw
   // case: fee < min <= amount
@@ -868,7 +827,6 @@ do {
   assert (await* handler.depositFromAllowance(user1, user1_account, 9)) == #err(#InsufficientAllowance({ allowance = 8 }));
   assert state(handler) == (0, 0, 0);
   assert journal.hasSize(1); // #consolidationError
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // deposit from allowance >= amount
   await ledger.mock.set_transfer_from_res([#Ok 42]);
@@ -876,7 +834,6 @@ do {
   assert handler.userCredit(user1) == 3;
   assert state(handler) == (0, 3, 0);
   assert journal.hasSize(3); // #consolidated, #newDeposit, #issued
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // deposit from allowance <= fee
   await ledger.mock.set_transfer_from_res([#Ok 42]); // should be not called
@@ -886,7 +843,6 @@ do {
   assert state(handler) == (0, 3, 0); // not changed
   assert transfer_from_count == (await ledger.mock.transfer_from_count());
   assert journal.hasSize(1); // #depositViaAllowanceError
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // ledger fee is increased while deposit from allowance is underway
   // old_fee < new_fee < amount
@@ -905,7 +861,6 @@ do {
   // #feeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
   // #depositFeeUpdated, #withdrawalFeeUpdated, #allowanceDrawn, #issued
   assert journal.hasSize(7);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // ledger fee is increased while deposit from allowance is underway
   // old_fee < amount < new_fee
@@ -924,7 +879,6 @@ do {
   // #feeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
   // #depositFeeUpdated, #withdrawalFeeUpdated, #consolidationError
   assert journal.hasSize(6);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // ledger fee is decreased while deposit from allowance is underway
   // new_fee < old_fee < amount
@@ -943,7 +897,6 @@ do {
   // #feeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
   // #depositFeeUpdated, #withdrawalFeeUpdated, #allowanceDrawn, #credited
   assert journal.hasSize(7);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
@@ -962,7 +915,6 @@ do {
   // notify with 0 balance
   await ledger.mock.set_balance(0);
   assert (await* handler.notify(user1)) == ?(0, 0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   assert handler.notificationsOnPause() == false;
 
@@ -972,7 +924,6 @@ do {
 
   // notify with 0 balance
   assert (await* handler.notify(user1)) == null;
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // unpause notifications
   handler.unpauseNotifications();
@@ -980,7 +931,6 @@ do {
 
   // notify with 0 balance
   assert (await* handler.notify(user1)) == ?(0, 0);
-  print("tree lookups = " # debug_show handler.lookups_());
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
@@ -1003,7 +953,6 @@ do {
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state(handler) == (6, 0, 1);
   assert journal.hasSize(2); // #newDeposit, #credited
-  print("tree lookups = " # debug_show handler.lookups_());
 
   // wait for consolidation
   await async {};
