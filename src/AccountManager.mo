@@ -37,6 +37,11 @@ module {
     };
     #withdraw : { to : ICRC1.Account; amount : Nat };
     #withdrawalError : WithdrawError;
+    #allowanceDrawn : { credited : Nat };
+    #depositViaAllowanceError : ICRC1.TransferFromError or {
+      #CallIcrc1LedgerError;
+      #TooLowQuantity;
+    };
   };
 
   public type MinimumType = {
@@ -360,11 +365,14 @@ module {
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
     public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat) : async* DepositFromAllowanceResponse {
-      if (amount < minimum(#deposit)) return #err(#TooLowQuantity);
+      if (amount <= ledgerFee_) {
+        log(p, #depositViaAllowanceError(#TooLowQuantity));
+        return #err(#TooLowQuantity);
+      };
 
       let transferResult = await* processAllowance(p, account, amount);
 
-      let originalCredit : Nat = amount - fee(#deposit);
+      let originalCredit : Nat = amount - ledgerFee_;
 
       switch (transferResult) {
         case (#Ok txid) {
@@ -376,24 +384,23 @@ module {
         };
         case (#Err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
-          let originalCredit_2 : Nat = Int.abs(Int.min(originalCredit, amount - fee(#deposit)));
+          let originalCredit_2 : Nat = Int.abs(Int.min(originalCredit, amount - ledgerFee_));
           let transferResult = await* processAllowance(p, account, amount);
           switch (transferResult) {
             case (#Ok txid) {
-              log(p, #consolidated({ deducted = amount; credited = originalCredit_2 }));
-              log(p, #newDeposit(originalCredit_2));
+              log(p, #allowanceDrawn({ credited = originalCredit_2 }));
               totalConsolidated_ += originalCredit_2;
               issue(p, originalCredit_2);
               return #ok(originalCredit_2, txid);
             };
             case (#Err err) {
-              log(p, #consolidationError(err));
+              log(p, #depositViaAllowanceError(err));
               return #err(err);
             };
           };
         };
         case (#Err err) {
-          log(p, #consolidationError(err));
+          log(p, #depositViaAllowanceError(err));
           return #err(err);
         };
       };

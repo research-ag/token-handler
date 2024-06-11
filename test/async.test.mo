@@ -878,14 +878,14 @@ do {
   assert journal.hasSize(3); // #consolidated, #newDeposit, #issued
   print("tree lookups = " # debug_show handler.lookups_());
 
-  // deposit from allowance < minimum
+  // deposit from allowance <= fee
   await ledger.mock.set_transfer_from_res([#Ok 42]); // should be not called
   var transfer_from_count = await ledger.mock.transfer_from_count();
   assert (await* handler.depositFromAllowance(user1, user1_account, 5)) == #err(#TooLowQuantity);
   assert handler.userCredit(user1) == 3; // not changed
   assert state(handler) == (0, 3, 0); // not changed
   assert transfer_from_count == (await ledger.mock.transfer_from_count());
-  assert journal.hasSize(0);
+  assert journal.hasSize(1); // #depositViaAllowanceError
   print("tree lookups = " # debug_show handler.lookups_());
 
   // ledger fee is increased while deposit from allowance is underway
@@ -903,9 +903,8 @@ do {
   assert state(handler) == (0, 5, 0);
   assert transfer_from_count + 2 == (await ledger.mock.transfer_from_count());
   // #feeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
-  // #depositFeeUpdated, #withdrawalFeeUpdated, #consolidated
-  // #newDeposit, #issued
-  assert journal.hasSize(8);
+  // #depositFeeUpdated, #withdrawalFeeUpdated, #allowanceDrawn, #issued
+  assert journal.hasSize(7);
   print("tree lookups = " # debug_show handler.lookups_());
 
   // ledger fee is increased while deposit from allowance is underway
@@ -942,9 +941,8 @@ do {
   assert state(handler) == (0, 6, 0);
   assert transfer_from_count + 2 == (await ledger.mock.transfer_from_count());
   // #feeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
-  // #depositFeeUpdated, #withdrawalFeeUpdated, #consolidated
-  // #newDeposit, #credited
-  assert journal.hasSize(8);
+  // #depositFeeUpdated, #withdrawalFeeUpdated, #allowanceDrawn, #credited
+  assert journal.hasSize(7);
   print("tree lookups = " # debug_show handler.lookups_());
 
   handler.assertIntegrity();
