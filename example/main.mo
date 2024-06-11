@@ -215,19 +215,19 @@ actor class Example() = self {
     };
   };
 
-  public shared ({ caller }) func icrc84_withdraw(args : { to_subaccount : ?Blob; amount : Nat; token : Principal }) : async WithdrawResult {
+  public shared ({ caller }) func icrc84_withdraw(args : { to : Account; amount : Nat; token : Principal }) : async WithdrawResult {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
 
-    switch (args.to_subaccount) {
-      case (?to_subaccount) {
-        let bytes = Blob.toArray(to_subaccount);
+    switch (args.to.subaccount) {
+      case (?subaccount) {
+        let bytes = Blob.toArray(subaccount);
         if (bytes.size() != 32) throw Error.reject("Invalid subaccount");
       };
       case (null) {};
     };
 
-    let res = await* assetInfo.handler.withdrawFromCredit(caller, { owner = caller; subaccount = args.to_subaccount }, args.amount);
+    let res = await* assetInfo.handler.withdrawFromCredit(caller, args.to, args.amount);
     switch (res) {
       case (#ok(txid, amount)) #Ok({ txid; amount });
       case (#err err) {
