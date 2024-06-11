@@ -827,14 +827,14 @@ do {
   await ledger.mock.set_transfer_from_res([#Err(#InsufficientAllowance({ allowance = 8 }))]);
   assert (await* handler.depositFromAllowance(user1, user1_account, 9)) == #err(#InsufficientAllowance({ allowance = 8 }));
   assert state(handler) == (0, 0, 0);
-  assert journal.hasSize(1); // #consolidationError
+  assert journal.hasSize(1); // #depositViaAllowanceError
 
   // deposit from allowance >= amount
   await ledger.mock.set_transfer_from_res([#Ok 42]);
   assert (await* handler.depositFromAllowance(user1, user1_account, 8)) == #ok(3, 42);
   assert handler.userCredit(user1) == 3;
   assert state(handler) == (0, 3, 0);
-  assert journal.hasSize(3); // #consolidated, #newDeposit, #issued
+  assert journal.hasSize(2); // #allowanceDrawn, #issued
 
   // deposit from allowance <= fee
   await ledger.mock.set_transfer_from_res([#Ok 42]); // should be not called
@@ -878,7 +878,7 @@ do {
   assert state(handler) == (0, 5, 0); // unchanged
   assert transfer_from_count + 1 == (await ledger.mock.transfer_from_count());
   // #feeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
-  // #depositFeeUpdated, #withdrawalFeeUpdated, #consolidationError
+  // #depositFeeUpdated, #withdrawalFeeUpdated, #depositViaAllowanceError
   assert journal.hasSize(6);
 
   // ledger fee is decreased while deposit from allowance is underway
@@ -905,7 +905,7 @@ do {
   assert (await* handler.depositFromAllowance(user1, user2_account, 9)) == #ok(1, 42);
   assert handler.userCredit(user1) == 7;
   assert state(handler) == (0, 7, 0);
-  assert journal.hasSize(3); //  #allowanceDrawn, #credited, #issued
+  assert journal.hasSize(2); // #allowanceDrawn, #credited, #issued
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
