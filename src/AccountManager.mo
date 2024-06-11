@@ -376,8 +376,7 @@ module {
 
       switch (transferResult) {
         case (#Ok txid) {
-          log(p, #consolidated({ deducted = amount; credited = originalCredit }));
-          log(p, #newDeposit(originalCredit));
+          log(p, #allowanceDrawn({ credited = originalCredit }));
           totalConsolidated_ += originalCredit;
           issue(p, originalCredit);
           return #ok(originalCredit, txid);
