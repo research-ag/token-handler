@@ -31,7 +31,7 @@ module {
     #withdrawalMinimumUpdated : { old : Nat; new : Nat };
     #newDeposit : Nat;
     #consolidated : { deducted : Nat; credited : Nat };
-    #consolidationError : ICRC1.TransferError or ICRC1.TransferFromError or {
+    #consolidationError : ICRC1.TransferError or {
       #CallIcrc1LedgerError;
       #TooLowQuantity;
     };
