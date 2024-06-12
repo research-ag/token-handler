@@ -2,7 +2,7 @@ import Principal "mo:base/Principal";
 import IntMap "IntMap";
 
 module {
-  public type StableData = ([(Principal, Int)], Int);
+  public type StableData = ([(Principal, Int)], Int, Int);
 
   public type Account = { #pool; #user : Principal };
 
@@ -48,10 +48,9 @@ module {
         case (#user p) {
           map.add(p, amount);
         };
-        case (#burn) {
-        };
+        case (#burn) {};
       };
-      true
+      true;
     };
 
     // The creditUser/debitUser functions transfer credit from the
@@ -97,12 +96,13 @@ module {
     };
 
     /// Serializes the credit registry data.
-    public func share() : StableData = (map.share(), issuer_);
+    public func share() : StableData = (map.share(), pool_, issuer_);
 
     /// Deserializes the credit registry data.
     public func unshare(values : StableData) {
       map.unshare(values.0);
-      issuer_ := values.1;
+      pool_ := values.1;
+      issuer_ := values.2;
     };
   };
 };
