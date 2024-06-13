@@ -95,6 +95,7 @@ actor class Example() = self {
       ownPrincipal = Principal.fromActor(self);
       initialFee = 0;
       triggerOnNotifications = true;
+      traceableWithdrawal = true;
       log = func(p : Principal, event : TokenHandler.LogEvent) {
         Vec.add(journal, (Time.now(), p, event));
       };

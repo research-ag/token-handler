@@ -35,6 +35,7 @@ module {
     ownPrincipal : Principal;
     initialFee : Nat;
     triggerOnNotifications : Bool;
+    traceableWithdrawal : Bool;
     log : (Principal, LogEvent) -> ();
   };
 
@@ -66,7 +67,16 @@ module {
   ///
   /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
   /// providing a comprehensive solution for handling ICRC-1 token transactions.
-  public class TokenHandler({ ledgerApi; ownPrincipal; initialFee; triggerOnNotifications; log } : TokenHandlerOptions) {
+  public class TokenHandler(
+    {
+      ledgerApi;
+      ownPrincipal;
+      initialFee;
+      triggerOnNotifications;
+      traceableWithdrawal;
+      log;
+    } : TokenHandlerOptions
+  ) {
 
     /// Returns `true` when new notifications are paused.
     public func notificationsOnPause() : Bool = accountManager.notificationsOnPause();
@@ -303,7 +313,7 @@ module {
       // try to burn from pool
       let success = creditRegistry.burn(#pool, amount);
       if (not success) return #err(#InsufficientCredit);
-      let result = await* accountManager.withdraw(to, amount);
+      let result = await* accountManager.withdrawDirectly(to, amount);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#pool, amount);
@@ -344,7 +354,13 @@ module {
           return #err(err);
         }
       );
-      let result = await* accountManager.withdraw(to, amount);
+
+      let result = if (traceableWithdrawal) {
+        await* accountManager.withdrawTraceably(p, to, amount);
+      } else {
+        await* accountManager.withdrawDirectly(to, amount);
+      };
+
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#user p, amount);

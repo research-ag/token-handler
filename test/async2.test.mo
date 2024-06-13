@@ -49,7 +49,7 @@ func state(handler : TokenHandler.TokenHandler) : (Nat, Nat, Nat) {
   );
 };
 
-func createHandler() : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
+func createHandler(traceableWithdrawal : Bool) : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
   TestJournal.TestJournal()
   |> (
     TokenHandler.TokenHandler({
@@ -57,6 +57,7 @@ func createHandler() : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
       ownPrincipal = anon_p;
       initialFee = 0;
       triggerOnNotifications = false;
+      traceableWithdrawal;
       log = _.log;
     }),
     _,
@@ -74,7 +75,7 @@ module Debug {
 do {
   print("new test: change fee plus notify");
   // fresh handler
-  let (handler, journal) = createHandler();
+  let (handler, journal) = createHandler(false);
   // stage a response
   let (release, status) = ledger.fee_.stage(?5);
   // trigger call
@@ -108,7 +109,7 @@ do {
   // make sure no staged responses are left from previous tests
   assert ledger.isEmpty();
   // fresh handler
-  let (handler, journal) = createHandler();
+  let (handler, journal) = createHandler(false);
   // giver user1 credit and put funds into the consolidated balance
   ledger.balance_.stage(?20).0 ();
   ledger.transfer_.stage(?(#Ok 0)).0 ();
@@ -164,7 +165,7 @@ do {
   // make sure no staged responses are left from previous tests
   assert ledger.isEmpty();
   // fresh handler
-  let (handler, journal) = createHandler();
+  let (handler, journal) = createHandler(false);
   // give user1 20 credits
   handler.issue_(#user user1, 20);
   assert journal.hasSize(1); // #issued
@@ -203,7 +204,7 @@ do {
 do {
   print("new test: multiple consolidations trigger");
 
-  let (handler, journal) = createHandler();
+  let (handler, journal) = createHandler(false);
 
   // update fee first time
   ledger.fee_.stage(?5).0 ();
