@@ -100,7 +100,7 @@ After the user has made a transfer to the deposit account and notified the servi
 
 ### Deposit via an allowance
 
-![image](https://github.com/research-ag/token-handler/assets/154005444/cdb8f2ff-e559-400e-be8b-313b354656f2)
+![image](https://github.com/research-ag/token-handler/assets/154005444/1f11c43f-4f13-4c79-8094-b18b067f1b5f)
 *Diagram representing the structural specifics of the deposit via an allowance.*
 
 An alternative way to make deposits is via allowances.
@@ -122,7 +122,7 @@ But allowances due not always work, for example if:
 
 <details>
 <summary>Sequence diagram</summary>
-<img src="https://github.com/research-ag/token-handler/assets/154005444/c51c5a8e-8ba1-4255-88c3-4bbced6ffaa7">
+<img src="[https://github.com/research-ag/token-handler/assets/154005444/c51c5a8e-8ba1-4255-88c3-4bbced6ffaa7](https://github.com/research-ag/token-handler/assets/154005444/584600ec-b35d-464d-b731-4d6b0825ec52)">
 </details>
 
 ## Withdrawal mechanism
@@ -148,9 +148,7 @@ MR Research AG, 2023-2024
 
 ## Authors
 
-Main author: Timo Hanke (timohanke)
-
-Contributors: Denys Kushnarov (reginleif888), Andy Gura (AndyGura)
+Authors: Timo Hanke (timohanke), Denys Kushnarov (reginleif888), Andy Gura (AndyGura)
 
 ## License
 
