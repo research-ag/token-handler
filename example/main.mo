@@ -41,7 +41,7 @@ actor class Example() = self {
     };
     #Err : {
       #CallLedgerError : { message : Text };
-      #NotAvailable : { };
+      #NotAvailable : { message : Text };
     };
   };
 
@@ -190,7 +190,7 @@ actor class Example() = self {
         });
       };
       case (null) {
-        #Err(#NotAvailable({ }));
+        #Err(#NotAvailable({ message = "" }));
       };
     };
   };
