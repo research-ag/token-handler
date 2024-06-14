@@ -2,6 +2,7 @@
 base = "https://github.com/dfinity/motoko-base"
 vector = "0.3.1"
 mrr = "https://github.com/research-ag/motoko-lib#276605187f57cf5fdd08b1ee810bc099b9c85349"
+icrc84 = "https://github.com/research-ag/icrc-84#4bce723d5111a18a86ff34165df8bd7a2f25b0f0"
 
 [toolchain]
 moc = "0.11.1"

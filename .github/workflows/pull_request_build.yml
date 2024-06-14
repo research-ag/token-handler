@@ -38,3 +38,7 @@ jobs:
       - name: Build example
         working-directory: ./example
         run: dfx build --check
+
+      - name: Check did file of example
+        working-directory: ./example
+        run: didc check .dfx/local/canisters/icrc84_example/icrc84_example.did .mops/_github/icrc84\#4bce723d5111a18a86ff34165df8bd7a2f25b0f0/icrc-84.did
