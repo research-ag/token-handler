@@ -38,6 +38,9 @@ jobs:
       - name: Build example
         working-directory: ./example
         run: dfx build --check
+ 
+      - name: Make bin directory
+        run: mkdir -p /home/runner/bin
 
       - name: Get didc
         run: |
