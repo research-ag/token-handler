@@ -39,6 +39,13 @@ jobs:
         working-directory: ./example
         run: dfx build --check
 
+      - name: Get didc
+        run: |
+          release=$(curl --silent "https://api.github.com/repos/dfinity/candid/releases/latest" | awk -F\" '/tag_name/ { print $4 }')  	
+          curl -fsSL https://github.com/dfinity/candid/releases/download/$release/didc-linux64 > /home/runner/bin/didc
+          chmod +x /home/runner/bin/didc
+          echo "/home/runner/bin" >> $GITHUB_PATH
+
       - name: Check did file of example
         working-directory: ./example
         run: didc check .dfx/local/canisters/icrc84_example/icrc84_example.did .mops/_github/icrc84\#4bce723d5111a18a86ff34165df8bd7a2f25b0f0/icrc-84.did
