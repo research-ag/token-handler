@@ -365,11 +365,6 @@ module {
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
     public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat) : async* DepositFromAllowanceResponse {
-      if (amount <= ledgerFee_) {
-        log(p, #allowanceError(#TooLowQuantity));
-        return #err(#TooLowQuantity);
-      };
-
       let transferResult = await* processAllowance(p, account, amount);
 
       switch (transferResult) {
