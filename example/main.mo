@@ -41,7 +41,7 @@ actor class Example() = self {
     };
     #Err : {
       #CallLedgerError : { message : Text };
-      #NotAvailable : {};
+      #NotAvailable : { message : Text };
     };
   };
 
@@ -163,13 +163,13 @@ actor class Example() = self {
 
   public shared query ({ caller }) func icrc84_trackedDeposit(token : Principal) : async {
     #Ok : Nat;
-    #Err : { #NotAvailable : Text };
+    #Err : { #NotAvailable : { message : Text} };
   } {
     assertInitialized();
     let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
     switch (assetInfo.handler.trackedDeposit(caller)) {
       case (?d) #Ok(d);
-      case (null) #Err(#NotAvailable("Unknown caller"));
+      case (null) #Err(#NotAvailable({ message = "Unknown caller"}));
     };
   };
 
@@ -190,7 +190,7 @@ actor class Example() = self {
         });
       };
       case (null) {
-        #Err(#NotAvailable({}));
+        #Err(#NotAvailable({ message = "" }));
       };
     };
   };
