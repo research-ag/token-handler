@@ -1,5 +1,6 @@
 import ICRC1 "ICRC1";
 import R "mo:base/Result";
+import Option "mo:base/Option";
 import Util "util";
 
 module {
@@ -60,9 +61,10 @@ module {
       );
     };
 
-    /// Send <amount> out from the main account, <amount> - fee_ will be received
-    public func send(to : Account, amount : Nat) : async* TransferRes {
-      await* transfer(null, to, amount);
+    /// Send out `amount`, `amount - fee` will be received,
+    /// `p` - service subaccount from which the transfer is made
+    public func send(p : ?Principal, to : Account, amount : Nat) : async* TransferRes {
+      await* transfer(Option.map(p, Util.toSubaccount), to, amount);
     };
 
     /// Draw <amount> from an allowance into the main account

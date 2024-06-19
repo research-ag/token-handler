@@ -35,6 +35,7 @@ module {
     ownPrincipal : Principal;
     initialFee : Nat;
     triggerOnNotifications : Bool;
+    twoStepWithdrawal : Bool;
     log : (Principal, LogEvent) -> ();
   };
 
@@ -66,7 +67,7 @@ module {
   ///
   /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
   /// providing a comprehensive solution for handling ICRC-1 token transactions.
-  public class TokenHandler({ ledgerApi; ownPrincipal; initialFee; triggerOnNotifications; log } : TokenHandlerOptions) {
+  public class TokenHandler({ ledgerApi; ownPrincipal; initialFee; triggerOnNotifications; twoStepWithdrawal; log } : TokenHandlerOptions) {
 
     /// Returns `true` when new notifications are paused.
     public func notificationsOnPause() : Bool = accountManager.notificationsOnPause();
@@ -104,6 +105,7 @@ module {
       log,
       initialFee,
       triggerOnNotifications,
+      twoStepWithdrawal,
       freezeTokenHandler,
       func(p : Principal, x : Int) { creditRegistry.issue(#user p, x) },
     );
@@ -150,6 +152,7 @@ module {
       flow : {
         consolidated : Nat;
         withdrawn : Nat;
+        withdrawalBenefit : Nat;
       };
       credit : {
         total : Int;
@@ -168,6 +171,7 @@ module {
       flow = {
         consolidated = accountManager.totalConsolidated();
         withdrawn = accountManager.totalWithdrawn();
+        withdrawalBenefit = accountManager.totalWithdrawalBenefit();
       };
       credit = {
         total = creditRegistry.totalBalance();
@@ -303,7 +307,7 @@ module {
       // try to burn from pool
       let success = creditRegistry.burn(#pool, amount);
       if (not success) return #err(#InsufficientCredit);
-      let result = await* accountManager.withdraw(to, amount);
+      let result = await* accountManager.withdraw(null, to, amount);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#pool, amount);
@@ -344,7 +348,7 @@ module {
           return #err(err);
         }
       );
-      let result = await* accountManager.withdraw(to, amount);
+      let result = await* accountManager.withdraw(?p, to, amount);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#user p, amount);

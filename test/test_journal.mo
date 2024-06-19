@@ -25,13 +25,9 @@ module {
     public func hasSize(n : Nat) : Bool = Vec.size(journal) == incrementCounter(n);
 
     public func debugShow(startFrom : Nat) : () {
-      print(
-        debug_show (
-          Vec.toArray(journal)
-          |> Array.slice(_, startFrom, _.size())
-          |> Iter.toArray(_)
-        )
-      );
+      Vec.toArray(journal)
+      |> Array.slice(_, startFrom, _.size())
+      |> Iter.toArray(_) |> print(debug_show _.size() # " : " # debug_show _);
     };
   };
 };
