@@ -2,12 +2,17 @@
 name = ""
 version = "0.0.1"
 description = ""
-repository = "https://github.com/research-ag/..."
+repository = "https://github.com/research-ag/token-handler"
 keywords = [ ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.11.1"
+base = "https://github.com/dfinity/motoko-base"
 
 [dev-dependencies]
 test = "2.0.0"
+vector = "0.3.1"
+
+[toolchain]
+moc = "0.11.1"
+wasmtime = "20.0.2"
