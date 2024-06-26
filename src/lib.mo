@@ -39,7 +39,7 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0, 0));
+  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = Util.toSubaccount(p);

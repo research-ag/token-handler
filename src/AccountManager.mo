@@ -23,6 +23,7 @@ module {
     Nat, // totalWithdrawn_
     Nat, // totalStuckWhileWithdrawal_
     Nat, // totalDepositBenefit_
+    Nat, // totalWithdrawalBenefit_
   );
 
   public type LogEvent = {
@@ -628,6 +629,7 @@ module {
       totalWithdrawn_,
       totalStuckWhileWithdrawal_,
       totalDepositBenefit_,
+      totalWithdrawalBenefit_,
     );
 
     /// Deserializes the token handler data.
@@ -642,6 +644,7 @@ module {
       totalWithdrawn_ := values.7;
       totalStuckWhileWithdrawal_ := values.8;
       totalDepositBenefit_ := values.9;
+      totalWithdrawalBenefit_ := values.10;
     };
   };
 };
