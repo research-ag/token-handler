@@ -8,7 +8,6 @@ import Principal "mo:base/Principal";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import Nat "mo:base/Nat";
-import Result "mo:base/Result";
 
 import Util "util";
 import ICRC1 "ICRC1";
@@ -107,7 +106,7 @@ module {
       triggerOnNotifications,
       twoStepWithdrawal,
       freezeTokenHandler,
-      func(p : Principal, x : Int) { creditRegistry.issue(#user p, x) },
+      creditRegistry,
     );
 
     /// Returns the ledger fee.
@@ -304,15 +303,7 @@ module {
     ///   };
     /// ```
     public func withdrawFromPool(to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
-      // try to burn from pool
-      let success = creditRegistry.burn(#pool, amount);
-      if (not success) return #err(#InsufficientCredit);
-      let result = await* accountManager.withdraw(null, to, amount);
-      if (Result.isErr(result)) {
-        // re-issue credit if unsuccessful
-        creditRegistry.issue(#pool, amount);
-      };
-      result;
+      await* accountManager.withdraw(null, to, amount);
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
@@ -339,25 +330,8 @@ module {
     ///   };
     /// ```
     public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
-      // try to burn from user
-      creditRegistry.burn(#user p, amount)
-      |> (
-        if (not _) {
-          let err = #InsufficientCredit;
-          log(ownPrincipal, #withdrawalError(err));
-          return #err(err);
-        }
-      );
-      let result = await* accountManager.withdraw(?p, to, amount);
-      if (Result.isErr(result)) {
-        // re-issue credit if unsuccessful
-        creditRegistry.issue(#user p, amount);
-      };
-      result;
+      await* accountManager.withdraw(?p, to, amount);
     };
-
-    /// For testing purposes.
-    public func assertIntegrity() { accountManager.assertIntegrity() };
 
     /// Serializes the token handler data.
     public func share() : StableData = (
