@@ -57,6 +57,7 @@ func createHandler() : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
       ownPrincipal = anon_p;
       initialFee = 0;
       triggerOnNotifications = false;
+      twoStepWithdrawal = false;
       log = _.log;
     }),
     _,

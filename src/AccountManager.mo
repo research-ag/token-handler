@@ -8,6 +8,8 @@ import Iter "mo:base/Iter";
 import ICRC1 "ICRC1";
 import NatMap "NatMapWithLock";
 import Calls "Calls";
+import Util "util";
+import CreditRegistry "CreditRegistry";
 
 module {
   public type StableData = (
@@ -19,8 +21,9 @@ module {
     Nat, // definedWithdrawalMinimum_
     Nat, // totalConsolidated_
     Nat, // totalWithdrawn_
-    Nat, // totalCredited
-    Nat, // totalDebited
+    Nat, // totalStuckWhileWithdrawal_
+    Nat, // totalDepositBenefit_
+    Nat, // totalWithdrawalBenefit_
   );
 
   public type LogEvent = {
@@ -32,6 +35,8 @@ module {
     #newDeposit : Nat;
     #consolidated : { deducted : Nat; credited : Nat };
     #consolidationError : Errors.Ledger.TransferMin;
+    #topUp : { p : Principal; amount : Nat };
+    #topUpError : Errors.Ledger.Transfer;
     #withdraw : { to : ICRC1.Account; amount : Nat };
     #withdrawalError : Errors.Withdraw;
     #allowanceDrawn : { credited : Nat };
@@ -51,11 +56,17 @@ module {
   module Errors {
     public module Ledger {
       public type Transfer = ICRC1.TransferError or { #CallIcrc1LedgerError };
-      public type TransferFrom = ICRC1.TransferFromError or { #CallIcrc1LedgerError };
+      public type TransferFrom = ICRC1.TransferFromError or {
+        #CallIcrc1LedgerError;
+      };
       public type TransferMin = Transfer or { #TooLowQuantity };
       public type TransferFromMin = TransferFrom or { #TooLowQuantity };
     };
-    public type Withdraw = Ledger.TransferMin or { #InsufficientCredit };
+    public type Withdraw = Ledger.TransferMin or {
+      #InsufficientCredit;
+      #NotAvailable;
+      #TopUpError;
+    };
   };
 
   type WithdrawResult = (transactionIndex : Nat, withdrawnAmount : Nat);
@@ -75,8 +86,9 @@ module {
     log : (Principal, LogEvent) -> (),
     initialFee : Nat,
     triggerOnNotifications : Bool,
+    twoStepWithdrawal : Bool,
     freezeCallback : (text : Text) -> (),
-    issue_ : (Principal, Int) -> (),
+    creditRegistry : CreditRegistry.CreditRegistry,
   ) {
 
     let Ledger = Calls.Ledger(icrc1Ledger, ownPrincipal);
@@ -111,19 +123,21 @@ module {
     /// Total amount consolidated. Accumulated value.
     var totalConsolidated_ : Nat = 0;
 
+    /// Total funds stuck on deposit account during two-step withdrawal.
+    /// Accumulated value.
+    var totalStuckWhileWithdrawal_ : Nat = 0;
+
     /// Total amount withdrawn. Accumulated value.
     var totalWithdrawn_ : Nat = 0;
 
+    /// Total deposit benefit. Accumulated value.
+    var totalDepositBenefit_ : Nat = 0;
+
+    /// Total withdrawal benefit. Accumulated value.
+    var totalWithdrawalBenefit_ : Nat = 0;
+
     /// Total funds underway for consolidation.
     var underwayFunds_ : Nat = 0;
-
-    /// Total funds credited within deposit tracking and consolidation.
-    /// Accumulated value.
-    var totalCredited : Nat = 0;
-
-    /// Total funds debited within deposit tracking and consolidation.
-    /// Accumulated value.
-    var totalDebited : Nat = 0;
 
     /// Returns `true` when new notifications are paused.
     public func notificationsOnPause() : Bool = notificationsOnPause_;
@@ -148,7 +162,13 @@ module {
     };
 
     /// Calculates the final fee of the specific type.
-    public func fee(t : FeeType) : Nat = Nat.max(definedFee(t), Ledger.fee());
+    public func fee(t : FeeType) : Nat = Nat.max(
+      definedFee(t),
+      switch (t) {
+        case (#deposit) Ledger.fee();
+        case (#withdrawal) Ledger.fee() * (if (twoStepWithdrawal) 2 else 1);
+      },
+    );
 
     // Checks if the fee has changed compared to old value and log if yes.
     func logFee(t : FeeType, old : Nat) {
@@ -163,7 +183,7 @@ module {
     /// Defines the admin-defined fee of the specific type.
     public func setFee(t : FeeType, value : Nat) {
       if (value == definedFee(t)) return;
-      recalculateBacklog(Nat.max(value, Ledger.fee()));
+      if (t == #deposit) recalculateBacklog(Nat.max(value, Ledger.fee()));
       let old = fee(t);
       let oldMinimum = minimum(t);
       switch (t) {
@@ -221,13 +241,13 @@ module {
       // update the deposit minimum depending on the new fee
       // the callback debits the principal for deposits that are removed in this step
       let depositFee = fee(#deposit);
-      depositRegistry.setMinimum(newDepositFee + 1, func(p, v) = burn(p, v - depositFee));
+      depositRegistry.setMinimum(newDepositFee + 1, func(p, v) = burn(#user p, v - depositFee));
       // adjust credit for all queued deposits
       depositRegistry.iterate(
         func(p, v) {
           if (v <= newDepositFee) freezeCallback("deposit <= newFee should have been erased in previous step");
           if (newDepositFee > depositFee) {
-            burn(p, newDepositFee - depositFee);
+            burn(#user p, newDepositFee - depositFee);
           } else {
             issue(p, depositFee - newDepositFee);
           };
@@ -272,8 +292,11 @@ module {
     /// Retrieves the sum of all deductions from the main account.
     public func totalWithdrawn() : Nat = totalWithdrawn_;
 
+    /// Retrieves the benefit from the difference in fee within withdrawal.
+    public func totalWithdrawalBenefit() : Nat = totalWithdrawalBenefit_;
+
     /// Retrieves the calculated balance of the main account.
-    public func consolidatedFunds() : Nat = totalConsolidated_ - totalWithdrawn_;
+    public func consolidatedFunds() : Nat = totalConsolidated_ - totalStuckWhileWithdrawal_ - totalWithdrawn_;
 
     /// Retrieves the deposit of a principal.
     public func getDeposit(p : Principal) : ?Nat = depositRegistry.getOpt(p);
@@ -390,19 +413,22 @@ module {
 
       // log event
       let event = switch (res) {
-        case (#ok _) #consolidated({ deducted = deposit; credited = originalCredit });
+        case (#ok _) #consolidated({
+          deducted = deposit;
+          credited = originalCredit;
+        });
         case (#err err) #consolidationError(err);
       };
       log(p, event);
 
-      //
       switch (res) {
         case (#ok _) {
-          totalConsolidated_ += originalCredit;
+          totalConsolidated_ += deposit - Ledger.fee();
+          totalDepositBenefit_ += fee(#deposit) - Ledger.fee();
           ignore release(null);
         };
         case (#err err) {
-          burn(p, originalCredit);
+          burn(#user p, originalCredit);
           ignore process_deposit(p, deposit, release);
         };
       };
@@ -418,7 +444,6 @@ module {
         underwayFunds_ += deposit;
         let result = await* consolidate(p, release);
         underwayFunds_ -= deposit;
-        assertIntegrity();
         switch (result) {
           case (#err(#CallIcrc1LedgerError)) return;
           case (_) {};
@@ -426,73 +451,171 @@ module {
       };
     };
 
-    func withdrawRecursive(to : ICRC1.Account, amount : Nat, retry : Bool) : async* WithdrawResponse {
+    func withdrawOneStep(p : ?Principal, to : ICRC1.Account, amount : Nat) : async* WithdrawResponse {
+      let balance : Int = switch (p) {
+        case null { creditRegistry.poolBalance() };
+        case (?p) { creditRegistry.userBalance(p) };
+      };
+
+      if (balance < amount) {
+        let err = #InsufficientCredit;
+        log(ownPrincipal, #withdrawalError(err));
+        return #err(err);
+      };
+
       if (amount < minimum(#withdrawal)) return #err(#TooLowQuantity);
 
-      let res = await* Ledger.send(to, amount);
+      let amountToSend : Nat = amount - fee(#withdrawal) + Ledger.fee();
+      let res = await* Ledger.send(null, to, amountToSend);
 
-      // catch BadFee
+      // catch #BadFee
       switch (res) {
-        case (#err(#BadFee { expected_fee })) {
-          updateFee(expected_fee);
-          if (retry) return await* withdrawRecursive(to, amount, false);
-        };
+        case (#err(#BadFee { expected_fee })) updateFee(expected_fee);
         case (_) {};
       };
-      // final return value
+
       switch (res) {
-        case (#ok txid) #ok(txid, amount - fee(#withdrawal));
+        case (#ok txid) {
+          switch (p) {
+            case null { burn(#pool, amount) };
+            case (?p) {
+              if (not debitUser(p, fee(#withdrawal))) freezeCallback("debitUser error in withdrawal");
+              burn(#user p, amount - fee(#withdrawal));
+              totalWithdrawalBenefit_ += fee(#withdrawal) - Ledger.fee();
+            };
+          };
+
+          #ok(txid, amount - fee(#withdrawal));
+        };
         case (#err err) #err(err);
+      };
+    };
+
+    func withdrawTwoStep(p : Principal, to : ICRC1.Account, amount : Nat) : async* WithdrawResponse {
+      if (creditRegistry.userBalance(p) < amount) {
+        let err = #InsufficientCredit;
+        log(ownPrincipal, #withdrawalError(err));
+        return #err(err);
+      };
+
+      if (amount < minimum(#withdrawal)) return #err(#TooLowQuantity);
+
+      let ?release = depositRegistry.obtainLock(p) else return #err(#NotAvailable);
+
+      var deposit = depositRegistry.get(p);
+
+      // Amount that will go to the recipient
+      let incomingAmount : Nat = amount - fee(#withdrawal);
+
+      // Sufficient amount for the user deposit account
+      let sufficientAmount : Nat = incomingAmount + Ledger.fee();
+
+      // Potential withdrawal benefit for the service
+      var potentialBenefit : Nat = 0;
+
+      // Flag representing whether a top-up is present in the flow.
+      // Check whether the deposit account has the required amount for withdrawal.
+      // If not, then we top up the deposit account with the required difference.
+      let topUpNeeded : Bool = deposit < sufficientAmount;
+
+      // Deposit account of the user
+      // It will be used as an intermediary in the withdrawal process
+      let depositAccount : ICRC1.Account = {
+        owner = ownPrincipal;
+        subaccount = ?Util.toSubaccount(p);
+      };
+
+      var amountToSendTopUp : Nat = 0;
+
+      if (topUpNeeded) {
+        amountToSendTopUp := sufficientAmount - deposit + Ledger.fee();
+
+        let topUpRes = await* Ledger.send(null, depositAccount, amountToSendTopUp);
+
+        // catch #BadFee
+        switch (topUpRes) {
+          case (#err(#BadFee { expected_fee })) updateFee(expected_fee);
+          case (_) {};
+        };
+
+        switch (topUpRes) {
+          case (#ok _) {
+            // charge fee after 1st step
+            if (not debitUser(p, fee(#withdrawal))) freezeCallback("debitUser error in withdrawal");
+            deposit := sufficientAmount;
+            log(ownPrincipal, #topUp({ p; amount = (amountToSendTopUp - Ledger.fee()) : Nat }));
+          };
+          case (#err err) {
+            log(ownPrincipal, #topUpError(err));
+            ignore release(null);
+            return #err(#TopUpError);
+          };
+        };
+      };
+
+      let res = await* Ledger.send(?p, to, sufficientAmount);
+
+      // catch #BadFee
+      switch (res) {
+        case (#err(#BadFee { expected_fee })) updateFee(expected_fee);
+        case (_) {};
+      };
+
+      switch (res) {
+        case (#ok txid) {
+          if (not topUpNeeded) {
+            // charge fee if there was no top-up
+            if (not debitUser(p, fee(#withdrawal))) freezeCallback("debitUser error in withdrawal");
+            potentialBenefit := fee(#withdrawal) - Ledger.fee();
+          } else {
+            potentialBenefit -= Ledger.fee();
+          };
+          // burn user credits
+          // burn (amount - fee) because fee was already debited
+          burn(#user p, amount - fee(#withdrawal));
+          totalWithdrawalBenefit_ += potentialBenefit;
+          ignore release(?(deposit - sufficientAmount));
+          #ok(txid, amount - fee(#withdrawal));
+        };
+        case (#err err) {
+          totalWithdrawalBenefit_ += potentialBenefit;
+          if (topUpNeeded) totalStuckWhileWithdrawal_ += amountToSendTopUp;
+          ignore release(?deposit);
+          #err(err);
+        };
       };
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
-    public func withdraw(to : ICRC1.Account, amount : Nat) : async* WithdrawResponse {
+    public func withdraw(p : ?Principal, to : ICRC1.Account, amount : Nat) : async* WithdrawResponse {
       totalWithdrawn_ += amount;
 
-      let res = await* withdrawRecursive(to, amount, true);
+      let res = if (twoStepWithdrawal) {
+        switch (p) {
+          case (?p) await* withdrawTwoStep(p, to, amount);
+          case (null) await* withdrawOneStep(null, to, amount);
+        };
+      } else await* withdrawOneStep(p, to, amount);
 
-      let event = switch (res) {
-        case (#ok _) #withdraw({ to = to; amount = amount });
-        case (#err err) #withdrawalError(err);
-      };
-      log(ownPrincipal, event);
+      log(
+        ownPrincipal,
+        switch (res) {
+          case (#ok _) #withdraw({ to = to; amount = amount });
+          case (#err err) #withdrawalError(err);
+        },
+      );
 
       if (R.isErr(res)) totalWithdrawn_ -= amount;
 
-      res
+      res;
     };
 
-    /// Increases the credit amount associated with a specific principal.
-    /// For internal use only - within deposit tracking and consolidation.
-    func issue(p : Principal, amount : Nat) {
-      totalCredited += amount;
-      issue_(p, amount);
-    };
+    func issue(p : Principal, amount : Nat) = creditRegistry.issue(#user p, amount);
 
-    /// Deducts the credit amount associated with a specific principal.
-    /// For internal use only - within deposit tracking and consolidation.
-    func burn(p : Principal, amount : Nat) {
-      totalDebited += amount;
-      issue_(p, -amount);
-    };
+    func burn(account : CreditRegistry.Account, amount : Nat) = creditRegistry.issue(account, -amount);
 
-    public func assertIntegrity() {
-      let deposited : Int = depositRegistry.sum() - fee(#deposit) * depositRegistry.size(); // deposited funds with fees subtracted
-      if (totalCredited != totalConsolidated_ + deposited + totalDebited) {
-        let values : [Text] = [
-          "Balances integrity failed",
-          "totalCredited=" # Nat.toText(totalCredited),
-          "totalConsolidated_=" # Nat.toText(totalConsolidated_),
-          "deposited=" # Int.toText(deposited),
-          "totalDebited=" # Nat.toText(totalDebited),
-        ];
-        freezeCallback(Text.join("; ", Iter.fromArray(values)));
-        return;
-      };
-
-    };
+    func debitUser(p : Principal, amount : Nat) : Bool = creditRegistry.debitUser(p, amount);
 
     /// Serializes the token handler data.
     public func share() : StableData = (
@@ -504,8 +627,9 @@ module {
       definedWithdrawalMinimum_,
       totalConsolidated_,
       totalWithdrawn_,
-      totalCredited,
-      totalDebited,
+      totalStuckWhileWithdrawal_,
+      totalDepositBenefit_,
+      totalWithdrawalBenefit_,
     );
 
     /// Deserializes the token handler data.
@@ -518,8 +642,9 @@ module {
       definedWithdrawalMinimum_ := values.5;
       totalConsolidated_ := values.6;
       totalWithdrawn_ := values.7;
-      totalCredited := values.8;
-      totalDebited := values.9;
+      totalStuckWhileWithdrawal_ := values.8;
+      totalDepositBenefit_ := values.9;
+      totalWithdrawalBenefit_ := values.10;
     };
   };
 };

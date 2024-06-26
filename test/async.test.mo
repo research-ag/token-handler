@@ -33,7 +33,7 @@ func state(handler : TokenHandler.TokenHandler) : (Nat, Nat, Nat) {
   );
 };
 
-func createHandler(triggerOnNotifications : Bool) : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
+func createHandler(triggerOnNotifications : Bool, twoStepWithdrawal : Bool) : (TokenHandler.TokenHandler, TestJournal.TestJournal) {
   TestJournal.TestJournal()
   |> (
     TokenHandler.TokenHandler({
@@ -41,6 +41,7 @@ func createHandler(triggerOnNotifications : Bool) : (TokenHandler.TokenHandler, 
       ownPrincipal = anon_p;
       initialFee = 0;
       triggerOnNotifications;
+      twoStepWithdrawal;
       log = _.log;
     }),
     _,
@@ -56,7 +57,7 @@ module Debug {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // init state
@@ -169,7 +170,7 @@ do {
 do {
   // Test credit inc from notify()
 
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -194,7 +195,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -295,7 +296,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -377,7 +378,81 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, true);
+  await ledger.mock.reset_state();
+
+  // update fee first time
+  await ledger.mock.set_fee(5);
+  ignore await* handler.fetchFee();
+  assert handler.ledgerFee() == 5;
+  assert journal.hasSize(5); // #feeUpdated, #depositFeeUpdated, #withdrawalFeeUpdated, #depositMinimumUpdated, #withdrawalMinimumUpdated
+
+  // another user deposit + consolidation
+  await ledger.mock.set_balance(300);
+  assert (await* handler.notify(user2)) == ?(300, 295);
+  assert journal.hasSize(2); // #newDeposit, #issued
+  await ledger.mock.set_response([#Ok 42]);
+  await* handler.trigger(1);
+  await ledger.mock.set_balance(0);
+  assert state(handler) == (0, 295, 0); // consolidation successful
+  assert journal.hasSize(1); // #consolidated
+
+  // increase deposit
+  await ledger.mock.set_balance(50);
+  assert (await* handler.notify(user1)) == ?(50, 45);
+  assert state(handler) == (50, 295, 1);
+  assert journal.hasSize(2); // #newDeposit, #issued
+
+  // trigger consolidation
+  await ledger.mock.set_response([#Ok 42]);
+  await* handler.trigger(1);
+  await ledger.mock.set_balance(0);
+  assert state(handler) == (0, 340, 0); // consolidation successful
+  assert journal.hasSize(1); // #consolidated
+
+  // set withdrawal fee
+  handler.setFee(#withdrawal, 15);
+  assert journal.hasSize(2); // #withdrawalFeeUpdated, #withdrawalMinimumUpdated
+
+  // withdraw from credit (fee < amount =< credit)
+  // should be successful
+  await ledger.mock.set_fee(1);
+  ignore await* handler.fetchFee();
+  assert journal.hasSize(3); // #feeUpdated, #depositFeeUpdated, #depositMinimumUpdated
+  await ledger.mock.set_response([#Ok 42, #Ok 42]);
+  assert handler.state().flow.withdrawalBenefit == 0;
+  assert (await* handler.withdrawFromCredit(user1, account, 25)) == #ok(42, 10);
+  assert journal.hasSize(3); // #burned, #topUp, #withdraw
+  assert state(handler) == (0, 315, 0);
+  assert handler.userCredit(user1) == 20;
+  assert handler.state().flow.withdrawalBenefit == 13;
+
+  // increase deposit
+  await ledger.mock.set_balance(50);
+  assert (await* handler.notify(user1)) == ?(50, 49);
+  assert state(handler) == (50, 315, 1);
+  assert journal.hasSize(2); // #newDeposit, #issued
+
+  // withdraw from credit (fee < amount =< credit)
+  // with funds on deposit account > (amount + ledger_fee)
+  // should be successful
+  let ctr = journal.counter();
+  await ledger.mock.set_response([#Ok 42]);
+  assert handler.state().flow.withdrawalBenefit == 13; // before
+  assert (await* handler.withdrawFromCredit(user1, account, 25)) == #ok(42, 10);
+  journal.debugShow(ctr);
+  assert journal.hasSize(2); // #burned, #withdraw
+  print(debug_show state(handler));
+  assert state(handler) == (39, 290, 1); // 50 - 11, BUG here
+  assert handler.userCredit(user1) == 44;
+  assert handler.state().flow.withdrawalBenefit == 27; // 13 + 14
+
+  handler.assertIntegrity();
+  assert not handler.isFrozen();
+};
+
+do {
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -442,7 +517,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -506,7 +581,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -530,7 +605,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -595,7 +670,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -669,7 +744,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // credit pool
@@ -715,7 +790,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -812,7 +887,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -858,7 +933,7 @@ do {
 };
 
 do {
-  let (handler, journal) = createHandler(false);
+  let (handler, journal) = createHandler(false, false);
   await ledger.mock.reset_state();
 
   // update fee first time
@@ -894,7 +969,7 @@ do {
 do {
   // Check whether the consolidation planned after the notification is successful.
 
-  let (handler, journal) = createHandler(true);
+  let (handler, journal) = createHandler(true, false);
   await ledger.mock.reset_state();
 
   // update fee first time

@@ -8,7 +8,6 @@ import Principal "mo:base/Principal";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import Nat "mo:base/Nat";
-import Result "mo:base/Result";
 
 import Util "util";
 import ICRC1 "ICRC1";
@@ -35,11 +34,12 @@ module {
     ownPrincipal : Principal;
     initialFee : Nat;
     triggerOnNotifications : Bool;
+    twoStepWithdrawal : Bool;
     log : (Principal, LogEvent) -> ();
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0, 0));
+  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = Util.toSubaccount(p);
@@ -66,7 +66,7 @@ module {
   ///
   /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
   /// providing a comprehensive solution for handling ICRC-1 token transactions.
-  public class TokenHandler({ ledgerApi; ownPrincipal; initialFee; triggerOnNotifications; log } : TokenHandlerOptions) {
+  public class TokenHandler({ ledgerApi; ownPrincipal; initialFee; triggerOnNotifications; twoStepWithdrawal; log } : TokenHandlerOptions) {
 
     /// Returns `true` when new notifications are paused.
     public func notificationsOnPause() : Bool = accountManager.notificationsOnPause();
@@ -104,8 +104,9 @@ module {
       log,
       initialFee,
       triggerOnNotifications,
+      twoStepWithdrawal,
       freezeTokenHandler,
-      func(p : Principal, x : Int) { creditRegistry.issue(#user p, x) },
+      creditRegistry,
     );
 
     /// Returns the ledger fee.
@@ -150,6 +151,7 @@ module {
       flow : {
         consolidated : Nat;
         withdrawn : Nat;
+        withdrawalBenefit : Nat;
       };
       credit : {
         total : Int;
@@ -168,6 +170,7 @@ module {
       flow = {
         consolidated = accountManager.totalConsolidated();
         withdrawn = accountManager.totalWithdrawn();
+        withdrawalBenefit = accountManager.totalWithdrawalBenefit();
       };
       credit = {
         total = creditRegistry.totalBalance();
@@ -300,15 +303,7 @@ module {
     ///   };
     /// ```
     public func withdrawFromPool(to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
-      // try to burn from pool
-      let success = creditRegistry.burn(#pool, amount);
-      if (not success) return #err(#InsufficientCredit);
-      let result = await* accountManager.withdraw(to, amount);
-      if (Result.isErr(result)) {
-        // re-issue credit if unsuccessful
-        creditRegistry.issue(#pool, amount);
-      };
-      result;
+      await* accountManager.withdraw(null, to, amount);
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
@@ -335,25 +330,8 @@ module {
     ///   };
     /// ```
     public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
-      // try to burn from user
-      creditRegistry.burn(#user p, amount)
-      |> (
-        if (not _) {
-          let err = #InsufficientCredit;
-          log(ownPrincipal, #withdrawalError(err));
-          return #err(err);
-        }
-      );
-      let result = await* accountManager.withdraw(to, amount);
-      if (Result.isErr(result)) {
-        // re-issue credit if unsuccessful
-        creditRegistry.issue(#user p, amount);
-      };
-      result;
+      await* accountManager.withdraw(?p, to, amount);
     };
-
-    /// For testing purposes.
-    public func assertIntegrity() { accountManager.assertIntegrity() };
 
     /// Serializes the token handler data.
     public func share() : StableData = (
