@@ -39,7 +39,7 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0), ([], 0, 0));
+  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0), ([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = Util.toSubaccount(p);
@@ -111,14 +111,12 @@ module {
     /// Returns the ledger fee.
     public func ledgerFee() : Nat = accountManager.ledgerFee();
 
-    /// Retrieves the admin-defined fee of the specific type.
-    public func definedFee(t : AccountManager.FeeType) : Nat = accountManager.definedFee(t);
+    public func surcharge() : Nat = accountManager.surcharge();
+
+    public func setSurcharge(s : Nat) = accountManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.
     public func fee(t : AccountManager.FeeType) : Nat = accountManager.fee(t);
-
-    /// Defines the admin-defined fee of the specific type.
-    public func setFee(t : AccountManager.FeeType, value : Nat) = accountManager.setFee(t, value);
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.

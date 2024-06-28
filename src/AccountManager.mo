@@ -13,18 +13,14 @@ module {
   public type StableData = (
     NatMap.StableData<Principal>, // depositRegistry
     Nat, // Ledger.fee()
-    Nat, // definedDepositFee_
-    Nat, // definedWithdrawalFee_
+    Nat, // surcharge_
     Nat, // totalConsolidated_
     Nat, // totalWithdrawn_
   );
 
   public type LogEvent = {
     #feeUpdated : { old : Nat; new : Nat };
-    #depositFeeUpdated : { old : Nat; new : Nat };
-    #withdrawalFeeUpdated : { old : Nat; new : Nat };
-    #depositMinimumUpdated : { old : Nat; new : Nat };
-    #withdrawalMinimumUpdated : { old : Nat; new : Nat };
+    #surchargeUpdated : { old : Nat; new : Nat };
     #newDeposit : Nat;
     #consolidated : { deducted : Nat; credited : Nat };
     #consolidationError : Errors.Ledger.TransferMin;
@@ -34,13 +30,9 @@ module {
     #allowanceError : Errors.Ledger.TransferFromMin;
   };
 
-  public type MinimumType = {
-    #deposit;
-    #withdrawal;
-  };
-
   public type FeeType = {
     #deposit;
+    #allowance;
     #withdrawal;
   };
 
@@ -88,13 +80,7 @@ module {
     /// Current ledger fee amount.
     Ledger.setFee(initialFee);
 
-    /// Admin-defined deposit fee.
-    /// Final fee: max(admin_defined_fee, fee).
-    var definedDepositFee_ : Nat = 0;
-
-    /// Admin-defined withdrawal fee.
-    /// Final fee: max(admin_defined_fee, fee).
-    var definedWithdrawalFee_ : Nat = 0;
+    var surcharge_ : Nat = 0;
 
     /// Manages deposit balances for each user.
     let depositRegistry = NatMap.NatMapWithLock<Principal>(Principal.compare, Ledger.fee() + 1);
@@ -124,35 +110,18 @@ module {
     /// Retrieves the current fee amount.
     public func ledgerFee() : Nat = Ledger.fee();
 
-    /// Retrieves the admin-defined fee of the specific type.
-    public func definedFee(t : FeeType) : Nat = switch (t) {
-      case (#deposit) definedDepositFee_;
-      case (#withdrawal) definedWithdrawalFee_;
+    public func surcharge() : Nat = surcharge_;
+
+    public func setSurcharge(s : Nat) {
+      log(ownPrincipal, #surchargeUpdated({ old = surcharge_; new = s }));
+      surcharge_ := s;
     };
 
     /// Calculates the final fee of the specific type.
-    public func fee(t : FeeType) : Nat = Nat.max(definedFee(t), Ledger.fee());
-
-    // Checks if the fee has changed compared to old value and log if yes.
-    func logFee(t : FeeType, old : Nat) {
-      let new = fee(t);
-      if (old == new) return;
-      switch (t) {
-        case (#deposit) log(ownPrincipal, #depositFeeUpdated({ old = old; new = new }));
-        case (#withdrawal) log(ownPrincipal, #withdrawalFeeUpdated({ old = old; new = new }));
-      };
-    };
-
-    /// Defines the admin-defined fee of the specific type.
-    public func setFee(t : FeeType, value : Nat) {
-      if (value == definedFee(t)) return;
-      recalculateBacklog(Nat.max(value, Ledger.fee()));
-      let old = fee(t);
-      switch (t) {
-        case (#deposit) definedDepositFee_ := value;
-        case (#withdrawal) definedWithdrawalFee_ := value;
-      };
-      logFee(t, old);
+    public func fee(t : FeeType) : Nat = switch (t) {
+      case (#deposit) Ledger.fee() + surcharge_;
+      case (#allowance) surcharge_;
+      case (#withdrawal) Ledger.fee() + surcharge_;
     };
 
     var fetchFeeLock : Bool = false;
@@ -188,16 +157,9 @@ module {
 
     func updateFee(newFee : Nat) {
       if (Ledger.fee() == newFee) return;
-      let feePrev = (fee(#deposit), fee(#withdrawal));
-
-      recalculateBacklog(Nat.max(definedFee(#deposit), newFee));
-
+      recalculateBacklog(newFee + surcharge_);
       log(ownPrincipal, #feeUpdated({ old = Ledger.fee(); new = newFee }));
       Ledger.setFee(newFee);
-
-      // log possible changes in deposit/withdrawal fee
-      logFee(#deposit, feePrev.0);
-      logFee(#withdrawal, feePrev.1);
     };
 
     /// Retrieves the sum of all current deposits.
@@ -444,8 +406,7 @@ module {
     public func share() : StableData = (
       depositRegistry.share(),
       Ledger.fee(),
-      definedDepositFee_,
-      definedWithdrawalFee_,
+      surcharge_,
       totalConsolidated_,
       totalWithdrawn_,
     );
@@ -454,10 +415,9 @@ module {
     public func unshare(values : StableData) {
       depositRegistry.unshare(values.0);
       Ledger.setFee(values.1);
-      definedDepositFee_ := values.2;
-      definedWithdrawalFee_ := values.3;
-      totalConsolidated_ := values.4;
-      totalWithdrawn_ := values.5;
+      surcharge_ := values.2;
+      totalConsolidated_ := values.3;
+      totalWithdrawn_ := values.4;
     };
   };
 };
