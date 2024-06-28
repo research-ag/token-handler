@@ -111,8 +111,10 @@ module {
     /// Returns the ledger fee.
     public func ledgerFee() : Nat = accountManager.ledgerFee();
 
+    /// Returns the current surcharge amount.
     public func surcharge() : Nat = accountManager.surcharge();
 
+    /// Sets new surcharge amount.
     public func setSurcharge(s : Nat) = accountManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.

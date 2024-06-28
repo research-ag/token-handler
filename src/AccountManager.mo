@@ -80,6 +80,8 @@ module {
     /// Current ledger fee amount.
     Ledger.setFee(initialFee);
 
+    /// Current surcharge amount.
+    /// Surcharge is a parameter representing the increment for building fees.
     var surcharge_ : Nat = 0;
 
     /// Manages deposit balances for each user.
@@ -110,8 +112,10 @@ module {
     /// Retrieves the current fee amount.
     public func ledgerFee() : Nat = Ledger.fee();
 
+    /// Retrieves the current surcharge amount.
     public func surcharge() : Nat = surcharge_;
 
+    /// Sets new surcharge amount.
     public func setSurcharge(s : Nat) {
       log(ownPrincipal, #surchargeUpdated({ old = surcharge_; new = s }));
       surcharge_ := s;
@@ -336,6 +340,7 @@ module {
       };
     };
 
+    /// Proccesses withdrawal transfer.
     func proccessWithdrawTransfer(p : ?Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawResponse {
       let (amountToSend, amountArrived) : (Nat, Nat) = switch (p) {
         // withdrawal from pool
@@ -395,11 +400,11 @@ module {
     };
 
     /// Increases the credit amount associated with a specific principal.
-    /// For internal use only - within deposit tracking and consolidation.
+    /// For internal use only.
     func issue(p : Principal, amount : Nat) = issue_(p, amount);
 
     /// Deducts the credit amount associated with a specific principal.
-    /// For internal use only - within deposit tracking and consolidation.
+    /// For internal use only.
     func burn(p : Principal, amount : Nat) = issue_(p, -amount);
 
     /// Serializes the token handler data.
