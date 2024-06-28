@@ -39,7 +39,7 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0, 0));
+  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0), ([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = Util.toSubaccount(p);
@@ -299,11 +299,11 @@ module {
     ///     }
     ///   };
     /// ```
-    public func withdrawFromPool(to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
+    public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.WithdrawResponse {
       // try to burn from pool
       let success = creditRegistry.burn(#pool, amount);
       if (not success) return #err(#InsufficientCredit);
-      let result = await* accountManager.withdraw(to, amount);
+      let result = await* accountManager.withdraw(null, to, amount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#pool, amount);
@@ -334,7 +334,7 @@ module {
     ///     }
     ///   };
     /// ```
-    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
+    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.WithdrawResponse {
       // try to burn from user
       creditRegistry.burn(#user p, amount)
       |> (
@@ -344,16 +344,13 @@ module {
           return #err(err);
         }
       );
-      let result = await* accountManager.withdraw(to, amount);
+      let result = await* accountManager.withdraw(?p, to, amount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#user p, amount);
       };
       result;
     };
-
-    /// For testing purposes.
-    public func assertIntegrity() { accountManager.assertIntegrity() };
 
     /// Serializes the token handler data.
     public func share() : StableData = (

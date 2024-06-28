@@ -19,8 +19,6 @@ module {
     Nat, // definedWithdrawalMinimum_
     Nat, // totalConsolidated_
     Nat, // totalWithdrawn_
-    Nat, // totalCredited
-    Nat, // totalDebited
   );
 
   public type LogEvent = {
@@ -51,11 +49,16 @@ module {
   module Errors {
     public module Ledger {
       public type Transfer = ICRC1.TransferError or { #CallIcrc1LedgerError };
-      public type TransferFrom = ICRC1.TransferFromError or { #CallIcrc1LedgerError };
+      public type TransferFrom = ICRC1.TransferFromError or {
+        #CallIcrc1LedgerError;
+      };
       public type TransferMin = Transfer or { #TooLowQuantity };
       public type TransferFromMin = TransferFrom or { #TooLowQuantity };
     };
-    public type Withdraw = Ledger.TransferMin or { #InsufficientCredit };
+    public type Withdraw = Ledger.TransferMin or {
+      #InsufficientCredit;
+      #LedgerBadFee : { expected_fee : Nat };
+    };
   };
 
   type WithdrawResult = (transactionIndex : Nat, withdrawnAmount : Nat);
@@ -116,14 +119,6 @@ module {
 
     /// Total funds underway for consolidation.
     var underwayFunds_ : Nat = 0;
-
-    /// Total funds credited within deposit tracking and consolidation.
-    /// Accumulated value.
-    var totalCredited : Nat = 0;
-
-    /// Total funds debited within deposit tracking and consolidation.
-    /// Accumulated value.
-    var totalDebited : Nat = 0;
 
     /// Returns `true` when new notifications are paused.
     public func notificationsOnPause() : Bool = notificationsOnPause_;
@@ -390,7 +385,10 @@ module {
 
       // log event
       let event = switch (res) {
-        case (#ok _) #consolidated({ deducted = deposit; credited = originalCredit });
+        case (#ok _) #consolidated({
+          deducted = deposit;
+          credited = originalCredit;
+        });
         case (#err err) #consolidationError(err);
       };
       log(p, event);
@@ -418,7 +416,6 @@ module {
         underwayFunds_ += deposit;
         let result = await* consolidate(p, release);
         underwayFunds_ -= deposit;
-        assertIntegrity();
         switch (result) {
           case (#err(#CallIcrc1LedgerError)) return;
           case (_) {};
@@ -426,73 +423,71 @@ module {
       };
     };
 
-    func withdrawRecursive(to : ICRC1.Account, amount : Nat, retry : Bool) : async* WithdrawResponse {
-      if (amount < minimum(#withdrawal)) return #err(#TooLowQuantity);
+    func proccessWithdrawTransfer(p : ?Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawResponse {
+      let (amountToSend, amountArrived) : (Nat, Nat) = switch (p) {
+        // withdrawal from pool
+        case (null) {
+          switch (expectedFee) {
+            case null {};
+            case (?f) if (f != Ledger.fee()) return #err(#BadFee { expected_fee = Ledger.fee() });
+          };
+          if (amount <= Ledger.fee()) return #err(#TooLowQuantity);
+          (amount, amount - Ledger.fee());
+        };
+        // withdrawal from credit
+        case (?p) {
+          switch (expectedFee) {
+            case null {};
+            case (?f) if (f != fee(#withdrawal)) return #err(#BadFee { expected_fee = fee(#withdrawal) });
+          };
+          if (amount <= fee(#withdrawal)) return #err(#TooLowQuantity);
+          (amount - fee(#withdrawal) + Ledger.fee(), amount - fee(#withdrawal));
+        };
+      };
 
-      let res = await* Ledger.send(to, amount);
+      let res = await* Ledger.send(to, amountToSend);
 
-      // catch BadFee
       switch (res) {
+        case (#ok txid) #ok(txid, amountArrived);
         case (#err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
-          if (retry) return await* withdrawRecursive(to, amount, false);
+          #err(#LedgerBadFee { expected_fee });
         };
-        case (_) {};
-      };
-      // final return value
-      switch (res) {
-        case (#ok txid) #ok(txid, amount - fee(#withdrawal));
         case (#err err) #err(err);
       };
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
-    public func withdraw(to : ICRC1.Account, amount : Nat) : async* WithdrawResponse {
+    public func withdraw(p : ?Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawResponse {
       totalWithdrawn_ += amount;
 
-      let res = await* withdrawRecursive(to, amount, true);
+      let res = await* proccessWithdrawTransfer(p, to, amount, expectedFee);
+
+      let principalToLog = switch (p) {
+        case (?p) { p };
+        case (null) { ownPrincipal };
+      };
 
       let event = switch (res) {
         case (#ok _) #withdraw({ to = to; amount = amount });
         case (#err err) #withdrawalError(err);
       };
-      log(ownPrincipal, event);
+
+      log(principalToLog, event);
 
       if (R.isErr(res)) totalWithdrawn_ -= amount;
 
-      res
+      res;
     };
 
     /// Increases the credit amount associated with a specific principal.
     /// For internal use only - within deposit tracking and consolidation.
-    func issue(p : Principal, amount : Nat) {
-      totalCredited += amount;
-      issue_(p, amount);
-    };
+    func issue(p : Principal, amount : Nat) = issue_(p, amount);
 
     /// Deducts the credit amount associated with a specific principal.
     /// For internal use only - within deposit tracking and consolidation.
-    func burn(p : Principal, amount : Nat) {
-      totalDebited += amount;
-      issue_(p, -amount);
-    };
-
-    public func assertIntegrity() {
-      let deposited : Int = depositRegistry.sum() - fee(#deposit) * depositRegistry.size(); // deposited funds with fees subtracted
-      if (totalCredited != totalConsolidated_ + deposited + totalDebited) {
-        let values : [Text] = [
-          "Balances integrity failed",
-          "totalCredited=" # Nat.toText(totalCredited),
-          "totalConsolidated_=" # Nat.toText(totalConsolidated_),
-          "deposited=" # Int.toText(deposited),
-          "totalDebited=" # Nat.toText(totalDebited),
-        ];
-        freezeCallback(Text.join("; ", Iter.fromArray(values)));
-        return;
-      };
-
-    };
+    func burn(p : Principal, amount : Nat) = issue_(p, -amount);
 
     /// Serializes the token handler data.
     public func share() : StableData = (
@@ -504,8 +499,6 @@ module {
       definedWithdrawalMinimum_,
       totalConsolidated_,
       totalWithdrawn_,
-      totalCredited,
-      totalDebited,
     );
 
     /// Deserializes the token handler data.
@@ -518,8 +511,6 @@ module {
       definedWithdrawalMinimum_ := values.5;
       totalConsolidated_ := values.6;
       totalWithdrawn_ := values.7;
-      totalCredited := values.8;
-      totalDebited := values.9;
     };
   };
 };
