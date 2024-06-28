@@ -39,7 +39,7 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0), ([], 0, 0));
+  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0), ([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = Util.toSubaccount(p);
@@ -119,15 +119,6 @@ module {
 
     /// Defines the admin-defined fee of the specific type.
     public func setFee(t : AccountManager.FeeType, value : Nat) = accountManager.setFee(t, value);
-
-    /// Retrieves the admin-defined minimum of the specific type.
-    public func definedMinimum(minimumType : AccountManager.MinimumType) : Nat = accountManager.definedMinimum(minimumType);
-
-    /// Calculates the final minimum of the specific type.
-    public func minimum(minimumType : AccountManager.MinimumType) : Nat = accountManager.minimum(minimumType);
-
-    /// Defines the admin-defined minimum of the specific type.
-    public func setMinimum(minimumType : AccountManager.MinimumType, min : Nat) = accountManager.setMinimum(minimumType, min);
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.

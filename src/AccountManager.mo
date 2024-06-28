@@ -15,8 +15,6 @@ module {
     Nat, // Ledger.fee()
     Nat, // definedDepositFee_
     Nat, // definedWithdrawalFee_
-    Nat, // definedDepositMinimum_
-    Nat, // definedWithdrawalMinimum_
     Nat, // totalConsolidated_
     Nat, // totalWithdrawn_
   );
@@ -101,16 +99,6 @@ module {
     /// Manages deposit balances for each user.
     let depositRegistry = NatMap.NatMapWithLock<Principal>(Principal.compare, Ledger.fee() + 1);
 
-    /// Admin-defined deposit minimum.
-    /// Can be less then the current fee.
-    /// Final minimum: max(admin_defined_min, fee + 1).
-    var definedDepositMinimum_ : Nat = 0;
-
-    /// Admin-defined withdrawal minimum.
-    /// Can be less then the current fee.
-    /// Final minimum: max(admin_defined_min, fee + 1).
-    var definedWithdrawalMinimum_ : Nat = 0;
-
     /// Total amount consolidated. Accumulated value.
     var totalConsolidated_ : Nat = 0;
 
@@ -160,43 +148,11 @@ module {
       if (value == definedFee(t)) return;
       recalculateBacklog(Nat.max(value, Ledger.fee()));
       let old = fee(t);
-      let oldMinimum = minimum(t);
       switch (t) {
         case (#deposit) definedDepositFee_ := value;
         case (#withdrawal) definedWithdrawalFee_ := value;
       };
       logFee(t, old);
-      logMinimum(t, oldMinimum);
-    };
-
-    /// Retrieves the admin-defined minimum of the specific type.
-    public func definedMinimum(t : MinimumType) : Nat = switch (t) {
-      case (#deposit) definedDepositMinimum_;
-      case (#withdrawal) definedWithdrawalMinimum_;
-    };
-
-    /// Calculates the final minimum of the specific type.
-    public func minimum(t : MinimumType) : Nat = Nat.max(definedMinimum(t), fee(t) + 1);
-
-    // check if the minimum has changed compared to old value and log if yes
-    func logMinimum(t : MinimumType, old : Nat) {
-      let new = minimum(t);
-      if (old == new) return;
-      switch (t) {
-        case (#deposit) log(ownPrincipal, #depositMinimumUpdated({ old = old; new = new }));
-        case (#withdrawal) log(ownPrincipal, #withdrawalMinimumUpdated({ old = old; new = new }));
-      };
-    };
-
-    /// Defines the admin-defined minimum of the specific type.
-    public func setMinimum(t : MinimumType, min : Nat) {
-      if (min == definedMinimum(t)) return;
-      let old = minimum(t);
-      switch (t) {
-        case (#deposit) definedDepositMinimum_ := min;
-        case (#withdrawal) definedWithdrawalMinimum_ := min;
-      };
-      logMinimum(t, old);
     };
 
     var fetchFeeLock : Bool = false;
@@ -232,17 +188,12 @@ module {
 
     func updateFee(newFee : Nat) {
       if (Ledger.fee() == newFee) return;
-      let minimumPrev = (minimum(#deposit), minimum(#withdrawal));
       let feePrev = (fee(#deposit), fee(#withdrawal));
 
       recalculateBacklog(Nat.max(definedFee(#deposit), newFee));
 
       log(ownPrincipal, #feeUpdated({ old = Ledger.fee(); new = newFee }));
       Ledger.setFee(newFee);
-
-      // log possible changes in deposit/withdrawal minima
-      logMinimum(#deposit, minimumPrev.0);
-      logMinimum(#withdrawal, minimumPrev.1);
 
       // log possible changes in deposit/withdrawal fee
       logFee(#deposit, feePrev.0);
@@ -305,7 +256,7 @@ module {
         throw err;
       };
 
-      if (latestDeposit < minimum(#deposit)) {
+      if (latestDeposit <= fee(#deposit)) {
         ignore release(null);
         return ?(0, 0);
       };
@@ -338,7 +289,7 @@ module {
 
     // This function is async* but is guaranteed to never throw.
     func depositFromAllowanceRecursive(p : Principal, account : ICRC1.Account, amount : Nat, retry : Bool) : async* DepositFromAllowanceResponse {
-      if (amount < minimum(#deposit)) return #err(#TooLowQuantity);
+      if (amount <= Ledger.fee()) return #err(#TooLowQuantity);
 
       let res = await* processAllowance(p, account, amount);
 
@@ -495,8 +446,6 @@ module {
       Ledger.fee(),
       definedDepositFee_,
       definedWithdrawalFee_,
-      definedDepositMinimum_,
-      definedWithdrawalMinimum_,
       totalConsolidated_,
       totalWithdrawn_,
     );
@@ -507,10 +456,8 @@ module {
       Ledger.setFee(values.1);
       definedDepositFee_ := values.2;
       definedWithdrawalFee_ := values.3;
-      definedDepositMinimum_ := values.4;
-      definedWithdrawalMinimum_ := values.5;
-      totalConsolidated_ := values.6;
-      totalWithdrawn_ := values.7;
+      totalConsolidated_ := values.4;
+      totalWithdrawn_ := values.5;
     };
   };
 };
