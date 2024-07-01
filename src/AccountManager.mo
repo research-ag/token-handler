@@ -8,6 +8,7 @@ import Iter "mo:base/Iter";
 import ICRC1 "ICRC1";
 import NatMap "NatMapWithLock";
 import Calls "Calls";
+import CreditRegistry "CreditRegistry";
 
 module {
   public type StableData = (
@@ -69,7 +70,7 @@ module {
     initialFee : Nat,
     triggerOnNotifications : Bool,
     freezeCallback : (text : Text) -> (),
-    issue_ : (Principal, Int) -> (),
+    creditRegistry : CreditRegistry.CreditRegistry,
   ) {
 
     let Ledger = Calls.Ledger(icrc1Ledger, ownPrincipal);
@@ -333,6 +334,7 @@ module {
         underwayFunds_ += deposit;
         let result = await* consolidate(p, release);
         underwayFunds_ -= deposit;
+        assertIntegrity();
         switch (result) {
           case (#err(#CallIcrc1LedgerError)) return;
           case (_) {};
@@ -401,11 +403,28 @@ module {
 
     /// Increases the credit amount associated with a specific principal.
     /// For internal use only.
-    func issue(p : Principal, amount : Nat) = issue_(p, amount);
+    func issue(p : Principal, amount : Nat) = creditRegistry.issue(#user p, amount);
 
     /// Deducts the credit amount associated with a specific principal.
     /// For internal use only.
-    func burn(p : Principal, amount : Nat) = issue_(p, -amount);
+    func burn(p : Principal, amount : Nat) = creditRegistry.issue(#user p, -amount);
+
+    public func assertIntegrity() {
+      let deposited : Int = depositRegistry |> _.sum() - fee(#deposit) * _.size();
+      let (total, pool) = creditRegistry |> (_.totalBalance(), _.poolBalance());
+      let integrityIsMaintained = consolidatedFunds() + deposited == total + pool;
+      if (not integrityIsMaintained) {
+        let values : [Text] = [
+          "Balances integrity failed",
+          "totalConsolidated_=" # Nat.toText(totalConsolidated_),
+          "totalWithdrawn_=" # Nat.toText(totalWithdrawn_),
+          "deposited=" # Int.toText(deposited),
+          "total=" # Int.toText(total),
+          "pool=" # Int.toText(pool),
+        ];
+        freezeCallback(Text.join("; ", Iter.fromArray(values)));
+      };
+    };
 
     /// Serializes the token handler data.
     public func share() : StableData = (

@@ -105,7 +105,7 @@ module {
       initialFee,
       triggerOnNotifications,
       freezeTokenHandler,
-      func(p : Principal, x : Int) { creditRegistry.issue(#user p, x) },
+      creditRegistry,
     );
 
     /// Returns the ledger fee.
@@ -342,6 +342,9 @@ module {
       };
       result;
     };
+
+    /// For testing purposes.
+    public func assertIntegrity() { accountManager.assertIntegrity() };
 
     /// Serializes the token handler data.
     public func share() : StableData = (
