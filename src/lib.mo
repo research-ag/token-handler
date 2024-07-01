@@ -39,7 +39,7 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0, 0));
+  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0), ([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = Util.toSubaccount(p);
@@ -105,29 +105,20 @@ module {
       initialFee,
       triggerOnNotifications,
       freezeTokenHandler,
-      func(p : Principal, x : Int) { creditRegistry.issue(#user p, x) },
+      creditRegistry,
     );
 
     /// Returns the ledger fee.
     public func ledgerFee() : Nat = accountManager.ledgerFee();
 
-    /// Retrieves the admin-defined fee of the specific type.
-    public func definedFee(t : AccountManager.FeeType) : Nat = accountManager.definedFee(t);
+    /// Returns the current surcharge amount.
+    public func surcharge() : Nat = accountManager.surcharge();
+
+    /// Sets new surcharge amount.
+    public func setSurcharge(s : Nat) = accountManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.
     public func fee(t : AccountManager.FeeType) : Nat = accountManager.fee(t);
-
-    /// Defines the admin-defined fee of the specific type.
-    public func setFee(t : AccountManager.FeeType, value : Nat) = accountManager.setFee(t, value);
-
-    /// Retrieves the admin-defined minimum of the specific type.
-    public func definedMinimum(minimumType : AccountManager.MinimumType) : Nat = accountManager.definedMinimum(minimumType);
-
-    /// Calculates the final minimum of the specific type.
-    public func minimum(minimumType : AccountManager.MinimumType) : Nat = accountManager.minimum(minimumType);
-
-    /// Defines the admin-defined minimum of the specific type.
-    public func setMinimum(minimumType : AccountManager.MinimumType, min : Nat) = accountManager.setMinimum(minimumType, min);
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
@@ -299,11 +290,11 @@ module {
     ///     }
     ///   };
     /// ```
-    public func withdrawFromPool(to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
+    public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.WithdrawResponse {
       // try to burn from pool
       let success = creditRegistry.burn(#pool, amount);
       if (not success) return #err(#InsufficientCredit);
-      let result = await* accountManager.withdraw(to, amount);
+      let result = await* accountManager.withdraw(null, to, amount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#pool, amount);
@@ -334,7 +325,7 @@ module {
     ///     }
     ///   };
     /// ```
-    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
+    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.WithdrawResponse {
       // try to burn from user
       creditRegistry.burn(#user p, amount)
       |> (
@@ -344,7 +335,7 @@ module {
           return #err(err);
         }
       );
-      let result = await* accountManager.withdraw(to, amount);
+      let result = await* accountManager.withdraw(?p, to, amount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#user p, amount);
