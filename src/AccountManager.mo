@@ -291,7 +291,8 @@ module {
     /// Attempts to consolidate the funds for a particular principal.
     func consolidate(p : Principal, release : ?Nat -> Int) : async* TransferResponse {
       let deposit = depositRegistry.erase(p);
-      let originalCredit : Nat = deposit - fee(#deposit);
+      let credit : Nat = deposit - fee(#deposit);
+      let benefit : Nat = fee(#deposit) - Ledger.fee();
 
       let res = await* Ledger.consolidate(p, deposit);
 
@@ -305,20 +306,20 @@ module {
       let event = switch (res) {
         case (#ok _) #consolidated({
           deducted = deposit;
-          credited = originalCredit;
+          credited = credit;
         });
         case (#err err) #consolidationError(err);
       };
       log(p, event);
 
-      //
       switch (res) {
         case (#ok _) {
-          totalConsolidated_ += originalCredit;
+          totalConsolidated_ += credit + benefit;
+          creditRegistry.issue(#pool, benefit);
           ignore release(null);
         };
         case (#err err) {
-          burn(p, originalCredit);
+          burn(p, credit);
           ignore process_deposit(p, deposit, release);
         };
       };
