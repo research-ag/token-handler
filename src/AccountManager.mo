@@ -28,7 +28,7 @@ module {
     #withdraw : { to : ICRC1.Account; amount : Nat };
     #withdrawalError : Errors.Withdraw;
     #allowanceDrawn : { credited : Nat };
-    #allowanceError : Errors.Ledger.TransferFromMin;
+    #allowanceError : Errors.DepositFromAllowance;
   };
 
   public type FeeType = {
@@ -50,6 +50,9 @@ module {
       #InsufficientCredit;
       #LedgerBadFee : { expected_fee : Nat };
     };
+    public type DepositFromAllowance = Ledger.TransferFromMin or {
+      #LedgerBadFee : { expected_fee : Nat };
+    };
   };
 
   type WithdrawResult = (transactionIndex : Nat, withdrawnAmount : Nat);
@@ -58,8 +61,7 @@ module {
   type Result<X, Y> = R.Result<X, Y>;
   public type WithdrawResponse = Result<WithdrawResult, Errors.Withdraw>;
   public type TransferResponse = Result<Nat, Errors.Ledger.Transfer>;
-  public type DrawResponse = Result<Nat, Errors.Ledger.TransferFrom>;
-  public type DepositFromAllowanceResponse = Result<DepositFromAllowanceResult, Errors.Ledger.TransferFromMin>;
+  public type DepositFromAllowanceResponse = Result<DepositFromAllowanceResult, Errors.DepositFromAllowance>;
 
   /// Manages accounts and funds for users.
   /// Handles deposit, withdrawal, and consolidation operations.
@@ -244,33 +246,23 @@ module {
       return ?(inc, creditInc);
     };
 
-    // This function is async* but is guaranteed to never throw.
-    func processAllowance(p : Principal, account : ICRC1.Account, amount : Nat) : async* DrawResponse {
-      let res = await* Ledger.draw(p, account, amount);
-      if (R.isOk(res)) {
-        totalConsolidated_ += amount;
-        issue(p, amount);
+    // Proccesses allowance.
+    func processAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
+      switch (expectedFee) {
+        case null {};
+        case (?f) if (f != fee(#allowance)) return #err(#BadFee { expected_fee = fee(#allowance) });
       };
-      res;
-    };
 
-    // This function is async* but is guaranteed to never throw.
-    func depositFromAllowanceRecursive(p : Principal, account : ICRC1.Account, amount : Nat, retry : Bool) : async* DepositFromAllowanceResponse {
-      if (amount <= Ledger.fee()) return #err(#TooLowQuantity);
+      if (amount <= fee(#allowance)) return #err(#TooLowQuantity);
 
-      let res = await* processAllowance(p, account, amount);
+      let res = await* Ledger.draw(p, account, amount);
 
-      // catch BadFee
       switch (res) {
+        case (#ok txid) #ok(amount - fee(#allowance), txid);
         case (#err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
-          if (retry) return await* depositFromAllowanceRecursive(p, account, amount, false);
+          #err(#LedgerBadFee { expected_fee });
         };
-        case (_) {};
-      };
-      // final return value
-      switch (res) {
-        case (#ok txid) #ok(amount, txid);
         case (#err err) #err(err);
       };
     };
@@ -278,13 +270,22 @@ module {
     /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
-    public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat) : async* DepositFromAllowanceResponse {
-      let res = await* depositFromAllowanceRecursive(p, account, amount, true);
+    public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
+      let res = await* processAllowance(p, account, amount, expectedFee);
+
       let event = switch (res) {
         case (#ok _) #allowanceDrawn({ credited = amount });
         case (#err err) #allowanceError(err);
       };
+
       log(p, event);
+
+      if (R.isOk(res)) {
+        totalConsolidated_ += amount;
+        issue(p, amount - fee(#allowance));
+        creditRegistry.issue(#pool, fee(#allowance));
+      };
+
       res;
     };
 
@@ -353,7 +354,7 @@ module {
             case (?f) if (f != Ledger.fee()) return #err(#BadFee { expected_fee = Ledger.fee() });
           };
           if (amount <= Ledger.fee()) return #err(#TooLowQuantity);
-          (amount, amount - Ledger.fee());
+          amount |> (_, _ - Ledger.fee());
         };
         // withdrawal from credit
         case (?p) {
@@ -362,7 +363,7 @@ module {
             case (?f) if (f != fee(#withdrawal)) return #err(#BadFee { expected_fee = fee(#withdrawal) });
           };
           if (amount <= fee(#withdrawal)) return #err(#TooLowQuantity);
-          (amount - fee(#withdrawal) + Ledger.fee(), amount - fee(#withdrawal));
+          (amount - fee(#withdrawal)) : Nat |> (_ + Ledger.fee(), _);
         };
       };
 
@@ -381,8 +382,6 @@ module {
     /// Initiates a withdrawal by transferring tokens to another account.
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
     public func withdraw(p : ?Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawResponse {
-      totalWithdrawn_ += amount;
-
       let res = await* proccessWithdrawTransfer(p, to, amount, expectedFee);
 
       let principalToLog = switch (p) {
@@ -397,7 +396,7 @@ module {
 
       log(principalToLog, event);
 
-      if (R.isErr(res)) totalWithdrawn_ -= amount;
+      if (R.isOk(res)) totalWithdrawn_ += amount;
 
       res;
     };

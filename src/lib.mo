@@ -252,8 +252,8 @@ module {
     ///   };
     /// };
     /// ```
-    public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat) : async* AccountManager.DepositFromAllowanceResponse {
-      await* accountManager.depositFromAllowance(p, account, amount);
+    public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.DepositFromAllowanceResponse {
+      await* accountManager.depositFromAllowance(p, account, amount, expectedFee);
     };
 
     /// Triggers the proccessing deposits.
