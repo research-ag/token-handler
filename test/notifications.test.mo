@@ -15,12 +15,21 @@ do {
   assert journal.hasEvents([]);
 
   // update fee first time
-  await mock_ledger.set_fee(5);
+  await mock_ledger.set_fee(3);
   ignore await* handler.fetchFee();
-  assert handler.ledgerFee() == 5;
+  assert handler.ledgerFee() == 3;
   assert journal.hasEvents([
-    #feeUpdated({ new = 5; old = 0 }),
+    #feeUpdated({ new = 3; old = 0 }),
   ]);
+
+  // update surcharge
+  handler.setSurcharge(2);
+  assert handler.surcharge() == 2;
+  assert journal.hasEvents([
+    #surchargeUpdated({ new = 2; old = 0 }),
+  ]);
+
+  // fee = ledger_fee + surcharge
 
   // notify with 0 balance
   await mock_ledger.set_balance(0);
