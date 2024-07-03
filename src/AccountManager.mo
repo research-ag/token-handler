@@ -274,7 +274,9 @@ module {
       let res = await* processAllowance(p, account, amount, expectedFee);
 
       let event = switch (res) {
-        case (#ok _) #allowanceDrawn({ credited = amount });
+        case (#ok _) #allowanceDrawn({
+          credited = (amount - fee(#allowance)) : Nat;
+        });
         case (#err err) #allowanceError(err);
       };
 
