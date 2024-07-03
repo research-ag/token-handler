@@ -22,7 +22,7 @@ module {
     () -> (Nat, Nat, Nat),
   ) {
 
-    let ledger = {
+    let ledger : TokenHandler.LedgerAPI = {
       fee = mock_ledger.icrc1_fee;
       balance_of = mock_ledger.icrc1_balance_of;
       transfer = mock_ledger.icrc1_transfer;
@@ -42,12 +42,21 @@ module {
     (handler, journal, func() { state(handler) });
   };
 
+  type TestLedgerAPI = TokenHandler.LedgerAPI and {
+    fee_ : Mock.Method<Nat>;
+    balance_ : Mock.Method<Nat>;
+    transfer_ : Mock.Method<ICRC1.TransferResult>;
+    transfer_from_ : Mock.Method<ICRC1.TransferFromResult>;
+    isEmpty : () -> Bool;
+  };
+
   public func createHandlerV2(triggerOnNotifications : Bool) : (
     TokenHandler.TokenHandler,
     TestJournal.TestJournal,
     () -> (Nat, Nat, Nat),
+    TestLedgerAPI,
   ) {
-    let ledger = object {
+    let ledger : TestLedgerAPI = object {
       public let fee_ = Mock.Method<Nat>();
       public let balance_ = Mock.Method<Nat>();
       public let transfer_ = Mock.Method<ICRC1.TransferResult>();
@@ -87,6 +96,6 @@ module {
       log = journal.log;
     });
 
-    (handler, journal, func() { state(handler) });
+    (handler, journal, func() { state(handler) }, ledger);
   };
 };

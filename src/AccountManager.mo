@@ -411,16 +411,15 @@ module {
 
     public func assertIntegrity() {
       let deposited : Int = depositRegistry |> _.sum() - fee(#deposit) * _.size();
-      let (total, pool) = creditRegistry |> (_.totalBalance(), _.poolBalance());
-      let integrityIsMaintained = consolidatedFunds() + deposited == total + pool;
+      let totalBalance = creditRegistry.totalBalance();
+      let integrityIsMaintained = consolidatedFunds() + deposited == totalBalance;
       if (not integrityIsMaintained) {
         let values : [Text] = [
           "Balances integrity failed",
           "totalConsolidated_=" # Nat.toText(totalConsolidated_),
           "totalWithdrawn_=" # Nat.toText(totalWithdrawn_),
           "deposited=" # Int.toText(deposited),
-          "total=" # Int.toText(total),
-          "pool=" # Int.toText(pool),
+          "totalBalance=" # Int.toText(totalBalance),
         ];
         freezeCallback(Text.join("; ", Iter.fromArray(values)));
       };
