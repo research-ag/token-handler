@@ -4,6 +4,8 @@ import Util "util/common";
 import MockLedger "util/mock_ledger";
 
 let user1 = Principal.fromBlob("1");
+let user2 = Principal.fromBlob("2");
+let user3 = Principal.fromBlob("3");
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
@@ -234,4 +236,127 @@ do {
     #issued(+0), // credit to pool (0)
   ]);
   assert state() == (0, 15, 0);
+
+  handler.assertIntegrity();
+  assert not handler.isFrozen();
+};
+
+// Multiple consolidations trigger
+do {
+  let (handler, journal, state, ledger) = Util.createHandlerV2(false);
+
+  // update fee first time
+  ledger.fee_.stage(?5).0 ();
+  ignore await* handler.fetchFee();
+  assert handler.fee(#deposit) == 5;
+  assert journal.hasEvents([
+    #feeUpdated({ new = 5; old = 0 }),
+  ]);
+
+  // user1 notify with balance > fee
+  ledger.balance_.stage(?6).0 ();
+  assert (await* handler.notify(user1)) == ?(6, 1);
+  assert state() == (6, 0, 1);
+  assert journal.hasEvents([
+    #issued(+1),
+    #newDeposit(6),
+  ]);
+
+  // user2 notify with balance > fee
+  ledger.balance_.stage(?10).0 ();
+  assert (await* handler.notify(user2)) == ?(10, 5);
+  assert state() == (16, 0, 2);
+  assert journal.hasEvents([
+    #issued(+5),
+    #newDeposit(10),
+  ]);
+
+  // trigger only 1 consolidation
+  do {
+    let (release, status) = ledger.transfer_.stage(?(#Ok 0));
+    release();
+    await* handler.trigger(1);
+    assert status() == #ready;
+    assert state() == (10, 1, 1); // user1 funds consolidated
+    assert journal.hasEvents([
+      #consolidated({ credited = 1; deducted = 6 }),
+      #issued(0),
+    ]);
+  };
+
+  // user1 notify again
+  ledger.balance_.stage(?6).0 ();
+  assert (await* handler.notify(user1)) == ?(6, 1);
+  assert state() == (16, 1, 2);
+  assert journal.hasEvents([
+    #issued(+1),
+    #newDeposit(6),
+  ]);
+
+  // trigger consolidation of all the deposits
+  // n >= deposit_number
+  do {
+    let (release1, status1) = ledger.transfer_.stage(?(#Ok 0));
+    let (release2, status2) = ledger.transfer_.stage(?(#Ok 0));
+    ignore (release1(), release2());
+    await* handler.trigger(10);
+    assert (status1(), status2()) == (#ready, #ready);
+    assert state() == (0, 7, 0); // all deposits consolidated
+    assert journal.hasEvents([
+      #consolidated({ credited = 1; deducted = 6 }),
+      #issued(0),
+      #consolidated({ credited = 5; deducted = 10 }),
+      #issued(0),
+    ]);
+  };
+
+  // user1 notify again
+  ledger.balance_.stage(?6).0 ();
+  assert (await* handler.notify(user1)) == ?(6, 1);
+  assert state() == (6, 7, 1);
+  assert journal.hasEvents([
+    #issued(+1),
+    #newDeposit(6),
+  ]);
+
+  // user2 notify again
+  ledger.balance_.stage(?10).0 ();
+  assert (await* handler.notify(user2)) == ?(10, 5);
+  assert state() == (16, 7, 2);
+  assert journal.hasEvents([
+    #issued(+5),
+    #newDeposit(10),
+  ]);
+
+  // user3 notify with balance > fee
+  ledger.balance_.stage(?8).0 ();
+  assert (await* handler.notify(user3)) == ?(8, 3);
+  assert state() == (24, 7, 3);
+  assert journal.hasEvents([
+    #issued(+3),
+    #newDeposit(8),
+  ]);
+
+  // trigger consolidation of all the deposits (n >= deposit_number)
+  // with error calling the ledger on the 2nd deposit
+  // so the consolidation loop must be stopped after attempting to consolidate the 2nd deposit
+  do {
+    let (release1, status1) = ledger.transfer_.stage(?(#Ok 0));
+    let (release2, status2) = ledger.transfer_.stage(null);
+    let (release3, status3) = ledger.transfer_.stage(?(#Ok 0));
+    ignore (release1(), release2(), release3());
+    await* handler.trigger(10);
+    assert (status1(), status2(), status3()) == (#ready, #ready, #staged);
+    assert state() == (18, 8, 2); // only user1 deposit consolidated
+    assert journal.hasEvents([
+      #consolidated({ credited = 1; deducted = 6 }),
+      #issued(0),
+      #consolidationError(#CallIcrc1LedgerError),
+      #issued(-5),
+      #issued(+5),
+    ]);
+  };
+
+  handler.assertIntegrity();
+  assert not handler.isFrozen();
 };
