@@ -292,8 +292,13 @@ module {
     /// ```
     public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.WithdrawResponse {
       // try to burn from pool
-      let success = creditRegistry.burn(#pool, amount);
-      if (not success) return #err(#InsufficientCredit);
+      creditRegistry.burn(#pool, amount) |> (
+        if (not _) {
+          let err = #InsufficientCredit;
+          log(ownPrincipal, #withdrawalError(err));
+          return #err(err);
+        }
+      );
       let result = await* accountManager.withdraw(null, to, amount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful

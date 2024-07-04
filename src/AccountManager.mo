@@ -371,8 +371,13 @@ module {
 
       let res = await* Ledger.send(to, amountToSend);
 
+      if (R.isOk(res)) totalWithdrawn_ += amountToSend;
+
       switch (res) {
-        case (#ok txid) #ok(txid, amountArrived);
+        case (#ok txid) {
+          if (p != null) creditRegistry.issue(#pool, amount - amountToSend);
+          #ok(txid, amountArrived);
+        };
         case (#err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
           #err(#LedgerBadFee { expected_fee });
@@ -397,8 +402,6 @@ module {
       };
 
       log(principalToLog, event);
-
-      if (R.isOk(res)) totalWithdrawn_ += amount;
 
       res;
     };
