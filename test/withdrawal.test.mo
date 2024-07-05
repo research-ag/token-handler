@@ -117,7 +117,7 @@ do {
     #withdraw({ amount = 4; to = account }),
   ]);
 
-  // withdraw from credit (amount <= ledger_fee)
+  // withdraw from pool (amount <= ledger_fee)
   transfer_count := await mock_ledger.transfer_count();
   await mock_ledger.set_response([#Ok 42]); // transfer call should not be executed anyway
   assert (await* handler.withdrawFromPool(account, 2, null)) == #err(#TooLowQuantity);
@@ -130,7 +130,7 @@ do {
     #issued(2),
   ]);
 
-  // withdraw from credit (credit < amount)
+  // withdraw from pool (credit < amount)
   await mock_ledger.set_response([#Err(#InsufficientFunds({ balance = 10 }))]);
   assert (await* handler.withdrawFromPool(account, 100, null)) == #err(#InsufficientCredit);
   assert state() == (0, 10, 0); // state unchanged
