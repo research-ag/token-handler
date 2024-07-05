@@ -3,12 +3,7 @@ import Principal "mo:base/Principal";
 import Util "util/common";
 import MockLedger "util/mock_ledger";
 
-let anon_p = Principal.fromBlob("");
 let user1 = Principal.fromBlob("1");
-let user2 = Principal.fromBlob("2");
-let account = { owner = Principal.fromBlob("o"); subaccount = null };
-let user1_account = { owner = user1; subaccount = null };
-let user2_account = { owner = user2; subaccount = null };
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
@@ -101,7 +96,7 @@ do {
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, _) = Util.createHandler(mock_ledger, false);
 
   // update fee first time
   await mock_ledger.set_fee(5);
@@ -129,7 +124,7 @@ do {
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, _) = Util.createHandler(mock_ledger, false);
 
   // credit pool
   handler.issue_(#pool, 20);
@@ -171,4 +166,39 @@ do {
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
+};
+
+do {
+  let mock_ledger = await MockLedger.MockLedger();
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+
+  // update fee first time
+  await mock_ledger.set_fee(2);
+  ignore await* handler.fetchFee();
+  assert handler.ledgerFee() == 2;
+  assert journal.hasEvents([
+    #feeUpdated({ new = 2; old = 0 }),
+  ]);
+
+  // update surcharge
+  handler.setSurcharge(3);
+  assert handler.surcharge() == 3;
+  assert journal.hasEvents([
+    #surchargeUpdated({ new = 3; old = 0 }),
+  ]);
+
+  assert handler.fee(#deposit) == 5;
+  assert handler.fee(#allowance) == 3;
+  assert handler.fee(#withdrawal) == 5;
+
+  // update surcharge
+  handler.setSurcharge(5);
+  assert handler.surcharge() == 5;
+  assert journal.hasEvents([
+    #surchargeUpdated({ new = 5; old = 3 }),
+  ]);
+
+  assert handler.fee(#deposit) == 7;
+  assert handler.fee(#allowance) == 5;
+  assert handler.fee(#withdrawal) == 7;
 };
