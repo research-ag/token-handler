@@ -49,7 +49,7 @@ do {
   // deposit from allowance >= amount
   // caller principal != account owner
   await mock_ledger.set_transfer_from_res([#Ok 42]);
-  assert (await* handler.depositFromAllowance(user1, user2_account, 9, null)) == #ok(9, 42);
+  assert (await* handler.depositFromAllowance(user1, user2_account, 9, null)) == #ok(7, 42);
   assert handler.userCredit(user1) == 10;
   assert state() == (0, 14, 0);
   assert journal.hasEvents([
@@ -76,8 +76,8 @@ do {
   var transfer_from_count_2 = await mock_ledger.transfer_from_count();
   // allowance fee = 2
   assert (await* handler.depositFromAllowance(user1, user1_account, 2, ?100)) == #err(#BadFee({ expected_fee = 2 }));
-  assert handler.userCredit(user1) == 3; // not changed
-  assert state() == (0, 5, 0); // not changed
+  assert handler.userCredit(user1) == 10; // not changed
+  assert state() == (0, 14, 0); // not changed
   assert transfer_from_count_2 == (await mock_ledger.transfer_from_count());
   assert journal.hasEvents([
     #allowanceError(#BadFee({ expected_fee = 2 }))
