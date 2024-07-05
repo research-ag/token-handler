@@ -96,6 +96,10 @@ module {
     /// Total amount withdrawn. Accumulated value.
     var totalWithdrawn_ : Nat = 0;
 
+    /// Total credited within the class. Accumulated value.
+    /// For internal usage only.
+    var credited : Nat = 0;
+
     /// Total funds underway for consolidation.
     var underwayFunds_ : Nat = 0;
 
@@ -286,6 +290,7 @@ module {
         totalConsolidated_ += amount;
         issue(p, amount - fee(#allowance));
         creditRegistry.issue(#pool, fee(#allowance));
+        credited += fee(#allowance);
       };
 
       res;
@@ -319,6 +324,7 @@ module {
         case (#ok _) {
           totalConsolidated_ += credit + benefit;
           creditRegistry.issue(#pool, benefit);
+          credited += benefit;
           ignore release(null);
         };
         case (#err err) {
@@ -375,7 +381,11 @@ module {
 
       switch (res) {
         case (#ok txid) {
-          if (p != null) creditRegistry.issue(#pool, amount - amountToSend);
+          if (p != null) {
+            let benefit : Nat = amount - amountToSend;
+            creditRegistry.issue(#pool, benefit);
+            credited += benefit;
+          };
           #ok(txid, amountArrived);
         };
         case (#err(#BadFee { expected_fee })) {
@@ -408,23 +418,28 @@ module {
 
     /// Increases the credit amount associated with a specific principal.
     /// For internal use only.
-    func issue(p : Principal, amount : Nat) = creditRegistry.issue(#user p, amount);
+    func issue(p : Principal, amount : Nat) {
+      creditRegistry.issue(#user p, amount);
+      credited += amount;
+    };
 
     /// Deducts the credit amount associated with a specific principal.
     /// For internal use only.
-    func burn(p : Principal, amount : Nat) = creditRegistry.issue(#user p, -amount);
+    func burn(p : Principal, amount : Nat) {
+      creditRegistry.issue(#user p, -amount);
+      credited -= amount;
+    };
 
     public func assertIntegrity() {
       let deposited : Int = depositRegistry |> _.sum() - fee(#deposit) * _.size();
-      let totalBalance = creditRegistry.totalBalance();
-      let integrityIsMaintained = consolidatedFunds() + deposited == totalBalance;
+      let integrityIsMaintained = consolidatedFunds() + deposited == credited;
       if (not integrityIsMaintained) {
         let values : [Text] = [
           "Balances integrity failed",
           "totalConsolidated_=" # Nat.toText(totalConsolidated_),
           "totalWithdrawn_=" # Nat.toText(totalWithdrawn_),
           "deposited=" # Int.toText(deposited),
-          "totalBalance=" # Int.toText(totalBalance),
+          "credited=" # Int.toText(credited),
         ];
         freezeCallback(Text.join("; ", Iter.fromArray(values)));
       };

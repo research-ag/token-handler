@@ -111,7 +111,6 @@ do {
   await mock_ledger.set_response([#Ok 42]);
   assert (await* handler.withdrawFromPool(account, 4, null)) == #ok(42, 2);
   assert handler.poolCredit() == 10;
-  journal.debugShow(0);
   assert state() == (0, 10, 0);
   assert journal.hasEvents([
     #burned(4),

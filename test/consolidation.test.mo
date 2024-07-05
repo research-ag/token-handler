@@ -185,7 +185,6 @@ do {
   await async {};
 
   assert state() == (0, 3, 0); // consolidation successful
-  journal.debugShow(0);
   assert journal.hasEvents([
     #consolidated({ credited = 1; deducted = 8 }),
     #issued(+2), // credit pool
