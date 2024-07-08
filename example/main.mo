@@ -27,10 +27,9 @@ actor class Example() = self {
   };
 
   type TokenInfo = {
-    min_deposit : Nat;
-    min_withdrawal : Nat;
     deposit_fee : Nat;
     withdrawal_fee : Nat;
+    allowance_fee : Nat;
   };
 
   type NotifyResult = {
@@ -49,6 +48,7 @@ actor class Example() = self {
     token : Principal;
     amount : Nat;
     from : Account;
+    expected_fee : ?Nat;
   };
 
   type Account = {
@@ -64,9 +64,17 @@ actor class Example() = self {
     };
     #Err : {
       #AmountBelowMinimum : {};
+      #BadFee : { expected_fee : Nat };
       #CallLedgerError : { message : Text };
       #TransferError : { message : Text };
     };
+  };
+
+  type WithdrawArgs = {
+    to : Account;
+    amount : Nat;
+    token : Principal;
+    expected_fee : ?Nat;
   };
 
   type WithdrawResult = {
@@ -76,6 +84,7 @@ actor class Example() = self {
     };
     #Err : {
       #CallLedgerError : { message : Text };
+      #BadFee : { expected_fee : Nat };
       #InsufficientCredit : {};
       #AmountBelowMinimum : {};
     };
@@ -133,10 +142,9 @@ actor class Example() = self {
     for ((assetInfo, i) in Vec.items(assets)) {
       if (Principal.equal(assetInfo.ledgerPrincipal, token)) {
         return {
-          min_deposit = assetInfo.handler.minimum(#deposit);
-          min_withdrawal = assetInfo.handler.minimum(#withdrawal);
           deposit_fee = assetInfo.handler.fee(#deposit);
           withdrawal_fee = assetInfo.handler.fee(#withdrawal);
+          allowance_fee = assetInfo.handler.fee(#allowance);
         };
       };
     };
@@ -163,13 +171,13 @@ actor class Example() = self {
 
   public shared query ({ caller }) func icrc84_trackedDeposit(token : Principal) : async {
     #Ok : Nat;
-    #Err : { #NotAvailable : { message : Text} };
+    #Err : { #NotAvailable : { message : Text } };
   } {
     assertInitialized();
     let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
     switch (assetInfo.handler.trackedDeposit(caller)) {
       case (?d) #Ok(d);
-      case (null) #Err(#NotAvailable({ message = "Unknown caller"}));
+      case (null) #Err(#NotAvailable({ message = "Unknown caller" }));
     };
   };
 
@@ -198,7 +206,7 @@ actor class Example() = self {
   public shared ({ caller }) func icrc84_deposit(args : DepositArgs) : async DepositResponse {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
-    let res = await* assetInfo.handler.depositFromAllowance(caller, args.from, args.amount);
+    let res = await* assetInfo.handler.depositFromAllowance(caller, args.from, args.amount, args.expected_fee);
     switch (res) {
       case (#ok(credit_inc, txid)) #Ok({
         txid;
@@ -208,6 +216,9 @@ actor class Example() = self {
       case (#err err) {
         switch (err) {
           case (#TooLowQuantity) #Err(#AmountBelowMinimum({}));
+          case (#BadFee({ expected_fee })) #Err(#BadFee({ expected_fee }));
+          case (#InsufficientFunds({ balance })) #Err(#TransferError({ message = "Insufficient funds" }));
+          case (#InsufficientAllowance({ allowance })) #Err(#TransferError({ message = "Insufficient allowance" }));
           case (#CallIcrc1LedgerError) #Err(#CallLedgerError({ message = "Call error" }));
           case (_) #Err(#CallLedgerError({ message = "Try later" }));
         };
@@ -215,7 +226,7 @@ actor class Example() = self {
     };
   };
 
-  public shared ({ caller }) func icrc84_withdraw(args : { to : Account; amount : Nat; token : Principal }) : async WithdrawResult {
+  public shared ({ caller }) func icrc84_withdraw(args : WithdrawArgs) : async WithdrawResult {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
 
@@ -227,12 +238,13 @@ actor class Example() = self {
       case (null) {};
     };
 
-    let res = await* assetInfo.handler.withdrawFromCredit(caller, args.to, args.amount);
+    let res = await* assetInfo.handler.withdrawFromCredit(caller, args.to, args.amount, args.expected_fee);
     switch (res) {
       case (#ok(txid, amount)) #Ok({ txid; amount });
       case (#err err) {
         switch (err) {
           case (#InsufficientCredit) #Err(#InsufficientCredit({}));
+          case (#BadFee({ expected_fee })) #Err(#BadFee({ expected_fee }));
           case (#TooLowQuantity) #Err(#AmountBelowMinimum({}));
           case (#CallIcrc1LedgerError) #Err(#CallLedgerError({ message = "Call error" }));
           case (_) #Err(#CallLedgerError({ message = "Try later" }));
