@@ -96,7 +96,7 @@ module {
     /// Total amount withdrawn. Accumulated value.
     var totalWithdrawn_ : Nat = 0;
 
-    /// Total credited within the class. Accumulated value.
+    /// Funds credited within the class.
     /// For internal usage only.
     var credited : Nat = 0;
 
