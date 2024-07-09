@@ -219,7 +219,7 @@ module {
     /// Example:
     /// ```motoko
     /// let userPrincipal = ...; // The principal of the user making the deposit
-    /// let (depositDelta, credit) = await* notify(userPrincipal);
+    /// let (depositDelta, creditDelta) = await* notify(userPrincipal);
     /// ```
     public func notify(p : Principal) : async* ?(Nat, Nat) {
       if isFrozen_ return null;
@@ -237,8 +237,9 @@ module {
     /// let userPrincipal = ...; // The principal of the user making the deposit
     /// let userAccount = { owner = userPrincipal; subaccount = ?subaccountBlob };
     /// let amount: Nat = 100_000; // Amount to deposit
+    /// let allowanceFee : Nat = ... // Current allowance fee
     ///
-    /// let response = await* handler.depositFromAllowance(userAccount, amount);
+    /// let response = await* handler.depositFromAllowance(userPrincipal, userAccount, amount, allowanceFee);
     /// switch (response) {
     ///   case (#ok credit_inc) {
     ///     // Handle successful deposit
@@ -271,13 +272,15 @@ module {
 
     /// Initiates a withdrawal by transferring tokens to another account.
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
+    /// At the same time, it reduces the pool credit. Accordingly, amount <= credit should be satisfied.
     ///
     /// Example:
     /// ```motoko
     /// let recipientAccount = { owner = recipientPrincipal; subaccount = ?subaccountBlob };
     /// let amount: Nat = 100_000; // Amount to withdraw
+    /// let withdrawalFee : Nat = ... // Current withdrawal fee
     ///
-    /// let response = await* tokenHandler.withdrawFromCredit(recipientAccount, amount);
+    /// let response = await* tokenHandler.withdrawFromCredit(recipientAccount, amount, withdrawalFee);
     /// switch(response) {
     ///   case (#ok (transactionIndex, withdrawnAmount)) {
     ///     // Handle successful withdrawal
@@ -316,8 +319,9 @@ module {
     /// let userPrincipal = ...; // The principal of the user transferring tokens
     /// let recipientAccount = { owner = recipientPrincipal; subaccount = ?subaccountBlob };
     /// let amount: Nat = 100_000; // Amount to withdraw
+    /// let withdrawalFee : Nat = ... // Current withdrawal fee
     ///
-    /// let response = await* tokenHandler.withdrawFromCredit(userPrincipal, recipientAccount, amount);
+    /// let response = await* tokenHandler.withdrawFromCredit(userPrincipal, recipientAccount, amount, withdrawalFee);
     /// switch(response) {
     ///   case (#ok (transactionIndex, withdrawnAmount)) {
     ///     // Handle successful withdrawal
@@ -368,5 +372,4 @@ module {
       creditRegistry.unshare(values.1);
     };
   };
-
 };
