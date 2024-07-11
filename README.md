@@ -62,6 +62,8 @@ The only requirement on the underlying token ledger is the ICRC-1 standard. Depo
 
 It is not required that the service can inspect individual deposit transactions by transaction id, memo or other means. Hence, it is not required that the underlying token ledger provides an indexer, transaction history or archive. In particular, the ICRC-3 extension is not required.
 
+A service can also support multiple tokens, but to do this it has to operate separate TokenHandler instances for each supported token.
+
 ### TokenHandler options
 
 | Property name | Type | Description |
