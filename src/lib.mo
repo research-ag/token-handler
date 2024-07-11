@@ -355,7 +355,7 @@ module {
     /// Clears the credit registry of entries with values below the provided minimum.
     /// The method is designed to prevent spam attacks.
     /// Returns the number of entries cleared.
-    public func clean(min : Nat) : Int = creditRegistry.clean(min);
+    public func clean(min : Nat) : Nat = creditRegistry.clean(min);
 
     /// For testing purposes.
     public func assertIntegrity() { accountManager.assertIntegrity() };

@@ -37,7 +37,7 @@ module {
     /// Clears the map of entries with values below the provided minimum.
     /// The method is designed to prevent spam attacks.
     /// Returns the number of entries cleared.
-    public func clean(min : Nat) : Int {
+    public func clean(min : Nat) : Nat {
       var ctr : Nat = 0;
       label L for ((k, v) in map.entries()) {
         if (v >= min) continue L;
