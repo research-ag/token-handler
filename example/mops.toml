@@ -2,7 +2,7 @@
 base = "0.11.2"
 vector = "0.3.2"
 mrr = "https://github.com/research-ag/motoko-lib#276605187f57cf5fdd08b1ee810bc099b9c85349"
-icrc84 = "https://github.com/research-ag/icrc-84#0.0.1"
+icrc84 = "https://github.com/research-ag/icrc-84#d85ee3c832e80d63184873df1c41c4bf6a9a35f7"
 
 [toolchain]
 moc = "0.11.2"
