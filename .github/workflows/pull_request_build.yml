@@ -51,4 +51,6 @@ jobs:
 
       - name: Check did file of example
         working-directory: ./example
-        run: didc check .dfx/local/canisters/icrc84_example/icrc84_example.did .mops/_github/icrc84\#e69d1cf4681f6fe49afd01bf90d534fff7b3e1d7/icrc-84.did
+        run: |
+          didc check .dfx/local/canisters/icrc84_example/icrc84_example.did .mops/_github/icrc84\#0.0.1/icrc-84.did
+
