@@ -257,7 +257,7 @@ module {
       await* accountManager.depositFromAllowance(p, account, amount, expectedFee);
     };
 
-    /// Triggers the proccessing deposits.
+    /// Triggers the processing deposits.
     /// n - desired number of potential consolidations.
     ///
     /// Example:

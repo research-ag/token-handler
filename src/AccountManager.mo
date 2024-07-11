@@ -250,7 +250,7 @@ module {
       return ?(inc, creditInc);
     };
 
-    // Proccesses allowance.
+    // Processes allowance.
     func processAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
       switch (expectedFee) {
         case null {};
@@ -336,7 +336,7 @@ module {
       res;
     };
 
-    /// Triggers the proccessing deposits.
+    /// Triggers the processing deposits.
     /// n - desired number of potential consolidations.
     public func trigger(n : Nat) : async* () {
       for (i in Iter.range(1, n)) {
@@ -352,8 +352,8 @@ module {
       };
     };
 
-    /// Proccesses withdrawal transfer.
-    func proccessWithdrawTransfer(p : ?Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawResponse {
+    /// Processes withdrawal transfer.
+    func processWithdrawTransfer(p : ?Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawResponse {
       let (amountToSend, amountArrived) : (Nat, Nat) = switch (p) {
         // withdrawal from pool
         case (null) {
@@ -399,7 +399,7 @@ module {
     /// Initiates a withdrawal by transferring tokens to another account.
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
     public func withdraw(p : ?Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawResponse {
-      let res = await* proccessWithdrawTransfer(p, to, amount, expectedFee);
+      let res = await* processWithdrawTransfer(p, to, amount, expectedFee);
 
       let principalToLog = switch (p) {
         case (?p) { p };
