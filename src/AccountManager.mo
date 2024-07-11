@@ -46,13 +46,8 @@ module {
       public type TransferMin = Transfer or { #TooLowQuantity };
       public type TransferFromMin = TransferFrom or { #TooLowQuantity };
     };
-    public type Withdraw = Ledger.TransferMin or {
-      #InsufficientCredit;
-      #LedgerBadFee : { expected_fee : Nat };
-    };
-    public type DepositFromAllowance = Ledger.TransferFromMin or {
-      #LedgerBadFee : { expected_fee : Nat };
-    };
+    public type Withdraw = Ledger.TransferMin or { #InsufficientCredit };
+    public type DepositFromAllowance = Ledger.TransferFromMin;
   };
 
   type WithdrawResult = (transactionIndex : Nat, withdrawnAmount : Nat);
@@ -265,7 +260,7 @@ module {
         case (#ok txid) #ok(amount - fee(#allowance), txid);
         case (#err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
-          #err(#LedgerBadFee { expected_fee });
+          #err(#BadFee { expected_fee = fee(#allowance) });
         };
         case (#err err) #err(err);
       };
@@ -390,7 +385,7 @@ module {
         };
         case (#err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
-          #err(#LedgerBadFee { expected_fee });
+          #err(#BadFee { expected_fee = fee(#withdrawal) });
         };
         case (#err err) #err(err);
       };
