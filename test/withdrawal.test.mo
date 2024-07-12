@@ -90,12 +90,12 @@ do {
   await mock_ledger.set_fee(2);
   await mock_ledger.set_response([#Err(#BadFee { expected_fee = 2 })]); // the second call should not be executed
   await mock_ledger.release_transfer(); // let transfer return
-  assert (await f2) == #err(#LedgerBadFee { expected_fee = 2 });
+  assert (await f2) == #err(#BadFee { expected_fee = 4 });
   assert state() == (0, 14, 0); // state unchanged
   assert journal.hasEvents([
     #burned(5),
     #feeUpdated({ new = 2; old = 1 }),
-    #withdrawalError(#LedgerBadFee { expected_fee = 2 }),
+    #withdrawalError(#BadFee { expected_fee = 4 }),
     #issued(+5),
   ]);
 

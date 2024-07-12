@@ -27,7 +27,7 @@ module {
     #consolidationError : Errors.Ledger.TransferMin;
     #withdraw : { to : ICRC1.Account; amount : Nat };
     #withdrawalError : Errors.Withdraw;
-    #allowanceDrawn : { credited : Nat };
+    #allowanceDrawn : { amount : Nat };
     #allowanceError : Errors.DepositFromAllowance;
   };
 
@@ -44,10 +44,9 @@ module {
         #CallIcrc1LedgerError;
       };
       public type TransferMin = Transfer or { #TooLowQuantity };
-      public type TransferFromMin = TransferFrom or { #TooLowQuantity };
     };
     public type Withdraw = Ledger.TransferMin or { #InsufficientCredit };
-    public type DepositFromAllowance = Ledger.TransferFromMin;
+    public type DepositFromAllowance = Ledger.TransferFrom;
   };
 
   type WithdrawResult = (transactionIndex : Nat, withdrawnAmount : Nat);
@@ -126,7 +125,7 @@ module {
     /// Calculates the final fee of the specific type.
     public func fee(t : FeeType) : Nat = switch (t) {
       case (#deposit) Ledger.fee() + surcharge_;
-      case (#allowance) surcharge_;
+      case (#allowance) Ledger.fee() + surcharge_;
       case (#withdrawal) Ledger.fee() + surcharge_;
     };
 
@@ -245,19 +244,20 @@ module {
       return ?(inc, creditInc);
     };
 
-    // Processes allowance.
+    /// Processes allowance.
+    /// `amount` - credit-side amount.
     func processAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
       switch (expectedFee) {
         case null {};
         case (?f) if (f != fee(#allowance)) return #err(#BadFee { expected_fee = fee(#allowance) });
       };
 
-      if (amount <= fee(#allowance)) return #err(#TooLowQuantity);
+      let amountToDraw : Nat = amount + fee(#allowance) - Ledger.fee();
 
-      let res = await* Ledger.draw(p, account, amount);
+      let res = await* Ledger.draw(p, account, amountToDraw);
 
       switch (res) {
-        case (#ok txid) #ok(amount - fee(#allowance), txid);
+        case (#ok txid) #ok(amount, txid);
         case (#err(#BadFee { expected_fee })) {
           updateFee(expected_fee);
           #err(#BadFee { expected_fee = fee(#allowance) });
@@ -269,23 +269,24 @@ module {
     /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
+    /// `amount` - credit-side amount.
     public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
+      let benefit : Nat = fee(#allowance) - Ledger.fee();
+
       let res = await* processAllowance(p, account, amount, expectedFee);
 
       let event = switch (res) {
-        case (#ok _) #allowanceDrawn({
-          credited = (amount - fee(#allowance)) : Nat;
-        });
+        case (#ok _) #allowanceDrawn({ amount });
         case (#err err) #allowanceError(err);
       };
 
       log(p, event);
 
       if (R.isOk(res)) {
-        totalConsolidated_ += amount;
-        issue(p, amount - fee(#allowance));
-        creditRegistry.issue(#pool, fee(#allowance));
-        credited += fee(#allowance);
+        totalConsolidated_ += amount + benefit;
+        issue(p, amount);
+        creditRegistry.issue(#pool, benefit);
+        credited += benefit;
       };
 
       res;

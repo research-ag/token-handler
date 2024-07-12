@@ -188,7 +188,7 @@ do {
   ]);
 
   assert handler.fee(#deposit) == 5;
-  assert handler.fee(#allowance) == 3;
+  assert handler.fee(#allowance) == 5;
   assert handler.fee(#withdrawal) == 5;
 
   // update surcharge
@@ -199,6 +199,6 @@ do {
   ]);
 
   assert handler.fee(#deposit) == 7;
-  assert handler.fee(#allowance) == 5;
+  assert handler.fee(#allowance) == 7;
   assert handler.fee(#withdrawal) == 7;
 };

@@ -230,6 +230,7 @@ module {
     /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
+    /// `amount` - credit-side amount.
     ///
     /// Example:
     /// ```motoko
