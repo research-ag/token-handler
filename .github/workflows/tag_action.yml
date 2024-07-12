@@ -1,7 +1,7 @@
 name: Send POST Request on Tag Creation
 
 on:
-  create:
+  push:
     tags:
       - "rc*"
 env:

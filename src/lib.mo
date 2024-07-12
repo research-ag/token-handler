@@ -39,7 +39,7 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0, 0, 0, 0, 0, 0), ([], 0, 0));
+  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0), ([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = Util.toSubaccount(p);
@@ -105,29 +105,20 @@ module {
       initialFee,
       triggerOnNotifications,
       freezeTokenHandler,
-      func(p : Principal, x : Int) { creditRegistry.issue(#user p, x) },
+      creditRegistry,
     );
 
     /// Returns the ledger fee.
     public func ledgerFee() : Nat = accountManager.ledgerFee();
 
-    /// Retrieves the admin-defined fee of the specific type.
-    public func definedFee(t : AccountManager.FeeType) : Nat = accountManager.definedFee(t);
+    /// Returns the current surcharge amount.
+    public func surcharge() : Nat = accountManager.surcharge();
+
+    /// Sets new surcharge amount.
+    public func setSurcharge(s : Nat) = accountManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.
     public func fee(t : AccountManager.FeeType) : Nat = accountManager.fee(t);
-
-    /// Defines the admin-defined fee of the specific type.
-    public func setFee(t : AccountManager.FeeType, value : Nat) = accountManager.setFee(t, value);
-
-    /// Retrieves the admin-defined minimum of the specific type.
-    public func definedMinimum(minimumType : AccountManager.MinimumType) : Nat = accountManager.definedMinimum(minimumType);
-
-    /// Calculates the final minimum of the specific type.
-    public func minimum(minimumType : AccountManager.MinimumType) : Nat = accountManager.minimum(minimumType);
-
-    /// Defines the admin-defined minimum of the specific type.
-    public func setMinimum(minimumType : AccountManager.MinimumType, min : Nat) = accountManager.setMinimum(minimumType, min);
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
@@ -228,7 +219,7 @@ module {
     /// Example:
     /// ```motoko
     /// let userPrincipal = ...; // The principal of the user making the deposit
-    /// let (depositDelta, credit) = await* notify(userPrincipal);
+    /// let (depositDelta, creditDelta) = await* notify(userPrincipal);
     /// ```
     public func notify(p : Principal) : async* ?(Nat, Nat) {
       if isFrozen_ return null;
@@ -239,6 +230,7 @@ module {
     /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
+    /// `amount` - credit-side amount.
     ///
     /// Example:
     /// ```motoko
@@ -246,8 +238,9 @@ module {
     /// let userPrincipal = ...; // The principal of the user making the deposit
     /// let userAccount = { owner = userPrincipal; subaccount = ?subaccountBlob };
     /// let amount: Nat = 100_000; // Amount to deposit
+    /// let allowanceFee : Nat = ... // Current allowance fee
     ///
-    /// let response = await* handler.depositFromAllowance(userAccount, amount);
+    /// let response = await* handler.depositFromAllowance(userPrincipal, userAccount, amount, allowanceFee);
     /// switch (response) {
     ///   case (#ok credit_inc) {
     ///     // Handle successful deposit
@@ -261,11 +254,11 @@ module {
     ///   };
     /// };
     /// ```
-    public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat) : async* AccountManager.DepositFromAllowanceResponse {
-      await* accountManager.depositFromAllowance(p, account, amount);
+    public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.DepositFromAllowanceResponse {
+      await* accountManager.depositFromAllowance(p, account, amount, expectedFee);
     };
 
-    /// Triggers the proccessing deposits.
+    /// Triggers the processing deposits.
     /// n - desired number of potential consolidations.
     ///
     /// Example:
@@ -280,13 +273,15 @@ module {
 
     /// Initiates a withdrawal by transferring tokens to another account.
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
+    /// At the same time, it reduces the pool credit. Accordingly, amount <= credit should be satisfied.
     ///
     /// Example:
     /// ```motoko
     /// let recipientAccount = { owner = recipientPrincipal; subaccount = ?subaccountBlob };
     /// let amount: Nat = 100_000; // Amount to withdraw
+    /// let withdrawalFee : Nat = ... // Current withdrawal fee
     ///
-    /// let response = await* tokenHandler.withdrawFromCredit(recipientAccount, amount);
+    /// let response = await* tokenHandler.withdrawFromCredit(recipientAccount, amount, withdrawalFee);
     /// switch(response) {
     ///   case (#ok (transactionIndex, withdrawnAmount)) {
     ///     // Handle successful withdrawal
@@ -299,11 +294,16 @@ module {
     ///     }
     ///   };
     /// ```
-    public func withdrawFromPool(to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
+    public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.WithdrawResponse {
       // try to burn from pool
-      let success = creditRegistry.burn(#pool, amount);
-      if (not success) return #err(#InsufficientCredit);
-      let result = await* accountManager.withdraw(to, amount);
+      creditRegistry.burn(#pool, amount) |> (
+        if (not _) {
+          let err = #InsufficientCredit;
+          log(ownPrincipal, #withdrawalError(err));
+          return #err(err);
+        }
+      );
+      let result = await* accountManager.withdraw(null, to, amount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#pool, amount);
@@ -320,8 +320,9 @@ module {
     /// let userPrincipal = ...; // The principal of the user transferring tokens
     /// let recipientAccount = { owner = recipientPrincipal; subaccount = ?subaccountBlob };
     /// let amount: Nat = 100_000; // Amount to withdraw
+    /// let withdrawalFee : Nat = ... // Current withdrawal fee
     ///
-    /// let response = await* tokenHandler.withdrawFromCredit(userPrincipal, recipientAccount, amount);
+    /// let response = await* tokenHandler.withdrawFromCredit(userPrincipal, recipientAccount, amount, withdrawalFee);
     /// switch(response) {
     ///   case (#ok (transactionIndex, withdrawnAmount)) {
     ///     // Handle successful withdrawal
@@ -334,7 +335,7 @@ module {
     ///     }
     ///   };
     /// ```
-    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat) : async* AccountManager.WithdrawResponse {
+    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.WithdrawResponse {
       // try to burn from user
       creditRegistry.burn(#user p, amount)
       |> (
@@ -344,7 +345,7 @@ module {
           return #err(err);
         }
       );
-      let result = await* accountManager.withdraw(to, amount);
+      let result = await* accountManager.withdraw(?p, to, amount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#user p, amount);
@@ -367,5 +368,4 @@ module {
       creditRegistry.unshare(values.1);
     };
   };
-
 };

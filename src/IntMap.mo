@@ -28,11 +28,25 @@ module {
       let current = get(x);
       let res = p(current);
       if (res) set(x, current + d);
-      res
+      res;
     };
 
     /// Get the sum of all values.
     public func sum() : Int = sum_;
+
+    /// Clears the map of entries with values below the provided minimum.
+    /// The method is designed to prevent spam attacks.
+    /// Returns the number of entries cleared.
+    public func clean(min : Nat) : Nat {
+      var ctr : Nat = 0;
+      label L for ((k, v) in map.entries()) {
+        if (v >= min) continue L;
+        ignore map.remove(k);
+        sum_ -= v;
+        ctr += 1;
+      };
+      ctr;
+    };
 
     /// Serializes the map.
     public func share() : [(K, Int)] = Iter.toArray(map.entries());
