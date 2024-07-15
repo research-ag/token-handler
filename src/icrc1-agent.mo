@@ -24,7 +24,7 @@ module {
 
   public type TransferResult = R.Result<Nat, TransferError>;
   public type TransferFromResult = R.Result<Nat, TransferFromError>;
-  public type BalanceOfResult = R.Result<Nat, { #CallIcrc1LedgerError }>; 
+  public type BalanceResult = R.Result<Nat, { #CallIcrc1LedgerError }>; 
 
   public class LedgerAgent(api : ICRC1.API) {
     var fee_ = 0;
@@ -32,7 +32,7 @@ module {
     public func fee() : Nat = fee_;
     public func setFee(x : Nat) = fee_ := x;
 
-    public func balance_of(a : ICRC1.Account) : async* BalanceOfResult {
+    public func balance_of(a : ICRC1.Account) : async* BalanceResult {
       try {
         #ok(await api.balance_of(a));
       } catch (_) {

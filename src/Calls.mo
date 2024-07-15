@@ -3,6 +3,7 @@ import ICRC1Agent "icrc1-agent";
 import ICRC84 "mo:icrc84";
 
 module {
+  type BalanceResult = ICRC1Agent.BalanceResult;
   type TransferResult = ICRC1Agent.TransferResult;
   type DrawResult = ICRC1Agent.TransferFromResult;
 
@@ -12,16 +13,11 @@ module {
     public func setFee(x : Nat) = agent.setFee(x);
 
     /// Fetches actual deposit for a principal from the ICRC1 ledger.
-    public func loadDeposit(p : Principal) : async* Nat {
-      let res = await* agent.balance_of({
+    public func loadDeposit(p : Principal) : async* BalanceResult {
+      await* agent.balance_of({
         owner = ownPrincipal;
         subaccount = ?ICRC84.toSubaccount(p);
       });
-      // TODO change return type to Result type
-      switch (res) {
-        case (#ok(x)) { x };
-        case (#err(_)) { 0 };
-      };
     };
 
     // Amount is the amount to transfer out, amount - fee is received

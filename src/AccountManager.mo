@@ -216,11 +216,13 @@ module {
       if (notificationsOnPause_) return null;
       let ?release = depositRegistry.obtainLock(p) else return null;
 
-      let latestDeposit = try {
-        await* Ledger.loadDeposit(p);
-      } catch (err) {
-        ignore release(null);
-        throw err;
+      let latestDeposit = 
+      switch (await* Ledger.loadDeposit(p)) {
+        case (#ok x) x;
+        case (#err _) {
+          ignore release(null);
+          return null;
+        };
       };
 
       if (latestDeposit <= fee(#deposit)) {
