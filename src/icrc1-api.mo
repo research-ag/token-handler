@@ -73,22 +73,22 @@ module ICRC1 {
   // Note: The functions icrc1_fee and icrc1_balance_of in the type below are actually query functions.
   // However, for an inter-canister call it makes no difference if we declare them as query or not.
   // If we don't declare them as query then this gives us more flexbility for testing.
-  public type LedgerActor = actor {
+  public type Service = actor {
     icrc1_fee : () -> async Nat;
     icrc1_balance_of : Account -> async Nat;
     icrc1_transfer : TransferArgs -> async TransferResult;
     icrc2_transfer_from : TransferFromArgs -> async TransferFromResult;
   };
 
-  public type LedgerAPI = {
+  public type API = {
     fee : shared () -> async Nat;
     balance_of : shared Account -> async Nat;
     transfer : shared TransferArgs -> async TransferResult;
     transfer_from : shared TransferFromArgs -> async TransferFromResult;
   };
 
-  public func ledgerActor(p : Principal) : LedgerActor = actor(Principal.toText(p));
-  public func actorAPI(x : LedgerActor) : LedgerAPI = {
+  public func service(p : Principal) : Service = actor(Principal.toText(p));
+  public func apiFromService(x : Service) : API = {
     fee = x.icrc1_fee;
     balance_of = x.icrc1_balance_of;
     transfer = x.icrc1_transfer;

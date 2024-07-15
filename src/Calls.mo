@@ -16,7 +16,7 @@ module {
   public type TransferResult = Result<Nat, Transfer>;
   public type DrawResult = Result<Nat, TransferFrom>;
 
-  public class Ledger(api : ICRC1.LedgerAPI, ownPrincipal : Principal) {
+  public class Ledger(api : ICRC1.API, ownPrincipal : Principal) {
     var fee_ = 0;
 
     public func fee() : Nat = fee_;

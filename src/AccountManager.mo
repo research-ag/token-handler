@@ -60,7 +60,7 @@ module {
   /// Manages accounts and funds for users.
   /// Handles deposit, withdrawal, and consolidation operations.
   public class AccountManager(
-    icrc1Ledger : ICRC1.LedgerAPI,
+    icrc1Ledger : ICRC1.API,
     ownPrincipal : Principal,
     log : (Principal, LogEvent) -> (),
     initialFee : Nat,

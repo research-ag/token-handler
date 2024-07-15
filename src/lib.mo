@@ -47,13 +47,13 @@ module {
   /// Converts `ICRC1.Subaccount` to `Principal`.
   public func toPrincipal(subaccount : ICRC1.Subaccount) : ?Principal = Util.toPrincipal(subaccount);
 
-  public type LedgerAPI = ICRC1.LedgerAPI;
+  public type LedgerAPI = ICRC1.API;
 
   /// Build a `LedgerAPI` object based on the ledger principal.
   public func buildLedgerApi(ledgerPrincipal : Principal) : LedgerAPI {
     ledgerPrincipal
-    |> ICRC1.ledgerActor(_)
-    |> ICRC1.actorAPI(_);
+    |> ICRC1.service(_)
+    |> ICRC1.apiFromService(_);
   };
 
   /// Class `TokenHandler` provides mechanisms to facilitate the deposit and withdrawal management on an ICRC-1 ledger.
