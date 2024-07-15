@@ -10,7 +10,7 @@ import Text "mo:base/Text";
 import Nat "mo:base/Nat";
 import Result "mo:base/Result";
 
-import Util "util";
+import ICRC84 "mo:icrc84";
 import ICRC1 "icrc1-api";
 import AccountManager "AccountManager";
 import CreditRegistry "CreditRegistry";
@@ -42,10 +42,10 @@ module {
   public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0), ([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
-  public func toSubaccount(p : Principal) : ICRC1.Subaccount = Util.toSubaccount(p);
+  public func toSubaccount(p : Principal) : ICRC1.Subaccount = ICRC84.toSubaccount(p);
 
   /// Converts `ICRC1.Subaccount` to `Principal`.
-  public func toPrincipal(subaccount : ICRC1.Subaccount) : ?Principal = Util.toPrincipal(subaccount);
+  public func toPrincipal(subaccount : ICRC1.Subaccount) : ?Principal = ICRC84.toPrincipal(subaccount);
 
   public type LedgerAPI = ICRC1.API;
 

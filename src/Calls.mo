@@ -1,6 +1,6 @@
 import ICRC1 "icrc1-api";
 import ICRC1Calls "icrc1-calls";
-import Util "util";
+import ICRC84 "mo:icrc84";
 
 module {
   type TransferResult = ICRC1Calls.TransferResult;
@@ -15,7 +15,7 @@ module {
     public func loadDeposit(p : Principal) : async* Nat {
       let res = await* calls.balance_of({
         owner = ownPrincipal;
-        subaccount = ?Util.toSubaccount(p);
+        subaccount = ?ICRC84.toSubaccount(p);
       });
       // TODO change return type to Result type
       switch (res) {
@@ -34,7 +34,7 @@ module {
     /// Consolidate funds into the main account
     public func consolidate(p : Principal, amount : Nat) : async* TransferResult {
       await* calls.transfer(
-        ?Util.toSubaccount(p),
+        ?ICRC84.toSubaccount(p),
         { owner = ownPrincipal; subaccount = null },
         amount,
       );
@@ -52,7 +52,7 @@ module {
       // let fee = calls.fee();
       // assert amount >= fee;
       let to = { owner = ownPrincipal; subaccount = null };
-      await* calls.transfer_from(from, to, amount, ?Util.toSubaccount(p));
+      await* calls.transfer_from(from, to, amount, ?ICRC84.toSubaccount(p));
     };
 
   };
