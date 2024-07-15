@@ -14,6 +14,8 @@ import Principal "mo:base/Principal";
 /// It is record of shared functions.
 /// This type is useful to pass the ledger's API around without having to pass around the actor.
 /// It is also useful for testing purposes because one can easily mock the ledger's API without having to create an actor.
+///
+/// This module is general-purpose. It is not specific to the TokenHandler.
 module ICRC1 {
   public type Subaccount = Blob;
 
