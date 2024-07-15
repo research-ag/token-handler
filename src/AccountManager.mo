@@ -5,7 +5,7 @@ import Text "mo:base/Text";
 import Nat "mo:base/Nat";
 import Iter "mo:base/Iter";
 
-import ICRC1 "ICRC1";
+import ICRC1 "icrc1-api";
 import NatMap "NatMapWithLock";
 import Calls "Calls";
 import CreditRegistry "CreditRegistry";

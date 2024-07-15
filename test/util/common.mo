@@ -1,7 +1,7 @@
 import Principal "mo:base/Principal";
 
 import TokenHandler "../../src";
-import ICRC1 "../../src/ICRC1";
+import ICRC1 "../../src/icrc1-api";
 import MockLedger "mock_ledger";
 import Mock "mock";
 import TestJournal "test_journal";

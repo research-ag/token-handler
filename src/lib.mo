@@ -11,7 +11,7 @@ import Nat "mo:base/Nat";
 import Result "mo:base/Result";
 
 import Util "util";
-import ICRC1 "ICRC1";
+import ICRC1 "icrc1-api";
 import AccountManager "AccountManager";
 import CreditRegistry "CreditRegistry";
 

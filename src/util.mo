@@ -3,7 +3,7 @@ import Nat8 "mo:base/Nat8";
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 
-import ICRC1 "./ICRC1";
+import ICRC1 "icrc1-api";
 
 module {
   /// Converts `Principal` to `ICRC1.Subaccount`.

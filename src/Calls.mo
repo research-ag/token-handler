@@ -1,23 +1,20 @@
-import ICRC1 "ICRC1";
+import ICRC1 "icrc1-api";
 import R "mo:base/Result";
 import Util "util";
 
 module {
   public type Account = ICRC1.Account;
 
-  public module Error {
-    public type Transfer = ICRC1.TransferError or { #CallIcrc1LedgerError };
-    public type TransferFrom = ICRC1.TransferFromError or {
-      #CallIcrc1LedgerError;
-    };
-    public type TransferMin = Transfer or { #TooLowQuantity };
-    public type TransferFromMin = TransferFrom or { #TooLowQuantity };
-    public type Withdraw = TransferMin or { #InsufficientCredit };
+  public type Transfer = ICRC1.TransferError or {
+    #CallIcrc1LedgerError;
+  };
+  public type TransferFrom = ICRC1.TransferFromError or {
+    #CallIcrc1LedgerError;
   };
 
   type Result<X, Y> = R.Result<X, Y>;
-  public type TransferRes = Result<Nat, Error.Transfer>;
-  public type DrawRes = Result<Nat, Error.TransferFrom>;
+  public type TransferResult = Result<Nat, Transfer>;
+  public type DrawResult = Result<Nat, TransferFrom>;
 
   public class Ledger(api : ICRC1.LedgerAPI, ownPrincipal : Principal) {
     var fee_ = 0;
@@ -27,6 +24,7 @@ module {
 
     /// Fetches actual deposit for a principal from the ICRC1 ledger.
     public func loadDeposit(p : Principal) : async* Nat {
+      // TODO try-catch to catch CallLedgerError
       await api.balance_of({
         owner = ownPrincipal;
         subaccount = ?Util.toSubaccount(p);
@@ -34,7 +32,7 @@ module {
     };
 
     // Amount is the amount to transfer out, amount - fee is received
-    func transfer(from_subaccount : ?ICRC1.Subaccount, to : Account, amount : Nat) : async* TransferRes {
+    func transfer(from_subaccount : ?ICRC1.Subaccount, to : Account, amount : Nat) : async* TransferResult {
       assert amount >= fee_;
       let args = {
         from_subaccount;
@@ -52,7 +50,7 @@ module {
     };
 
     /// Consolidate funds into the main account
-    public func consolidate(p : Principal, amount : Nat) : async* TransferRes {
+    public func consolidate(p : Principal, amount : Nat) : async* TransferResult {
       await* transfer(
         ?Util.toSubaccount(p),
         { owner = ownPrincipal; subaccount = null },
@@ -61,13 +59,14 @@ module {
     };
 
     /// Send <amount> out from the main account, <amount> - fee_ will be received
-    public func send(to : Account, amount : Nat) : async* TransferRes {
+    public func send(to : Account, amount : Nat) : async* TransferResult {
       await* transfer(null, to, amount);
     };
 
     /// Draw <amount> from an allowance into the main account
     /// <amount> will be received
-    public func draw(p : Principal, from : Account, amount : Nat) : async* DrawRes {
+    public func draw(p : Principal, from : Account, amount : Nat) : async* DrawResult {
+      // TODO: change amount to amount - fee
       let args = {
         spender_subaccount = ?Util.toSubaccount(p);
         from;
