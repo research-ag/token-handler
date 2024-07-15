@@ -26,7 +26,7 @@ module {
   public type TransferFromResult = R.Result<Nat, TransferFromError>;
   public type BalanceOfResult = R.Result<Nat, { #CallIcrc1LedgerError }>; 
 
-  public class LedgerCalls(api : ICRC1.API) {
+  public class LedgerAgent(api : ICRC1.API) {
     var fee_ = 0;
 
     public func fee() : Nat = fee_;
