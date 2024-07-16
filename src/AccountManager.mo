@@ -14,7 +14,7 @@ import Debug "mo:base/Debug";
 module {
   public type StableData = (
     NatMap.StableData<Principal>, // depositRegistry
-// TODO    Nat, // Ledger.fee()
+    Nat, // ledgerFeee_
     Nat, // surcharge_
     Nat, // totalConsolidated_
     Nat, // totalWithdrawn_
@@ -216,7 +216,7 @@ module {
 
     func updatedFee(oldFee : Nat, newFee : Nat) {
       assert oldFee != newFee;
-      assert oldFee == ledgerFee_;
+      // assert oldFee == ledgerFee_; This may be violated after upgrade
       recalculateBacklog(newFee + surcharge_);
       ledgerFee_ := newFee;
       log(ownPrincipal, #feeUpdated({ old = oldFee; new = newFee }));
@@ -230,8 +230,7 @@ module {
       if (notificationsOnPause_) return null;
       let ?release = depositRegistry.obtainLock(p) else return null;
 
-      let latestDeposit = 
-      switch (await* Ledger.loadDeposit(p)) {
+      let latestDeposit = switch (await* Ledger.loadDeposit(p)) {
         case (#ok x) x;
         case (#err _) {
           ignore release(null);
@@ -395,6 +394,9 @@ module {
           };
           #ok(txid, amountArrived);
         };
+        case (#err(#BadFee { expected_fee })) {
+          #err(#BadFee { expected_fee = fee(#withdrawal) });
+        };
         case (#err err) #err(err);
       };
     };
@@ -437,7 +439,7 @@ module {
     /// Serializes the token handler data.
     public func share() : StableData = (
       depositRegistry.share(),
-// TODO      Ledger.fee(),
+      ledgerFee_,
       surcharge_,
       totalConsolidated_,
       totalWithdrawn_,
@@ -446,10 +448,11 @@ module {
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
       depositRegistry.unshare(values.0);
-// TODO      Ledger.setFee(values.1);
-      surcharge_ := values.1;
-      totalConsolidated_ := values.2;
-      totalWithdrawn_ := values.3;
+      ledgerFee_ := values.1;
+      Ledger.setFee(values.1);
+      surcharge_ := values.2;
+      totalConsolidated_ := values.3;
+      totalWithdrawn_ := values.4;
     };
   };
 };
