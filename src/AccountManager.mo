@@ -10,7 +10,6 @@ import NatMap "NatMapWithLock";
 import ICRC84Helper "icrc84-helper";
 import CreditRegistry "CreditRegistry";
 
-import Debug "mo:base/Debug";
 module {
   public type StableData = (
     NatMap.StableData<Principal>, // depositRegistry
@@ -376,12 +375,7 @@ module {
         };
       };
 
-      Debug.print("amountToSend: " # Nat.toText(amountToSend));
-      Debug.print("expectedFee: " # debug_show expectedFee);
-
       let res = await* Ledger.send(to, amountToSend);
-
-      Debug.print(debug_show res);
 
       if (R.isOk(res)) totalWithdrawn_ += amountToSend;
 
