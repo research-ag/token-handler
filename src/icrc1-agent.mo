@@ -13,6 +13,10 @@ import R "mo:base/Result";
 /// It does not require the `fee` argument to passed with every call.
 /// Instead, `setFee()` can be called once and the provided fee value is then automatically passed along with every call made.
 ///
+/// This module does not parse errors and does interpret them.
+/// In particular, it does not try to be smart about fees and does not try to auto-detect the ledger fee.
+/// It does not deal with race conditions and concurrency issues between ledger calls.
+///
 /// This module is general-purpose. It is not specific to the TokenHandler.
 module {
   public type TransferError = ICRC1.TransferError or {
@@ -25,12 +29,21 @@ module {
   public type TransferResult = R.Result<Nat, TransferError>;
   public type TransferFromResult = R.Result<Nat, TransferFromError>;
   public type BalanceResult = R.Result<Nat, { #CallIcrc1LedgerError }>; 
+  public type FeeResult = R.Result<Nat, { #CallIcrc1LedgerError }>; 
 
   public class LedgerAgent(api : ICRC1.API) {
     var fee_ = 0;
 
     public func fee() : Nat = fee_;
     public func setFee(x : Nat) = fee_ := x;
+
+    public func fetchFee() : async* FeeResult {
+      try {
+        #ok(await api.fee());
+      } catch (_) {
+        #err(#CallIcrc1LedgerError);
+      };
+    };
 
     public func balance_of(a : ICRC1.Account) : async* BalanceResult {
       try {

@@ -7,13 +7,14 @@ import Iter "mo:base/Iter";
 
 import ICRC1 "icrc1-api";
 import NatMap "NatMapWithLock";
-import Calls "Calls";
+import ICRC84Helper "icrc84-helper";
 import CreditRegistry "CreditRegistry";
 
+import Debug "mo:base/Debug";
 module {
   public type StableData = (
     NatMap.StableData<Principal>, // depositRegistry
-    Nat, // Ledger.fee()
+// TODO    Nat, // Ledger.fee()
     Nat, // surcharge_
     Nat, // totalConsolidated_
     Nat, // totalWithdrawn_
@@ -69,20 +70,17 @@ module {
     creditRegistry : CreditRegistry.CreditRegistry,
   ) {
 
-    let Ledger = Calls.Ledger(icrc1Ledger, ownPrincipal);
+    var ledgerFee_ : Nat = initialFee;
 
     /// If `true` new notifications are paused.
     var notificationsOnPause_ : Bool = false;
-
-    /// Current ledger fee amount.
-    Ledger.setFee(initialFee);
 
     /// Current surcharge amount.
     /// Surcharge is a parameter representing the increment for building fees.
     var surcharge_ : Nat = 0;
 
     /// Manages deposit balances for each user.
-    let depositRegistry = NatMap.NatMapWithLock<Principal>(Principal.compare, Ledger.fee() + 1);
+    let depositRegistry = NatMap.NatMapWithLock<Principal>(Principal.compare, initialFee + 1);
 
     /// Total amount consolidated. Accumulated value.
     var totalConsolidated_ : Nat = 0;
@@ -111,7 +109,7 @@ module {
     public func lookups() : Nat = depositRegistry.lookups();
 
     /// Retrieves the current fee amount.
-    public func ledgerFee() : Nat = Ledger.fee();
+    public func ledgerFee() : Nat = ledgerFee_;
 
     /// Retrieves the current surcharge amount.
     public func surcharge() : Nat = surcharge_;
@@ -124,9 +122,9 @@ module {
 
     /// Calculates the final fee of the specific type.
     public func fee(t : FeeType) : Nat = switch (t) {
-      case (#deposit) Ledger.fee() + surcharge_;
-      case (#allowance) Ledger.fee() + surcharge_;
-      case (#withdrawal) Ledger.fee() + surcharge_;
+      case (#deposit) ledgerFee_ + surcharge_;
+      case (#allowance) ledgerFee_ + surcharge_;
+      case (#withdrawal) ledgerFee_ + surcharge_;
     };
 
     var fetchFeeLock : Bool = false;
@@ -136,10 +134,9 @@ module {
     public func fetchFee() : async* ?Nat {
       if (fetchFeeLock) return null;
       fetchFeeLock := true;
-      let newFee = await icrc1Ledger.fee();
+      let res = await* Ledger.loadFee();
       fetchFeeLock := false;
-      updateFee(newFee);
-      ?newFee;
+      res;
     };
 
     func recalculateBacklog(newDepositFee : Nat) {
@@ -158,13 +155,6 @@ module {
           };
         }
       );
-    };
-
-    func updateFee(newFee : Nat) {
-      if (Ledger.fee() == newFee) return;
-      recalculateBacklog(newFee + surcharge_);
-      log(ownPrincipal, #feeUpdated({ old = Ledger.fee(); new = newFee }));
-      Ledger.setFee(newFee);
     };
 
     /// Retrieves the sum of all current deposits.
@@ -191,6 +181,20 @@ module {
     /// Retrieves the deposit of a principal.
     public func getDeposit(p : Principal) : ?Nat = depositRegistry.getOpt(p);
 
+    /// Increases the credit amount associated with a specific principal.
+    /// For internal use only.
+    func issue(p : Principal, amount : Nat) {
+      creditRegistry.issue(#user p, amount);
+      credited += amount;
+    };
+
+    /// Deducts the credit amount associated with a specific principal.
+    /// For internal use only.
+    func burn(p : Principal, amount : Nat) {
+      creditRegistry.issue(#user p, -amount);
+      credited -= amount;
+    };
+
     func process_deposit(p : Principal, deposit : Nat, release : ?Nat -> Int) : (Nat, Nat) {
       if (deposit <= fee(#deposit)) {
         ignore release(null);
@@ -209,6 +213,16 @@ module {
       issue(p, creditInc);
       (inc, creditInc);
     };
+
+    func updatedFee(oldFee : Nat, newFee : Nat) {
+      assert oldFee != newFee;
+      assert oldFee == ledgerFee_;
+      recalculateBacklog(newFee + surcharge_);
+      ledgerFee_ := newFee;
+      log(ownPrincipal, #feeUpdated({ old = oldFee; new = newFee }));
+    };
+
+    let Ledger = ICRC84Helper.Ledger(icrc1Ledger, ownPrincipal, initialFee, updatedFee);
 
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit if successful.
@@ -260,10 +274,6 @@ module {
 
       switch (res) {
         case (#ok txid) #ok(amount, txid);
-        case (#err(#BadFee { expected_fee })) {
-          updateFee(expected_fee);
-          #err(#BadFee { expected_fee = fee(#allowance) });
-        };
         case (#err err) #err(err);
       };
     };
@@ -301,12 +311,6 @@ module {
       let benefit : Nat = fee(#deposit) - Ledger.fee();
 
       let res = await* Ledger.consolidate(p, deposit);
-
-      // catch #BadFee
-      switch (res) {
-        case (#err(#BadFee { expected_fee })) updateFee(expected_fee);
-        case (_) {};
-      };
 
       // log event
       let event = switch (res) {
@@ -373,7 +377,12 @@ module {
         };
       };
 
+      Debug.print("amountToSend: " # Nat.toText(amountToSend));
+      Debug.print("expectedFee: " # debug_show expectedFee);
+
       let res = await* Ledger.send(to, amountToSend);
+
+      Debug.print(debug_show res);
 
       if (R.isOk(res)) totalWithdrawn_ += amountToSend;
 
@@ -385,10 +394,6 @@ module {
             credited += benefit;
           };
           #ok(txid, amountArrived);
-        };
-        case (#err(#BadFee { expected_fee })) {
-          updateFee(expected_fee);
-          #err(#BadFee { expected_fee = fee(#withdrawal) });
         };
         case (#err err) #err(err);
       };
@@ -414,20 +419,6 @@ module {
       res;
     };
 
-    /// Increases the credit amount associated with a specific principal.
-    /// For internal use only.
-    func issue(p : Principal, amount : Nat) {
-      creditRegistry.issue(#user p, amount);
-      credited += amount;
-    };
-
-    /// Deducts the credit amount associated with a specific principal.
-    /// For internal use only.
-    func burn(p : Principal, amount : Nat) {
-      creditRegistry.issue(#user p, -amount);
-      credited -= amount;
-    };
-
     public func assertIntegrity() {
       let deposited : Int = depositRegistry |> _.sum() - fee(#deposit) * _.size();
       let integrityIsMaintained = consolidatedFunds() + deposited == credited;
@@ -446,7 +437,7 @@ module {
     /// Serializes the token handler data.
     public func share() : StableData = (
       depositRegistry.share(),
-      Ledger.fee(),
+// TODO      Ledger.fee(),
       surcharge_,
       totalConsolidated_,
       totalWithdrawn_,
@@ -455,10 +446,10 @@ module {
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
       depositRegistry.unshare(values.0);
-      Ledger.setFee(values.1);
-      surcharge_ := values.2;
-      totalConsolidated_ := values.3;
-      totalWithdrawn_ := values.4;
+// TODO      Ledger.setFee(values.1);
+      surcharge_ := values.1;
+      totalConsolidated_ := values.2;
+      totalWithdrawn_ := values.3;
     };
   };
 };
