@@ -78,13 +78,13 @@ module {
     };
 
     /// Draw <amount> from an allowance into the main account
-    /// <amount> will be received
+    /// <amount> is the amount including fees subtracted from the allowance
+    /// <amount - fee will be received in the main account
     public func draw(p : Principal, from : ICRC1.Account, amount : Nat) : async* DrawResult {
-      // TODO: change amount to amount - fee
-      // let fee = agent.fee();
-      // assert amount >= fee;
+      let fee = agent.fee();
+      assert amount >= fee;
       let to = { owner = ownPrincipal; subaccount = null };
-      let res = await* agent.transfer_from(from, to, amount, ?ICRC84.toSubaccount(p));
+      let res = await* agent.transfer_from(from, to, amount - fee, ?ICRC84.toSubaccount(p));
       checkFee(res);
       res;
     };

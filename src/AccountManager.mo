@@ -105,7 +105,7 @@ module {
 
     // Pass through the lookup counter from depositRegistry
     // TODO: Remove later
-    public func lookups() : Nat = depositRegistry.lookups();
+    public func lookups_() : Nat = depositRegistry.lookups();
 
     /// Retrieves the current fee amount.
     public func ledgerFee() : Nat = ledgerFee_;
@@ -260,18 +260,16 @@ module {
 
     /// Processes allowance.
     /// `amount` - credit-side amount.
-    func processAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
+    func processAllowance(p : Principal, account : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
       switch (expectedFee) {
         case null {};
         case (?f) if (f != fee(#allowance)) return #err(#BadFee { expected_fee = fee(#allowance) });
       };
 
-      let amountToDraw : Nat = amount + fee(#allowance) - Ledger.fee();
-
-      let res = await* Ledger.draw(p, account, amountToDraw);
+      let res = await* Ledger.draw(p, account, creditAmount + fee(#allowance));
 
       switch (res) {
-        case (#ok txid) #ok(amount, txid);
+        case (#ok txid) #ok(creditAmount, txid);
         case (#err err) #err(err);
       };
     };
@@ -280,21 +278,21 @@ module {
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
     /// `amount` - credit-side amount.
-    public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
+    public func depositFromAllowance(p : Principal, account : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
       let benefit : Nat = fee(#allowance) - Ledger.fee();
 
-      let res = await* processAllowance(p, account, amount, expectedFee);
+      let res = await* processAllowance(p, account, creditAmount, expectedFee);
 
       let event = switch (res) {
-        case (#ok _) #allowanceDrawn({ amount });
+        case (#ok _) #allowanceDrawn({ amount = creditAmount });
         case (#err err) #allowanceError(err);
       };
 
       log(p, event);
 
       if (R.isOk(res)) {
-        totalConsolidated_ += amount + benefit;
-        issue(p, amount);
+        totalConsolidated_ += creditAmount + benefit;
+        issue(p, creditAmount);
         creditRegistry.issue(#pool, benefit);
         credited += benefit;
       };

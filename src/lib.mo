@@ -73,7 +73,7 @@ module {
 
     // Pass through the lookup counter from depositRegistry
     // TODO: Remove later
-    public func lookups_() : Nat = accountManager.lookups();
+    public func lookups_() : Nat = accountManager.lookups_();
 
     /// If some unexpected error happened, this flag turns true and handler stops doing anything until recreated.
     var isFrozen_ : Bool = false;
