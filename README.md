@@ -143,6 +143,23 @@ There are 2 types of withdrawals at the moment:
 
 Full API documentation can be found [here](https://mops.one/token-handler/docs/lib).
 
+## Implementation
+
+We have the following modules:
+
+|Module|Description|
+|---|---|
+|icrc1-api|ICRC1 type and interface definitions|
+|icrc1-agent|Catches async errors, its functions never throw, simplified argument, no error inspection (pass-through), no retries|
+|icrc84-helper|Easy access to subaccounts with embedded principal, amount arguments have their fee application "reversed", catches BadFee errors, tracks fee changes, stateless except for fee value, no retries|
+
+Dependency graph:
+```mermaid
+flowchart TD
+  A[icrc84-helper] --> B[icrc1-agent]
+  B --> C[icrc1-api]
+```
+
 ## Copyright
 
 MR Research AG, 2023-2024
