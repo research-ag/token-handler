@@ -116,6 +116,7 @@ module {
     /// Sets new surcharge amount.
     public func setSurcharge(s : Nat) {
       log(ownPrincipal, #surchargeUpdated({ old = surcharge_; new = s }));
+      recalculateBacklog(ledgerFee_ + s);
       surcharge_ := s;
     };
 
