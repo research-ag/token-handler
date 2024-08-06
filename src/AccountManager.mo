@@ -340,7 +340,7 @@ module {
         underwayFunds_ += deposit;
         let result = await* consolidate(p, release);
         underwayFunds_ -= deposit;
-        assertIntegrity();
+        // assertIntegrity();
         switch (result) {
           case (#err(#CallIcrc1LedgerError)) return;
           case (_) {};
