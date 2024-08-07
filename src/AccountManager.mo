@@ -6,13 +6,13 @@ import Nat "mo:base/Nat";
 import Iter "mo:base/Iter";
 
 import ICRC1 "icrc1-api";
-import NatMap "NatMapWithLock";
 import ICRC84Helper "icrc84-helper";
 import CreditRegistry "CreditRegistry";
+import DepositRegistry "DepositRegistry";
 
 module {
   public type StableData = (
-    NatMap.StableData<Principal>, // depositRegistry
+    DepositRegistry.StableData, // depositRegistry
     Nat, // ledgerFeee_
     Nat, // surcharge_
     Nat, // totalConsolidated_
@@ -63,14 +63,11 @@ module {
     icrc1Ledger : ICRC1.API,
     ownPrincipal : Principal,
     log : (Principal, LogEvent) -> (),
-    initialFee : Nat,
+    initialLedgerFee : Nat, // initial ledger fee
     triggerOnNotifications : Bool,
     freezeCallback : (text : Text) -> (),
     creditRegistry : CreditRegistry.CreditRegistry,
   ) {
-
-    var ledgerFee_ : Nat = initialFee;
-
     /// If `true` new notifications are paused.
     var notificationsOnPause_ : Bool = false;
 
@@ -79,7 +76,11 @@ module {
     var surcharge_ : Nat = 0;
 
     /// Manages deposit balances for each user.
-    let depositRegistry = NatMap.NatMapWithLock<Principal>(Principal.compare, initialFee + 1);
+    let depositRegistry = DepositRegistry.DepositRegistry(
+      initialLedgerFee + surcharge_,
+      freezeCallback,
+    );
+    let depositMap = depositRegistry.map;
 
     /// Total amount consolidated. Accumulated value.
     var totalConsolidated_ : Nat = 0;
@@ -103,12 +104,8 @@ module {
     /// Unpause new notifications.
     public func unpauseNotifications() = notificationsOnPause_ := false;
 
-    // Pass through the lookup counter from depositRegistry
-    // TODO: Remove later
-    public func lookups_() : Nat = depositRegistry.lookups();
-
     /// Retrieves the current fee amount.
-    public func ledgerFee() : Nat = ledgerFee_;
+    public func ledgerFee() : Nat = Ledger.fee();
 
     /// Retrieves the current surcharge amount.
     public func surcharge() : Nat = surcharge_;
@@ -116,15 +113,15 @@ module {
     /// Sets new surcharge amount.
     public func setSurcharge(s : Nat) {
       log(ownPrincipal, #surchargeUpdated({ old = surcharge_; new = s }));
-      recalculateBacklog(ledgerFee_ + s);
+      depositRegistry.updateFee(Ledger.fee() + s, issue, burn);
       surcharge_ := s;
     };
 
     /// Calculates the final fee of the specific type.
     public func fee(t : FeeType) : Nat = switch (t) {
-      case (#deposit) ledgerFee_ + surcharge_;
-      case (#allowance) ledgerFee_ + surcharge_;
-      case (#withdrawal) ledgerFee_ + surcharge_;
+      case (#deposit) Ledger.fee() + surcharge_;
+      case (#allowance) Ledger.fee() + surcharge_;
+      case (#withdrawal) Ledger.fee() + surcharge_;
     };
 
     var fetchFeeLock : Bool = false;
@@ -139,35 +136,17 @@ module {
       res;
     };
 
-    func recalculateBacklog(newDepositFee : Nat) {
-      // update the deposit minimum depending on the new fee
-      // the callback debits the principal for deposits that are removed in this step
-      let depositFee = fee(#deposit);
-      depositRegistry.setMinimum(newDepositFee + 1, func(p, v) = burn(p, v - depositFee));
-      // adjust credit for all queued deposits
-      depositRegistry.iterate(
-        func(p, v) {
-          if (v <= newDepositFee) freezeCallback("deposit <= newFee should have been erased in previous step");
-          if (newDepositFee > depositFee) {
-            burn(p, newDepositFee - depositFee);
-          } else {
-            issue(p, depositFee - newDepositFee);
-          };
-        }
-      );
-    };
-
     /// Retrieves the sum of all current deposits.
-    public func depositedFunds() : Nat = depositRegistry.sum() + underwayFunds_;
+    public func depositedFunds() : Nat = depositMap.sum() + underwayFunds_;
 
     /// Retrieves the sum of all current deposits.
     public func underwayFunds() : Nat = underwayFunds_;
 
     /// Retrieves the sum of all current deposits.
-    public func queuedFunds() : Nat = depositRegistry.sum();
+    public func queuedFunds() : Nat = depositMap.sum();
 
     /// Returns the size of the deposit registry.
-    public func depositsNumber() : Nat = depositRegistry.size();
+    public func depositsNumber() : Nat = depositMap.size();
 
     /// Retrieves the sum of all successful consolidations.
     public func totalConsolidated() : Nat = totalConsolidated_;
@@ -179,7 +158,7 @@ module {
     public func consolidatedFunds() : Nat = totalConsolidated_ - totalWithdrawn_;
 
     /// Retrieves the deposit of a principal.
-    public func getDeposit(p : Principal) : ?Nat = depositRegistry.getOpt(p);
+    public func getDeposit(p : Principal) : ?Nat = depositMap.getOpt(p);
 
     /// Increases the credit amount associated with a specific principal.
     /// For internal use only.
@@ -216,19 +195,17 @@ module {
 
     func updatedFee(oldFee : Nat, newFee : Nat) {
       assert oldFee != newFee;
-      // assert oldFee == ledgerFee_; This may be violated after upgrade
-      recalculateBacklog(newFee + surcharge_);
-      ledgerFee_ := newFee;
+      depositRegistry.updateFee(newFee + surcharge_, issue, burn);
       log(ownPrincipal, #feeUpdated({ old = oldFee; new = newFee }));
     };
 
-    let Ledger = ICRC84Helper.Ledger(icrc1Ledger, ownPrincipal, initialFee, updatedFee);
+    let Ledger = ICRC84Helper.Ledger(icrc1Ledger, ownPrincipal, initialLedgerFee, updatedFee);
 
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit if successful.
     public func notify(p : Principal) : async* ?(Nat, Nat) {
       if (notificationsOnPause_) return null;
-      let ?release = depositRegistry.obtainLock(p) else return null;
+      let ?release = depositMap.obtainLock(p) else return null;
 
       let latestDeposit = switch (await* Ledger.loadDeposit(p)) {
         case (#ok x) x;
@@ -303,7 +280,7 @@ module {
 
     /// Attempts to consolidate the funds for a particular principal.
     func consolidate(p : Principal, release : ?Nat -> Int) : async* TransferResponse {
-      let deposit = depositRegistry.erase(p);
+      let deposit = depositMap.erase(p);
       let credit : Nat = deposit - fee(#deposit);
       let benefit : Nat = fee(#deposit) - Ledger.fee();
 
@@ -339,7 +316,7 @@ module {
     /// n - desired number of potential consolidations.
     public func trigger(n : Nat) : async* () {
       for (i in Iter.range(1, n)) {
-        let ?(p, deposit, release) = depositRegistry.nextLock() else return;
+        let ?(p, deposit, release) = depositMap.nextLock() else return;
         underwayFunds_ += deposit;
         let result = await* consolidate(p, release);
         underwayFunds_ -= deposit;
@@ -415,7 +392,7 @@ module {
     };
 
     public func assertIntegrity() {
-      let deposited : Int = depositRegistry |> _.sum() - fee(#deposit) * _.size();
+      let deposited : Int = depositMap |> _.sum() - fee(#deposit) * _.size();
       let integrityIsMaintained = consolidatedFunds() + deposited == credited;
       if (not integrityIsMaintained) {
         let values : [Text] = [
@@ -431,8 +408,8 @@ module {
 
     /// Serializes the token handler data.
     public func share() : StableData = (
-      depositRegistry.share(),
-      ledgerFee_,
+      depositMap.share(),
+      Ledger.fee(),
       surcharge_,
       totalConsolidated_,
       totalWithdrawn_,
@@ -440,8 +417,7 @@ module {
 
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
-      depositRegistry.unshare(values.0);
-      ledgerFee_ := values.1;
+      depositMap.unshare(values.0);
       Ledger.setFee(values.1);
       surcharge_ := values.2;
       totalConsolidated_ := values.3;

@@ -158,6 +158,10 @@ Dependency graph:
 flowchart TD
   A[icrc84-helper] --> B[icrc1-agent]
   B --> C[icrc1-api]
+  D[CreditRegistry] --> E[IntMap]
+  F[AccountManager] --> G[DepositRegistry] --> H[NatMapWithLock]
+  F --> D
+  F --> A
 ```
 
 ## Copyright
