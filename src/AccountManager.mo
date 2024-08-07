@@ -12,7 +12,7 @@ import DepositRegistry "DepositRegistry";
 
 module {
   public type StableData = (
-    DepositRegistry.StableData, // depositRegistry
+    DepositRegistry.StableDataMap, // depositRegistry
     Nat, // ledgerFeee_
     Nat, // surcharge_
     Nat, // totalConsolidated_
@@ -113,7 +113,7 @@ module {
     /// Sets new surcharge amount.
     public func setSurcharge(s : Nat) {
       log(ownPrincipal, #surchargeUpdated({ old = surcharge_; new = s }));
-      depositRegistry.updateFee(Ledger.fee() + s, issue, burn);
+      depositRegistry.updateFee(Ledger.fee() + s, changeCredit);
       surcharge_ := s;
     };
 
@@ -160,18 +160,9 @@ module {
     /// Retrieves the deposit of a principal.
     public func getDeposit(p : Principal) : ?Nat = depositMap.getOpt(p);
 
-    /// Increases the credit amount associated with a specific principal.
-    /// For internal use only.
-    func issue(p : Principal, amount : Nat) {
+    func changeCredit(p : Principal, amount : Int) {
       creditRegistry.issue(#user p, amount);
-      credited += amount;
-    };
-
-    /// Deducts the credit amount associated with a specific principal.
-    /// For internal use only.
-    func burn(p : Principal, amount : Nat) {
-      creditRegistry.issue(#user p, -amount);
-      credited -= amount;
+      if (amount >= 0) credited += Int.abs(amount) else credited -= Int.abs(amount);
     };
 
     func process_deposit(p : Principal, deposit : Nat, release : ?Nat -> Int) : (Nat, Nat) {
@@ -189,13 +180,13 @@ module {
         case false { inc };
       };
 
-      issue(p, creditInc);
+      changeCredit(p, creditInc);
       (inc, creditInc);
     };
 
     func updatedFee(oldFee : Nat, newFee : Nat) {
       assert oldFee != newFee;
-      depositRegistry.updateFee(newFee + surcharge_, issue, burn);
+      depositRegistry.updateFee(newFee + surcharge_, changeCredit);
       log(ownPrincipal, #feeUpdated({ old = oldFee; new = newFee }));
     };
 
@@ -270,7 +261,7 @@ module {
 
       if (R.isOk(res)) {
         totalConsolidated_ += creditAmount + benefit;
-        issue(p, creditAmount);
+        changeCredit(p, creditAmount);
         creditRegistry.issue(#pool, benefit);
         credited += benefit;
       };
@@ -303,8 +294,8 @@ module {
           credited += benefit;
           ignore release(null);
         };
-        case (#err err) {
-          burn(p, credit);
+        case (#err _) {
+          changeCredit(p, -credit);
           ignore process_deposit(p, deposit, release);
         };
       };
