@@ -10,7 +10,7 @@ let user3 = Principal.fromBlob("3");
 
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state) = MockLedger.createHandler(mock_ledger, false);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
 
   // update fee first time
   mock_ledger.fee_.set(3);
@@ -155,7 +155,7 @@ do {
 // Check whether the consolidation planned after the notification is successful
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state) = MockLedger.createHandler(mock_ledger, true);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, true);
 
   // update fee first time
   mock_ledger.fee_.set(5);

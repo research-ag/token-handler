@@ -1,8 +1,5 @@
 import AsyncMethodTester "mo:await-async";
-import Principal "mo:base/Principal";
 import ICRC1 "../../src/ICRC1";
-import TokenHandler "../../src";
-import TestJournal "test_journal";
 
 module {
   public class MockLedger() {
@@ -52,27 +49,5 @@ module {
     };
 
     public func transfer_from_count() : async Nat = async transfer_from_count_;
-  };
-
-  public func createHandler(ledger : TokenHandler.LedgerAPI, triggerOnNotifications : Bool) : (
-    TokenHandler.TokenHandler,
-    TestJournal.TestJournal,
-    () -> (Nat, Nat, Nat),
-  ) {
-    let journal = TestJournal.TestJournal();
-
-    let handler = TokenHandler.TokenHandler({
-      ledgerApi = ledger;
-      ownPrincipal = Principal.fromBlob("");
-      initialFee = 0;
-      triggerOnNotifications;
-      log = journal.log;
-    });
-
-    func state() : (Nat, Nat, Nat) {
-      let s = handler.state();
-      (s.balance.deposited, s.balance.consolidated, s.users.queued);
-    };
-    (handler, journal, state);
   };
 };
