@@ -222,7 +222,7 @@ do {
     #newDeposit(20),
   ]);
   assert state() == (20, 0, 1);
-  ledger.balance_.release(ledger.transfer_.stage(null)); // error response
+  ledger.transfer_.release(ledger.transfer_.stage(null)); // error response
   await* handler.trigger(1);
   assert journal.hasEvents([
     #consolidationError(#CallIcrc1LedgerError),
@@ -230,7 +230,7 @@ do {
     #issued(+15),
   ]);
   assert state() == (20, 0, 1);
-  ledger.balance_.release(ledger.transfer_.stage(?(#Ok 0)));
+  ledger.transfer_.release(ledger.transfer_.stage(?(#Ok 0)));
   await* handler.trigger(1);
   assert journal.hasEvents([
     #consolidated({ credited = 15; deducted = 20 }),
@@ -257,7 +257,7 @@ do {
   ]);
 
   // user1 notify with balance > fee
-  ledger.fee_.release(ledger.balance_.stage(?6));
+  ledger.balance_.release(ledger.balance_.stage(?6));
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state() == (6, 0, 1);
   assert journal.hasEvents([
@@ -266,7 +266,7 @@ do {
   ]);
 
   // user2 notify with balance > fee
-  ledger.fee_.release(ledger.balance_.stage(?10));
+  ledger.balance_.release(ledger.balance_.stage(?10));
   assert (await* handler.notify(user2)) == ?(10, 5);
   assert state() == (16, 0, 2);
   assert journal.hasEvents([
