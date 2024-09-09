@@ -1,7 +1,7 @@
 import Principal "mo:base/Principal";
 
 import Util "util/common";
-import MockLedger "util/ledger";
+import MockLedger "util/mock_ledger";
 
 let user1 = Principal.fromBlob("1");
 let user2 = Principal.fromBlob("2");
