@@ -1,7 +1,6 @@
 import Principal "mo:base/Principal";
-import Debug "mo:base/Debug";
-import Util "util/common";
 import MockLedger "util/mock_ledger";
+import Util "util/common";
 
 let user1 = Principal.fromBlob("1");
 let user2 = Principal.fromBlob("2");
@@ -10,11 +9,11 @@ let user2_account = { owner = user2; subaccount = null };
 let verbose = false;
 
 do {
-  let mock_ledger = await MockLedger.MockLedger();
+  let mock_ledger = MockLedger.MockLedger();
   let (handler, journal, state, fullState) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
-  await mock_ledger.set_fee(3);
+  mock_ledger.fee_.set(3);
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 3;
   assert journal.hasEvents([
@@ -29,7 +28,7 @@ do {
   ]);
 
   // deposit via allowance < amount + fee
-  await mock_ledger.set_transfer_from_res([#Err(#InsufficientAllowance({ allowance = 8 }))]);
+  mock_ledger.transfer_from_.set(#Err(#InsufficientAllowance({ allowance = 8 })));
   assert (await* handler.depositFromAllowance(user1, user1_account, 4, null)) == #err(#InsufficientAllowance({ allowance = 8 }));
   assert state() == (0, 0, 0);
   assert journal.hasEvents([
@@ -37,7 +36,7 @@ do {
   ]);
 
   // deposit via allowance >= amount + fee
-  await mock_ledger.set_transfer_from_res([#Ok 42]);
+  mock_ledger.transfer_from_.set(#Ok 42);
   assert (await* handler.depositFromAllowance(user1, user1_account, 3, null)) == #ok(3, 42);
   assert handler.userCredit(user1) == 3;
   assert fullState().credit == { pool = 2; total = 5};
@@ -49,11 +48,10 @@ do {
 
   // deposit from allowance >= amount
   // caller principal != source account owner
-  await mock_ledger.set_transfer_from_res([#Ok 42]);
+  mock_ledger.transfer_from_.set(#Ok 42);
   assert (await* handler.depositFromAllowance(user1, user2_account, 7, null)) == #ok(7, 42);
   assert handler.userCredit(user1) == 10;
   assert fullState().credit == { pool = 4; total = 14};
-  Debug.print(debug_show fullState());
   assert journal.hasEvents([
     #allowanceDrawn({ amount = 7 }),
     #issued(+7), // credit to user
@@ -62,7 +60,7 @@ do {
 
   // deposit via allowance with fee expectation
   // expected_fee != ledger_fee
-  await mock_ledger.set_transfer_from_res([#Ok 42]); // should be not called
+  mock_ledger.transfer_from_.set(#Ok 42); // should be not called
   var transfer_from_count = await mock_ledger.transfer_from_count();
   // allowance fee = 5
   assert (await* handler.depositFromAllowance(user1, user1_account, 2, ?100)) == #err(#BadFee({ expected_fee = 5 }));
