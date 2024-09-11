@@ -1,12 +1,12 @@
 import ICRC1 "../../src/ICRC1";
-import AsyncMethodTester "mo:await-async";
+import AsyncTester "mo:await-async";
 
 module {
   public class MockLedgerV2() {
-    public let fee_ = AsyncMethodTester.SimpleStageAsyncMethodTester<Nat>(null);
-    public let balance_ = AsyncMethodTester.SimpleStageAsyncMethodTester<Nat>(null);
-    public let transfer_ = AsyncMethodTester.SimpleStageAsyncMethodTester<ICRC1.TransferResult>(null);
-    public let transfer_from_ = AsyncMethodTester.SimpleStageAsyncMethodTester<ICRC1.TransferFromResult>(null);
+    public let fee_ = AsyncTester.SimpleStageTester<Nat>(null);
+    public let balance_ = AsyncTester.SimpleStageTester<Nat>(null);
+    public let transfer_ = AsyncTester.SimpleStageTester<ICRC1.TransferResult>(null);
+    public let transfer_from_ = AsyncTester.SimpleStageTester<ICRC1.TransferFromResult>(null);
     
     public shared func fee() : async Nat {
       fee_.call_result(await* fee_.call());

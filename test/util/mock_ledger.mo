@@ -1,16 +1,16 @@
-import AsyncMethodTester "mo:await-async";
+import AsyncTester "mo:await-async";
 import ICRC1 "../../src/ICRC1";
 
 module {
   public class MockLedger() {
-    public let fee_ = AsyncMethodTester.AsyncVariableTester<Nat>(0, null);
+    public let fee_ = AsyncTester.VariableTester<Nat>(0, null);
 
-    public let balance_ = AsyncMethodTester.AsyncVariableTester<Nat>(0, null);
+    public let balance_ = AsyncTester.VariableTester<Nat>(0, null);
 
-    public let transfer_ = AsyncMethodTester.AsyncVariableTester<ICRC1.TransferResult>(#Ok 42, null);
+    public let transfer_ = AsyncTester.VariableTester<ICRC1.TransferResult>(#Ok 42, null);
     var transfer_count_ = 0;
 
-    public let transfer_from_ = AsyncMethodTester.AsyncVariableTester<ICRC1.TransferFromResult>(#Ok 42, null);
+    public let transfer_from_ = AsyncTester.VariableTester<ICRC1.TransferFromResult>(#Ok 42, null);
     var transfer_from_count_ = 0;
 
     public func reset_state() : async () {
