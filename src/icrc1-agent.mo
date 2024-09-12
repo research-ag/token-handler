@@ -13,7 +13,7 @@ import R "mo:base/Result";
 /// It does not require the `fee` argument to passed with every call.
 /// Instead, `setFee()` can be called once and the provided fee value is then automatically passed along with every call made.
 ///
-/// This module does not parse errors and does interpret them.
+/// This module does not parse nor interpret any errors returned from calls.
 /// In particular, it does not try to be smart about fees and does not try to auto-detect the ledger fee.
 /// It does not deal with race conditions and concurrency issues between ledger calls.
 ///

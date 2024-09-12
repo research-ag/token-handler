@@ -10,7 +10,7 @@ import ICRC84 "mo:icrc84";
 /// which better maps to ICRC-84 behaviour.
 /// The class in this module also tracks the underlying ledger fee and
 /// automatically updates the tracked value if it changes.
-/// The functions in this module to not retry any ledger calls if they fail.
+/// The functions in this module do not retry any ledger calls if they fail.
 module {
   type BalanceResult = ICRC1Agent.BalanceResult;
   type TransferResult = ICRC1Agent.TransferResult;
@@ -22,11 +22,11 @@ module {
 
     public func fee() : Nat = agent.fee();
 
-    public func setFee(x : Nat) {
+    public func setFee(newFee : Nat) {
       let oldFee = agent.fee();
-      if (x != oldFee) {
-        agent.setFee(x);
-        callback(oldFee, x);
+      if (newFee != oldFee) {
+        agent.setFee(newFee);
+        callback(oldFee, newFee);
       };
     };
 
