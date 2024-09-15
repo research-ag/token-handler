@@ -60,12 +60,11 @@ do {
 
   // deposit via allowance with fee expectation
   // expected_fee != ledger_fee
-  let i = mock_ledger.transfer_from_.stage_unlocked(?#Ok 42); // should be not called
+  // not staging a response to assert that no call is happening
   // allowance fee = 5
   assert (await* handler.depositFromAllowance(user1, user1_account, 2, ?100)) == #err(#BadFee({ expected_fee = 5 }));
   assert handler.userCredit(user1) == 10; // not changed
   assert state() == (0, 14, 0); // not changed
-  assert mock_ledger.transfer_from_.state(i) == #staged; 
   assert journal.hasEvents([
     #allowanceError(#BadFee({ expected_fee = 5 }))
   ]);
