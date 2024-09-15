@@ -12,8 +12,6 @@ base = "https://github.com/dfinity/motoko-base"
 [dev-dependencies]
 test = "2.0.0"
 vector = "0.3.1"
-# await-async = "https://github.com/research-ag/await-async#dd50b92b7b455c6e3cc5ec136574461539a2d08a"
-# await-async = "https://github.com/research-ag/await-async#0934ea3f8656dae02ae3966f48dd159a6bab3bb3"
 await-async = "https://github.com/research-ag/await-async#df13f2923b07f48e35b7ee59628bd82614282239"
 
 [toolchain]
