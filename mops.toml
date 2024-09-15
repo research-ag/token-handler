@@ -7,7 +7,7 @@ keywords = [ ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "https://github.com/dfinity/motoko-base"
+base = "0.12.1"
 
 [dev-dependencies]
 test = "2.0.0"
@@ -15,5 +15,5 @@ vector = "0.3.1"
 await-async = "https://github.com/research-ag/await-async#df13f2923b07f48e35b7ee59628bd82614282239"
 
 [toolchain]
-moc = "0.11.1"
+moc = "0.12.1"
 wasmtime = "20.0.2"
