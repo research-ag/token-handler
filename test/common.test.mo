@@ -1,12 +1,12 @@
 import Principal "mo:base/Principal";
 
-import MockLedger "util/mock_ledger_v2";
+import MockLedger "util/mock_ledger";
 import Util "util/common";
 
 let user1 = Principal.fromBlob("1");
 
 do {
-  let mock_ledger = MockLedger.MockLedgerV2();
+  let mock_ledger = MockLedger.MockLedger();
   let (handler, journal, state) = Util.createHandler(mock_ledger, false);
 
   // update fee first time
@@ -94,7 +94,7 @@ do {
 
 do {
   
-  let mock_ledger = MockLedger.MockLedgerV2();
+  let mock_ledger = MockLedger.MockLedger();
   let (handler, journal, _) = Util.createHandler(mock_ledger, false);
 
   // update fee first time
@@ -121,7 +121,7 @@ do {
 };
 
 do {
-  let mock_ledger = MockLedger.MockLedgerV2();
+  let mock_ledger = MockLedger.MockLedger();
   let (handler, journal, _) = Util.createHandler(mock_ledger, false);
 
   // credit pool
@@ -167,7 +167,7 @@ do {
 };
 
 do {
-  let mock_ledger = MockLedger.MockLedgerV2();
+  let mock_ledger = MockLedger.MockLedger();
   let (handler, journal, _) = Util.createHandler(mock_ledger, false);
 
   // update fee first time

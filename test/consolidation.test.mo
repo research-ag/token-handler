@@ -1,7 +1,7 @@
 import Principal "mo:base/Principal";
 
 import Util "util/common";
-import MockLedger "util/mock_ledger_v2";
+import MockLedger "util/mock_ledger";
 
 let user1 = Principal.fromBlob("1");
 let user2 = Principal.fromBlob("2");
@@ -9,7 +9,7 @@ let user3 = Principal.fromBlob("3");
 
 // Tests with triggerOnNotifications off
 do {
-  let mock_ledger = MockLedger.MockLedgerV2();
+  let mock_ledger = MockLedger.MockLedger();
   let (handler, journal, state) = Util.createHandler(mock_ledger, false);
 
   // update fee first time
@@ -144,7 +144,7 @@ do {
 // Tests with triggerOnNotifications on
 // Check whether the consolidation planned after the notification is successful
 do {
-  let mock_ledger = MockLedger.MockLedgerV2();
+  let mock_ledger = MockLedger.MockLedger();
   let (handler, journal, state) = Util.createHandler(mock_ledger, true);
 
   // update fee first time
@@ -191,7 +191,7 @@ do {
 };
 
 do {
-  let ledger = MockLedger.MockLedgerV2();
+  let ledger = MockLedger.MockLedger();
   // fresh handler
   let (handler, journal, state) = Util.createHandler(ledger, false);
   // stage a response
@@ -239,7 +239,7 @@ do {
 
 // Multiple consolidations trigger
 do {
-  let ledger = MockLedger.MockLedgerV2();
+  let ledger = MockLedger.MockLedger();
   // fresh handler
   let (handler, journal, state) = Util.createHandler(ledger, false);
 

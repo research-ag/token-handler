@@ -2,7 +2,7 @@ import ICRC1 "../../src/ICRC1";
 import AsyncTester "mo:await-async";
 
 module {
-  public class MockLedgerV2() {
+  public class MockLedger() {
     public let fee_ = AsyncTester.SimpleStageTester<Nat>(null);
     public let balance_ = AsyncTester.SimpleStageTester<Nat>(null);
     public let transfer_ = AsyncTester.SimpleStageTester<ICRC1.TransferResult>(null);

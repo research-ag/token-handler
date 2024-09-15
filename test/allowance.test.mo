@@ -1,6 +1,6 @@
 import Principal "mo:base/Principal";
 
-import MockLedger "util/mock_ledger_v2";
+import MockLedger "util/mock_ledger";
 import Util "util/common";
 
 let user1 = Principal.fromBlob("1");
@@ -9,7 +9,7 @@ let user1_account = { owner = user1; subaccount = null };
 let user2_account = { owner = user2; subaccount = null };
 
 do {
-  let mock_ledger = MockLedger.MockLedgerV2();
+  let mock_ledger = MockLedger.MockLedger();
   let (handler, journal, state) = Util.createHandler(mock_ledger, false);
 
   // update fee first time
