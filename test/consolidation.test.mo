@@ -175,8 +175,7 @@ do {
 
   // Wait for consolidation
   //   1. wait for transfer() response to be ready 
-  //   similar: await* mock_ledger.transfer_.wait(i);
-  while (mock_ledger.transfer_.state(i) != #ready) await async {};
+  await* mock_ledger.transfer_.wait(i);
   //   2. wait for the response to be delivered
   await async {};
 
