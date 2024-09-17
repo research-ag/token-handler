@@ -12,7 +12,8 @@ base = "0.12.1"
 [dev-dependencies]
 test = "2.0.0"
 vector = "0.3.1"
-await-async = "https://github.com/research-ag/await-async#df13f2923b07f48e35b7ee59628bd82614282239"
+#await-async = "https://github.com/research-ag/await-async#df13f2923b07f48e35b7ee59628bd82614282239"
+await-async = "https://github.com/research-ag/await-async#da4133c2db35088a0134d11f445a223a152c6fc4"
 
 [toolchain]
 moc = "0.12.1"

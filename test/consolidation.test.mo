@@ -174,10 +174,8 @@ do {
   ]);
 
   // Wait for consolidation
-  //   1. wait for transfer() response to be ready 
-  await* mock_ledger.transfer_.wait(i);
-  //   2. wait for the response to be delivered
-  await async {};
+  // Wait for transfer() response to be ready 
+  await* mock_ledger.transfer_.wait(i, #ready);
 
   assert state() == (0, 3, 0); // consolidation successful
   assert journal.hasEvents([
@@ -198,7 +196,7 @@ do {
   // trigger call
   let fut1 = async { await* handler.fetchFee() };
   // wait for call to arrive
-  await* ledger.fee_.wait(i);
+  await* ledger.fee_.wait(i, #running);
   // trigger second call
   assert (await* handler.fetchFee()) == null;
   // release response
