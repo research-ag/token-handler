@@ -190,7 +190,8 @@ module {
       log(ownPrincipal, #feeUpdated({ old = oldFee; new = newFee }));
     };
 
-    let Ledger = ICRC84Helper.Ledger(icrc1Ledger, ownPrincipal, initialLedgerFee, updatedFee);
+    let Ledger = ICRC84Helper.Ledger(icrc1Ledger, ownPrincipal, initialLedgerFee);
+    Ledger.callback := updatedFee;
 
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit if successful.

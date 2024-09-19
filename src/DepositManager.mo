@@ -113,6 +113,14 @@ module {
       public func changePool(amount : Int) = change(#pool, amount);
     };
 
+    // get informed by updated ledger fee
+    icrc84.callback := func (oldFee : Nat, newFee : Nat) {
+      assert oldFee != newFee;
+      // set new deposit fee such that the surcharge remains the same
+      depositRegistry.updateFee(depositRegistry.fee + newFee - oldFee, credit.changeUser);
+      log(Principal.fromBlob(""), #feeUpdated({ old = oldFee; new = newFee }));
+    };
+
     func process_deposit(p : Principal, deposit : Nat, release : ?Nat -> Int) : (Nat, Nat) {
       if (deposit <= depositRegistry.fee) {
         ignore release(null);
@@ -130,14 +138,6 @@ module {
 
       credit.changeUser(p, creditInc);
       (inc, creditInc);
-    };
-
-    // get informed by updated ledger fee
-    public func updatedFee(oldFee : Nat, newFee : Nat) {
-      assert oldFee != newFee;
-      // set new deposit fee such that the surcharge remains the same
-      depositRegistry.updateFee(depositRegistry.fee + newFee - oldFee, credit.changeUser);
-      log(Principal.fromBlob(""), #feeUpdated({ old = oldFee; new = newFee }));
     };
 
     /// Notifies of a deposit and schedules consolidation process.

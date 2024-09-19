@@ -12,7 +12,9 @@ import Result "mo:base/Result";
 
 import ICRC84 "mo:icrc84";
 import ICRC1 "icrc1-api";
+import ICRC84Helper "icrc84-helper";
 import AccountManager "AccountManager";
+import DepositManager "DepositManager";
 import CreditRegistry "CreditRegistry";
 
 module {
@@ -96,6 +98,17 @@ module {
       triggerOnNotifications,
       freezeTokenHandler,
       creditRegistry,
+    );
+
+
+    let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
+
+    let depositManager = DepositManager.DepositManager(
+      Ledger,
+      false, // triggerOnNotifications
+      creditRegistry.issue,
+      log,
+      freezeTokenHandler
     );
 
     /// Returns the ledger fee.

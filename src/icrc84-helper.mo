@@ -16,7 +16,9 @@ module {
   type TransferResult = ICRC1Agent.TransferResult;
   type DrawResult = ICRC1Agent.TransferFromResult;
 
-  public class Ledger(api : ICRC1.API, ownPrincipal : Principal, initial_fee : Nat, callback : (Nat, Nat) -> ()) {
+  public class Ledger(api : ICRC1.API, ownPrincipal : Principal, initial_fee : Nat) {
+    public var callback : (Nat, Nat) -> () = func(_,_) {};
+
     let agent = ICRC1Agent.LedgerAgent(api);
     agent.setFee(initial_fee);
 
