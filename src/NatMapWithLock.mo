@@ -9,6 +9,7 @@ module {
   public class NatMapWithLock<K>(compare : (K, K) -> Order.Order, initialMinimum : Nat) {
     let tree = RBTree.RBTree<K, V>(compare);
     var size_ : Nat = 0;
+    var locks_ : Nat = 0;
     var sum_ : Nat = 0;
     var minimum_ : Nat = initialMinimum;
 
@@ -19,6 +20,9 @@ module {
 
     // Returns the number of non-zero entries in the map (locked or not).
     public func size() : Nat = size_;
+
+    // Returns the number of locks in the map.
+    public func locks() : Nat = locks_;
 
     // Returns the sum of all entries.
     public func sum() : Nat = sum_;
@@ -78,6 +82,7 @@ module {
         case (?r) {
           if (r.lock) return null;
           r.lock := true;
+          locks_ += 1;
           r;
         };
         case (null) {
@@ -87,6 +92,7 @@ module {
           };
           lookupCtr += 1;
           tree.put(k, r);
+          locks_ += 1;
           r;
         };
       };
@@ -97,6 +103,7 @@ module {
       func(arg : ?Nat) : Int {
         if (not info.lock) Prim.trap("Cannot happen: lock must be set");
         info.lock := false;
+        locks_ -= 1;
         // enter new value
         let delta : Int = switch (arg) {
           case (?v) {
@@ -127,6 +134,7 @@ module {
         if (info.lock) continue L;
         let k = e.0;
         info.lock := true;
+        locks_ += 1;
         return ?(k, info.value, releaseFunc(k, info));
       };
       return null;

@@ -85,6 +85,7 @@ module {
         queued = depositMap.sum();
       };
       nDeposits = depositMap.size();
+      nLocks = depositMap.locks();
     };
 
     /// Pause or unpause notifications.
