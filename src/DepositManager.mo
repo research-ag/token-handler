@@ -68,6 +68,7 @@ module {
         queued : Nat;
       };
       nDeposits : Nat;
+      nLocks : Nat;
     } = {
       paused = paused;
       fee = {
@@ -114,7 +115,7 @@ module {
     };
 
     // get informed by updated ledger fee
-    icrc84.callback := func (oldFee : Nat, newFee : Nat) {
+    public func registerFeeChange(oldFee : Nat, newFee : Nat) {
       assert oldFee != newFee;
       // set new deposit fee such that the surcharge remains the same
       depositRegistry.updateFee(depositRegistry.fee + newFee - oldFee, credit.changeUser);

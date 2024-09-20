@@ -15,6 +15,7 @@ import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
 import AccountManager "AccountManager";
 import DepositManager "DepositManager";
+import AllowanceManager "AllowanceManager";
 import CreditRegistry "CreditRegistry";
 
 module {
@@ -111,29 +112,47 @@ module {
       freezeTokenHandler
     );
 
+    Ledger.callback := func(oldFee : Nat, newFee : Nat) {
+      depositManager.registerFeeChange(oldFee, newFee);
+    };
+
     /// Returns the ledger fee.
-    public func ledgerFee() : Nat = accountManager.ledgerFee();
+    //public func ledgerFee() : Nat = accountManager.ledgerFee();
+    public func ledgerFee() : Nat = depositManager.state().fee.ledger;
 
     /// Returns the current surcharge amount.
-    public func surcharge() : Nat = accountManager.surcharge();
+    //public func surcharge() : Nat = accountManager.surcharge();
+    public func surcharge() : Nat = depositManager.state().fee.surcharge;
 
     /// Sets new surcharge amount.
-    public func setSurcharge(s : Nat) = accountManager.setSurcharge(s);
+    //public func setSurcharge(s : Nat) = accountManager.setSurcharge(s);
+    public func setSurcharge(s : Nat) = depositManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.
-    public func fee(t : AccountManager.FeeType) : Nat = accountManager.fee(t);
+    // public func fee(t : AccountManager.FeeType) : Nat = accountManager.fee(t);
+    // TODO: do we need this function?
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
     public func fetchFee() : async* ?Nat {
-      await* accountManager.fetchFee();
+//      await* accountManager.fetchFee();
+      await* Ledger.loadFee();
     };
 
     /// Returns a user's last know (= tracked) deposit
     /// Null means the principal is locked, hence no value is available.
-    public func trackedDeposit(p : Principal) : ?Nat = accountManager.getDeposit(p);
+    public func trackedDeposit(p : Principal) : ?Nat = depositManager.getDeposit(p);
+
+    let allowanceManager = AllowanceManager.AllowanceManager(
+      Ledger,
+      surcharge, // surcharge
+      creditRegistry.issue,
+      log,
+      freezeTokenHandler
+    );
 
     /// Returns the current `TokenHandler` state.
+    // TODO
     public func state() : {
       balance : {
         deposited : Nat;
@@ -152,25 +171,27 @@ module {
       users : {
         queued : Nat;
       };
-    } = {
+    } = ( 
+      depositManager.state() |> {
       balance = {
-        deposited = accountManager.depositedFunds();
-        underway = accountManager.underwayFunds();
-        queued = accountManager.queuedFunds();
-        consolidated = accountManager.consolidatedFunds();
+        deposited = _.funds.deposited;
+        underway = _.funds.underway;
+        queued = _.funds.queued;
+        consolidated = _.totalConsolidated - 0; // TODO: - totalWithdrawn;
       };
       flow = {
-        consolidated = accountManager.totalConsolidated();
-        withdrawn = accountManager.totalWithdrawn();
+        consolidated = _.totalConsolidated;
+        withdrawn = 0; // TODO
       };
       credit = {
         total = creditRegistry.totalBalance();
         pool = creditRegistry.poolBalance();
       };
       users = {
-        queued = accountManager.depositsNumber();
+        queued = _.nDeposits;
+        locked = _.nLocks;
       };
-    };
+    });
 
     /// Gets the current credit amount associated with a specific principal.
     public func userCredit(p : Principal) : Int = creditRegistry.userBalance(p);
@@ -226,14 +247,14 @@ module {
     /// ```
     public func notify(p : Principal) : async* ?(Nat, Nat) {
       if isFrozen_ return null;
-      let ?result = await* accountManager.notify(p) else return null;
+      let ?result = await* depositManager.notify(p) else return null;
       ?result;
     };
 
     /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
-    /// `amount` - credit-side amount.
+    /// `amount` = credit-side amount.
     ///
     /// Example:
     /// ```motoko
@@ -257,8 +278,9 @@ module {
     ///   };
     /// };
     /// ```
-    public func depositFromAllowance(p : Principal, account : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.DepositFromAllowanceResponse {
-      await* accountManager.depositFromAllowance(p, account, amount, expectedFee);
+    public func depositFromAllowance(p : Principal, source : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.DepositFromAllowanceResponse {
+      //await* accountManager.depositFromAllowance(p, account, amount, expectedFee);
+      await* allowanceManager.depositFromAllowance(p, source, amount, expectedFee);
     };
 
     /// Triggers the processing deposits.
@@ -271,7 +293,7 @@ module {
     /// ```
     public func trigger(n : Nat) : async* () {
       if isFrozen_ return;
-      await* accountManager.trigger(n);
+      await* depositManager.trigger(n);
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
