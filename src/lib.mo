@@ -13,18 +13,19 @@ import Result "mo:base/Result";
 import ICRC84 "mo:icrc84";
 import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
-import AccountManager "AccountManager";
+//import AccountManager "AccountManager";
 import DepositManager "DepositManager";
 import AllowanceManager "AllowanceManager";
+import WithdrawalManager "WithdrawalManager";
 import CreditRegistry "CreditRegistry";
 
 module {
   public type StableData = (
-    AccountManager.StableData, // account manager
+//    AccountManager.StableData, // account manager
     CreditRegistry.StableData, // credit registry
   );
 
-  public type LogEvent = AccountManager.LogEvent or CreditRegistry.LogEvent or {
+  public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditRegistry.LogEvent or {
     #error : Text;
   };
 
@@ -42,7 +43,8 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0), ([], 0, 0));
+  //public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0), ([], 0, 0));
+  public func defaultStableData() : StableData = (([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = ICRC84.toSubaccount(p);
@@ -66,13 +68,13 @@ module {
   public class TokenHandler({ ledgerApi; ownPrincipal; initialFee; triggerOnNotifications; log } : TokenHandlerOptions) {
 
     /// Returns `true` when new notifications are paused.
-    public func notificationsOnPause() : Bool = accountManager.notificationsOnPause();
+    public func notificationsOnPause() : Bool = depositManager.state().paused;
 
     /// Pause new notifications.
-    public func pauseNotifications() = accountManager.pauseNotifications();
+    public func pauseNotifications() = depositManager.pause(true);
 
     /// Unpause new notifications.
-    public func unpauseNotifications() = accountManager.unpauseNotifications();
+    public func unpauseNotifications() = depositManager.pause(false);
 
     /// If some unexpected error happened, this flag turns true and handler stops doing anything until recreated.
     var isFrozen_ : Bool = false;
@@ -89,24 +91,11 @@ module {
     /// Tracks credited funds (usable balance) associated with each principal.
     let creditRegistry = CreditRegistry.CreditRegistry(log);
 
-    /// Manages accounts and funds for users.
-    /// Handles deposit, withdrawal, and consolidation operations.
-    let accountManager = AccountManager.AccountManager(
-      ledgerApi,
-      ownPrincipal,
-      log,
-      initialFee,
-      triggerOnNotifications,
-      freezeTokenHandler,
-      creditRegistry,
-    );
-
-
     let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
 
     let depositManager = DepositManager.DepositManager(
       Ledger,
-      false, // triggerOnNotifications
+      triggerOnNotifications,
       creditRegistry.issue,
       log,
       freezeTokenHandler
@@ -117,25 +106,20 @@ module {
     };
 
     /// Returns the ledger fee.
-    //public func ledgerFee() : Nat = accountManager.ledgerFee();
     public func ledgerFee() : Nat = depositManager.state().fee.ledger;
 
     /// Returns the current surcharge amount.
-    //public func surcharge() : Nat = accountManager.surcharge();
     public func surcharge() : Nat = depositManager.state().fee.surcharge;
 
     /// Sets new surcharge amount.
-    //public func setSurcharge(s : Nat) = accountManager.setSurcharge(s);
     public func setSurcharge(s : Nat) = depositManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.
-    // public func fee(t : AccountManager.FeeType) : Nat = accountManager.fee(t);
-    // TODO: do we need this function?
+    public func fee(_ : { #deposit; #allowance; #withdrawal }) : Nat = depositManager.state().fee.deposit;
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
     public func fetchFee() : async* ?Nat {
-//      await* accountManager.fetchFee();
       await* Ledger.loadFee();
     };
 
@@ -144,6 +128,14 @@ module {
     public func trackedDeposit(p : Principal) : ?Nat = depositManager.getDeposit(p);
 
     let allowanceManager = AllowanceManager.AllowanceManager(
+      Ledger,
+      surcharge, // surcharge
+      creditRegistry.issue,
+      log,
+      freezeTokenHandler
+    );
+
+    let withdrawalManager = WithdrawalManager.WithdrawalManager(
       Ledger,
       surcharge, // surcharge
       creditRegistry.issue,
@@ -177,11 +169,11 @@ module {
         deposited = _.funds.deposited;
         underway = _.funds.underway;
         queued = _.funds.queued;
-        consolidated = _.totalConsolidated - 0; // TODO: - totalWithdrawn;
+        consolidated = _.totalConsolidated - withdrawalManager.totalWithdrawn();
       };
       flow = {
         consolidated = _.totalConsolidated;
-        withdrawn = 0; // TODO
+        withdrawn = withdrawalManager.totalWithdrawn();
       };
       credit = {
         total = creditRegistry.totalBalance();
@@ -278,8 +270,7 @@ module {
     ///   };
     /// };
     /// ```
-    public func depositFromAllowance(p : Principal, source : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.DepositFromAllowanceResponse {
-      //await* accountManager.depositFromAllowance(p, account, amount, expectedFee);
+    public func depositFromAllowance(p : Principal, source : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AllowanceManager.DepositFromAllowanceResponse {
       await* allowanceManager.depositFromAllowance(p, source, amount, expectedFee);
     };
 
@@ -319,7 +310,7 @@ module {
     ///     }
     ///   };
     /// ```
-    public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.WithdrawResponse {
+    public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
       // try to burn from pool
       creditRegistry.burn(#pool, amount) |> (
         if (not _) {
@@ -328,7 +319,7 @@ module {
           return #err(err);
         }
       );
-      let result = await* accountManager.withdraw(null, to, amount, expectedFee);
+      let result = await* withdrawalManager.withdraw(null, to, amount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#pool, amount);
@@ -360,7 +351,7 @@ module {
     ///     }
     ///   };
     /// ```
-    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AccountManager.WithdrawResponse {
+    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
       // try to burn from user
       creditRegistry.burn(#user p, amount)
       |> (
@@ -370,7 +361,7 @@ module {
           return #err(err);
         }
       );
-      let result = await* accountManager.withdraw(?p, to, amount, expectedFee);
+      let result = await* withdrawalManager.withdraw(?p, to, amount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
         creditRegistry.issue(#user p, amount);
@@ -379,18 +370,20 @@ module {
     };
 
     /// For testing purposes.
-    public func assertIntegrity() { accountManager.assertIntegrity() };
+    //public func assertIntegrity() { accountManager.assertIntegrity() };
+    public func assertIntegrity() {};
 
     /// Serializes the token handler data.
     public func share() : StableData = (
-      accountManager.share(),
+//      accountManager.share(),
       creditRegistry.share(),
     );
 
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
-      accountManager.unshare(values.0);
-      creditRegistry.unshare(values.1);
+//      accountManager.unshare(values.0);
+//      creditRegistry.unshare(values.1);
+      creditRegistry.unshare(values);
     };
   };
 };
