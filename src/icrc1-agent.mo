@@ -10,7 +10,7 @@ import R "mo:base/Result";
 /// The module also tries to simplify making the calls.
 /// It reduces generality by not allowing `memo` and `created_at_time` to be set.
 /// They are always set to `null`.
-/// It does not require the `fee` argument to passed with every call.
+/// It does not require the `fee` argument to be passed with every call.
 /// Instead, `setFee()` can be called once and the provided fee value is then automatically passed along with every call made.
 ///
 /// This module does not parse nor interpret any errors returned from calls.

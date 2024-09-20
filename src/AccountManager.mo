@@ -13,7 +13,7 @@ import DepositRegistry "DepositRegistry";
 module {
   public type StableData = (
     DepositRegistry.StableDataMap, // depositRegistry
-    Nat, // ledgerFeee_
+    Nat, // ledgerFee_
     Nat, // surcharge_
     Nat, // totalConsolidated_
     Nat, // totalWithdrawn_
