@@ -16,7 +16,7 @@ module {
     );
   };
 
-  public func createHandler(mock_ledger : MockLedger.MockLedger, triggerOnNotifications : Bool) : (
+  public func createHandler(mock_ledger : MockLedger.MockLedger, triggerOnNotifications : Bool, verbose : Bool) : (
     TokenHandler.TokenHandler,
     TestJournal.TestJournal,
     () -> (Nat, Nat, Nat),
@@ -30,7 +30,7 @@ module {
       transfer_from = mock_ledger.icrc2_transfer_from;
     };
 
-    let journal = TestJournal.TestJournal();
+    let journal = TestJournal.TestJournal(verbose);
 
     let handler = TokenHandler.TokenHandler({
       ledgerApi = ledger;
@@ -51,7 +51,7 @@ module {
     isEmpty : () -> Bool;
   };
 
-  public func createHandlerV2(triggerOnNotifications : Bool) : (
+  public func createHandlerV2(triggerOnNotifications : Bool, verbose : Bool) : (
     TokenHandler.TokenHandler,
     TestJournal.TestJournal,
     () -> (Nat, Nat, Nat),
@@ -87,7 +87,7 @@ module {
       };
     };
 
-    let journal = TestJournal.TestJournal();
+    let journal = TestJournal.TestJournal(verbose);
 
     let handler = TokenHandler.TokenHandler({
       ledgerApi = ledger;

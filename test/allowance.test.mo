@@ -7,10 +7,11 @@ let user1 = Principal.fromBlob("1");
 let user2 = Principal.fromBlob("2");
 let user1_account = { owner = user1; subaccount = null };
 let user2_account = { owner = user2; subaccount = null };
+let verbose = false;
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state, fullState) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, state, fullState) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   await mock_ledger.set_fee(3);

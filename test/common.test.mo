@@ -4,10 +4,11 @@ import Util "util/common";
 import MockLedger "util/mock_ledger";
 
 let user1 = Principal.fromBlob("1");
+let verbose = false;
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   await mock_ledger.set_fee(2);
@@ -34,6 +35,7 @@ do {
   let f1 = async { await* handler.notify(user1) };
   await mock_ledger.set_fee(4);
   ignore await* handler.fetchFee();
+  
   assert journal.hasEvents([
     #feeUpdated({ new = 4; old = 2 }),
   ]);
@@ -96,7 +98,7 @@ do {
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, _) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, _, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   await mock_ledger.set_fee(5);
@@ -124,7 +126,7 @@ do {
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, _) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, _, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // credit pool
   handler.issue_(#pool, 20);
@@ -170,7 +172,7 @@ do {
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   await mock_ledger.set_fee(2);
@@ -202,3 +204,4 @@ do {
   assert handler.fee(#allowance) == 7;
   assert handler.fee(#withdrawal) == 7;
 };
+

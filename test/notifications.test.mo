@@ -4,11 +4,12 @@ import Util "util/common";
 import MockLedger "util/mock_ledger";
 
 let user1 = Principal.fromBlob("1");
+let verbose = false;
 
 // Basic tests
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // init state
   assert handler.ledgerFee() == 0;
@@ -56,7 +57,7 @@ do {
 // Race condition tests
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   await mock_ledger.set_fee(5);
@@ -175,7 +176,7 @@ do {
 // Test credit inc from notify
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   await mock_ledger.set_fee(5);
@@ -212,7 +213,7 @@ do {
 // Test notifications pause
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // notify with 0 balance
   await mock_ledger.set_balance(0);

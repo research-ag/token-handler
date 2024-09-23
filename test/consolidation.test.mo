@@ -6,10 +6,11 @@ import MockLedger "util/mock_ledger";
 let user1 = Principal.fromBlob("1");
 let user2 = Principal.fromBlob("2");
 let user3 = Principal.fromBlob("3");
+let verbose = false;
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   await mock_ledger.set_fee(3);
@@ -154,7 +155,7 @@ do {
 // Check whether the consolidation planned after the notification is successful
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, true);
+  let (handler, journal, state, _) = Util.createHandler(mock_ledger, true, verbose);
 
   // update fee first time
   await mock_ledger.set_fee(5);
@@ -196,7 +197,7 @@ do {
 
 do {
   // fresh handler
-  let (handler, journal, state, ledger) = Util.createHandlerV2(false);
+  let (handler, journal, state, ledger) = Util.createHandlerV2(false, verbose);
   // stage a response
   let (release, status) = ledger.fee_.stage(?5);
   // trigger call
@@ -242,7 +243,7 @@ do {
 
 // Multiple consolidations trigger
 do {
-  let (handler, journal, state, ledger) = Util.createHandlerV2(false);
+  let (handler, journal, state, ledger) = Util.createHandlerV2(false, verbose);
 
   // update fee first time
   ledger.fee_.stage(?5).0 ();

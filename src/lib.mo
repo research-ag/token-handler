@@ -6,6 +6,7 @@
 
 import Principal "mo:base/Principal";
 import Int "mo:base/Int";
+import Debug "mo:base/Debug";
 import Text "mo:base/Text";
 import Nat "mo:base/Nat";
 import Result "mo:base/Result";
@@ -317,7 +318,8 @@ module {
     /// ```
     public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
       // try to burn from pool
-      creditRegistry.burn(#pool, amount) |> (
+      creditRegistry.burn(#pool, amount) 
+      |> (
         if (not _) {
           let err = #InsufficientCredit;
           log(ownPrincipal, #withdrawalError(err));
@@ -335,6 +337,9 @@ module {
     /// Initiates a withdrawal by transferring tokens to another account.
     /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
     /// At the same time, it reduces the user's credit. Accordingly, amount <= credit should be satisfied.
+    ///
+    /// creditAmount = amount of credit being deducted
+    /// amount of tokens that the `to` account receives = creditAmount - userExpectedFee
     ///
     /// Example:
     /// ```motoko
@@ -356,20 +361,20 @@ module {
     ///     }
     ///   };
     /// ```
-    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
+    public func withdrawFromCredit(p : Principal, to : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
       // try to burn from user
-      creditRegistry.burn(#user p, amount)
+      creditRegistry.burn(#user p, creditAmount)
       |> (
-        if (not _) {
+        if (not _) { 
           let err = #InsufficientCredit;
           log(ownPrincipal, #withdrawalError(err));
           return #err(err);
         }
       );
-      let result = await* withdrawalManager.withdraw(?p, to, amount, expectedFee);
+      let result = await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
       if (Result.isErr(result)) {
         // re-issue credit if unsuccessful
-        creditRegistry.issue(#user p, amount);
+        creditRegistry.issue(#user p, creditAmount);
       };
       result;
     };

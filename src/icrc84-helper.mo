@@ -17,7 +17,7 @@ module {
   type DrawResult = ICRC1Agent.TransferFromResult;
 
   public class Ledger(api : ICRC1.API, ownPrincipal : Principal, initial_fee : Nat) {
-    public var callback : (Nat, Nat) -> () = func(_,_) {};
+    public var callback : (Nat, Nat) -> () = func(_, _) {};
 
     let agent = ICRC1Agent.LedgerAgent(api);
     agent.setFee(initial_fee);
@@ -32,11 +32,16 @@ module {
       };
     };
 
+    var feeLock = false;
     public func loadFee() : async* ?Nat {
-      switch (await* agent.fetchFee()) {
-        case (#ok(fee)) { setFee(fee); ?fee };
-        case (_) null;
-      };
+      if (feeLock) return null;
+      feeLock := true;
+      try {
+        switch (await* agent.fetchFee()) {
+          case (#ok(fee)) { setFee(fee); ?fee };
+          case (_) null;
+        };
+      } finally feeLock := false;
     };
 
     func checkFee(res : TransferResult or DrawResult) : () {

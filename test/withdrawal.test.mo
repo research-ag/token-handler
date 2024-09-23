@@ -5,10 +5,11 @@ import MockLedger "util/mock_ledger";
 
 let user1 = Principal.fromBlob("1");
 let account = { owner = Principal.fromBlob("o"); subaccount = null };
+let verbose = false;
 
 do {
   let mock_ledger = await MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   await mock_ledger.set_fee(3);
@@ -135,4 +136,5 @@ do {
   assert (await* handler.withdrawFromPool(account, 100, null)) == #err(#InsufficientCredit);
   assert state() == (0, 10, 0); // state unchanged
   assert journal.hasEvents([#withdrawalError(#InsufficientCredit)]);
+  
 };

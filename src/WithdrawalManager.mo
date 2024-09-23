@@ -42,9 +42,8 @@ module {
       };
     };
 
-    /// Initiates a withdrawal by transferring tokens to another account.
-    /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
-    public func withdraw(p : ?Principal, to : ICRC1.Account, amount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
+    // Without logging
+    func process_withdraw(p : ?Principal, to : ICRC1.Account, creditAmount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
       let realFee = switch (p) {
         case (null) icrc84.fee(); // withdrawal from pool
         case (_) fee(); // withdrawal from credit
@@ -53,11 +52,11 @@ module {
         case (null) {};
         case (?f) if (f != realFee) return #err(#BadFee { expected_fee = realFee });
       };
-      if (amount <= realFee) return #err(#TooLowQuantity);
+      if (creditAmount <= realFee) return #err(#TooLowQuantity);
 
       let amountToSend : Nat = switch (p) {
-        case (null) amount;
-        case (?p) amount - surcharge();
+        case (null) creditAmount;
+        case (?p) creditAmount - surcharge();
       };
       let surcharge_ = surcharge();
 
@@ -68,17 +67,9 @@ module {
         if (p != null) credit.change(#pool, surcharge_);
       };
 
-      // logging
-      let event = switch (res) {
-        case (#ok _) #withdraw({ to = to; amount = amount });
-        case (#err err) #withdrawalError(err);
-      };
-
-      log(Option.get(p, noPrincipal), event);
-
       // return value
       switch (res) {
-        case (#ok txid) #ok(txid, amount - realFee); // = amount arrived
+        case (#ok txid) #ok(txid, creditAmount - realFee); // = amount arrived
         case (#err(#BadFee _)) {
           #err(#BadFee { expected_fee = fee() }); // return the expected fee value from now
         };
@@ -86,6 +77,23 @@ module {
       };
     };
 
-  };
+    /// Initiates a withdrawal by transferring tokens to another account.
+    /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
+    /// creditAmount = amount of credit being deducted
+    /// amount of tokens that the `to` account receives = creditAmount - userExpectedFee
+    public func withdraw(p : ?Principal, to : ICRC1.Account, creditAmount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
+      let res = await* process_withdraw(p, to, creditAmount, userExpectedFee);
 
+      // logging
+      let event = switch (res) {
+        case (#ok _) #withdraw({ to = to; amount = creditAmount });
+        case (#err err) #withdrawalError(err);
+      };
+
+      log(Option.get(p, noPrincipal), event);
+
+      res
+    };
+
+  };
 };
