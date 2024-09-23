@@ -9,7 +9,7 @@ let verbose = false;
 
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   mock_ledger.fee_.set(3);

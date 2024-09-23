@@ -10,7 +10,7 @@ let verbose = false;
 
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state, fullState) = Util.createHandler(mock_ledger, false, verbose);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   mock_ledger.fee_.set(3);
@@ -39,7 +39,7 @@ do {
   mock_ledger.transfer_from_.set(#Ok 42);
   assert (await* handler.depositFromAllowance(user1, user1_account, 3, null)) == #ok(3, 42);
   assert handler.userCredit(user1) == 3;
-  assert fullState().credit == { pool = 2; total = 5};
+  assert handler.state().credit == { pool = 2; total = 5};
   assert journal.hasEvents([
     #allowanceDrawn({ amount = 3 }),
     #issued(+3), // credit to user
@@ -51,7 +51,7 @@ do {
   mock_ledger.transfer_from_.set(#Ok 42);
   assert (await* handler.depositFromAllowance(user1, user2_account, 7, null)) == #ok(7, 42);
   assert handler.userCredit(user1) == 10;
-  assert fullState().credit == { pool = 4; total = 14};
+  assert handler.state().credit == { pool = 4; total = 14};
   assert journal.hasEvents([
     #allowanceDrawn({ amount = 7 }),
     #issued(+7), // credit to user
@@ -65,7 +65,7 @@ do {
   // allowance fee = 5
   assert (await* handler.depositFromAllowance(user1, user1_account, 2, ?100)) == #err(#BadFee({ expected_fee = 5 }));
   assert handler.userCredit(user1) == 10; // not changed
-  assert fullState().credit == { pool = 4; total = 14}; // not changed
+  assert handler.state().credit == { pool = 4; total = 14}; // not changed
   assert transfer_from_count == (await mock_ledger.transfer_from_count());
   assert journal.hasEvents([
     #allowanceError(#BadFee({ expected_fee = 5 }))

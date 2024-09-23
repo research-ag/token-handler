@@ -9,7 +9,7 @@ let verbose = false;
 // Basic tests
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false, verbose);
 
   // init state
   assert handler.ledgerFee() == 0;
@@ -57,7 +57,7 @@ do {
 // Race condition tests
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   mock_ledger.fee_.set(5);
@@ -176,7 +176,7 @@ do {
 // Test credit inc from notify
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   mock_ledger.fee_.set(5);
@@ -213,7 +213,7 @@ do {
 // Test notifications pause
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false, verbose);
 
   // notify with 0 balance
   mock_ledger.balance_.set(0);

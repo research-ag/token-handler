@@ -11,7 +11,7 @@ let verbose = false;
 
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state, _) = Util.createHandler(mock_ledger, false, verbose);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false, verbose);
 
   // update fee first time
   mock_ledger.fee_.set(3);
@@ -156,7 +156,7 @@ do {
 // Check whether the consolidation planned after the notification is successful
 do {
   let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state, _) = Util.createHandler(mock_ledger, true, verbose);
+  let (handler, journal, state) = Util.createHandler(mock_ledger, true, verbose);
 
   // update fee first time
   mock_ledger.fee_.set(5);
@@ -199,7 +199,7 @@ do {
 do {
   let ledger = MockLedgerV2.MockLedgerV2();
   // fresh handler
-  let (handler, journal, state, _) = Util.createHandler(ledger, false, verbose);
+  let (handler, journal, state) = Util.createHandler(ledger, false, verbose);
 
   // stage a response
   let i = ledger.fee_.stage(?5);
@@ -248,7 +248,7 @@ do {
 do {
   let ledger = MockLedgerV2.MockLedgerV2();
   // fresh handler
-  let (handler, journal, state, _) = Util.createHandler(ledger, false, verbose);
+  let (handler, journal, state) = Util.createHandler(ledger, false, verbose);
 
   // update fee first time
   ignore ledger.fee_.stage_unlocked(?5);

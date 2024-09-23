@@ -11,7 +11,6 @@ module {
     TokenHandler.TokenHandler,
     TestJournal.TestJournal,
     () -> (Nat, Nat, Nat),
-    () -> TokenHandler.State
   ) {
     let journal = TestJournal.TestJournal(verbose);
 
@@ -27,6 +26,6 @@ module {
       let s = handler.state();
       (s.balance.deposited, s.balance.consolidated, s.users.queued);
     };
-    (handler, journal, state, handler.state);
+    (handler, journal, state);
   };
 };
