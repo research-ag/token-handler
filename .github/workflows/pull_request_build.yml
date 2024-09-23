@@ -1,6 +1,6 @@
 name: App build
 env:
-  dfx_version: 0.20.1
+  dfx_version: 0.23.0
 on:
   pull_request:
     types: [synchronize, opened, reopened, ready_for_review, unlabeled]
@@ -22,7 +22,7 @@ jobs:
         run: dfx --version
 
       - name: Install mops
-        uses: ZenVoich/setup-mops@v1.2.0
+        uses: ZenVoich/setup-mops@v1
 
       - name: Make sure moc is installed
         run: mops toolchain bin moc || mops toolchain use moc latest
