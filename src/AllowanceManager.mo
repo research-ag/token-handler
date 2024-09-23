@@ -42,7 +42,11 @@ module {
     public func depositFromAllowance(p : Principal, source : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
       switch (expectedFee) {
         case null {};
-        case (?f) if (f != fee()) return #err(#BadFee { expected_fee = fee() });
+        case (?f) if (f != fee()) {
+          let err = #BadFee { expected_fee = fee() };
+          log(p, #allowanceError err);
+          return #err(err);
+        };
       };
 
       let surcharge_ = surcharge();
@@ -50,8 +54,8 @@ module {
       let res = await* icrc84.draw(p, source, creditAmount + fee());
 
       let event = switch (res) {
-        case (#ok _) #allowanceDrawn({ amount = creditAmount });
-        case (#err err) #allowanceError(err);
+        case (#ok _) #allowanceDrawn { amount = creditAmount };
+        case (#err err) #allowanceError err;
       };
 
       log(p, event);

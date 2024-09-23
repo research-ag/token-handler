@@ -20,6 +20,7 @@ module {
     TokenHandler.TokenHandler,
     TestJournal.TestJournal,
     () -> (Nat, Nat, Nat),
+    () -> TokenHandler.State
   ) {
 
     let ledger : TokenHandler.LedgerAPI = {
@@ -39,7 +40,7 @@ module {
       log = journal.log;
     });
 
-    (handler, journal, func() { state(handler) });
+    (handler, journal, func() { state(handler) }, handler.state);
   };
 
   type TestLedgerAPI = TokenHandler.LedgerAPI and {

@@ -15,6 +15,20 @@ module {
     Nat, // totalConsolidated
   );
 
+  public type State = {
+    paused : Bool;
+    fee : { ledger : Nat; deposit : Nat; surcharge : Nat };
+    flow : { credited : Nat };
+    totalConsolidated : Nat;
+    funds : {
+      deposited : Nat;
+      underway : Nat;
+      queued : Nat;
+    };
+    nDeposits : Nat;
+    nLocks : Nat;
+  };
+
   public type LogEvent = {
     #feeUpdated : { old : Nat; new : Nat };
     #surchargeUpdated : { old : Nat; new : Nat };
@@ -57,19 +71,7 @@ module {
 
     func surcharge() : Nat = depositRegistry.fee - icrc84.fee();
 
-    public func state() : {
-      paused : Bool;
-      fee : { ledger : Nat; deposit : Nat; surcharge : Nat };
-      flow : { credited : Nat };
-      totalConsolidated : Nat;
-      funds : {
-        deposited : Nat;
-        underway : Nat;
-        queued : Nat;
-      };
-      nDeposits : Nat;
-      nLocks : Nat;
-    } = {
+    public func state() : State = {
       paused = paused;
       fee = {
         ledger = icrc84.fee();

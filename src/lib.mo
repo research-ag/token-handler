@@ -42,6 +42,27 @@ module {
     log : (Principal, LogEvent) -> ();
   };
 
+  public type State = {
+    balance : {
+      deposited : Nat;
+      underway : Nat;
+      queued : Nat;
+      consolidated : Nat;
+    };
+    flow : {
+      consolidated : Nat;
+      withdrawn : Nat;
+    };
+    credit : {
+      total : Int;
+      pool : Int;
+    };
+    users : {
+      queued : Nat;
+    };
+    depositManager : DepositManager.State;
+  };
+
   /// Returns default stable data for `TokenHandler`.
   //public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0), ([], 0, 0));
   public func defaultStableData() : StableData = (([], 0, 0));
@@ -144,26 +165,7 @@ module {
     );
 
     /// Returns the current `TokenHandler` state.
-    // TODO
-    public func state() : {
-      balance : {
-        deposited : Nat;
-        underway : Nat;
-        queued : Nat;
-        consolidated : Nat;
-      };
-      flow : {
-        consolidated : Nat;
-        withdrawn : Nat;
-      };
-      credit : {
-        total : Int;
-        pool : Int;
-      };
-      users : {
-        queued : Nat;
-      };
-    } = ( 
+    public func state() : State = ( 
       depositManager.state() |> {
       balance = {
         deposited = _.funds.deposited;
@@ -183,6 +185,9 @@ module {
         queued = _.nDeposits;
         locked = _.nLocks;
       };
+      depositManager = depositManager.state();
+//      withdrawalManager = withdrawalManager.state();
+//      allowanceManager = allowanceManager.state();
     });
 
     /// Gets the current credit amount associated with a specific principal.
