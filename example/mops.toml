@@ -1,7 +1,6 @@
 [dependencies]
 base = "0.13.0"
 vector = "0.4.1"
-mrr = "https://github.com/research-ag/motoko-lib#276605187f57cf5fdd08b1ee810bc099b9c85349"
 icrc84 = "https://github.com/research-ag/icrc-84#main"
 
 [toolchain]

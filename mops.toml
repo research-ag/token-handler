@@ -17,4 +17,4 @@ await-async = "https://github.com/research-ag/await-async#dd50b92b7b455c6e3cc5ec
 
 [toolchain]
 moc = "0.13.0"
-wasmtime = "22.0.0"
+wasmtime = "25.0.0"
