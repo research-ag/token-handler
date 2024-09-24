@@ -2,7 +2,6 @@ import Vec "mo:vector";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
-import Debug "mo:base/Debug";
 import { print } "mo:base/Debug";
 
 import TokenHandler "../../src";
@@ -10,7 +9,7 @@ import TokenHandler "../../src";
 module {
   type JournalVector = Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)>;
 
-  public class TestJournal(verbose : Bool) {
+  public class TestJournal() {
     let journal : Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)> = Vec.new();
 
     var counter_ = 0;
@@ -18,9 +17,7 @@ module {
     public func counter() : Nat = counter_;
 
     public func log(p : Principal, e : TokenHandler.LogEvent) {
-      let event = (Time.now(), p, e);
-      if (verbose) Debug.print("logging: " # debug_show event);
-      Vec.add(journal, event);
+      Vec.add(journal, (Time.now(), p, e));
     };
 
     public func hasEvents(events : [TokenHandler.LogEvent]) : Bool {

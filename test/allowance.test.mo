@@ -1,19 +1,20 @@
 import Principal "mo:base/Principal";
+
 import MockLedger "util/mock_ledger";
 import Util "util/common";
 
+let DEBUG = true;
 let user1 = Principal.fromBlob("1");
 let user2 = Principal.fromBlob("2");
 let user1_account = { owner = user1; subaccount = null };
 let user2_account = { owner = user2; subaccount = null };
-let verbose = false;
 
 do {
-  let mock_ledger = MockLedger.MockLedger();
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false, verbose);
+  let mock_ledger = MockLedger.MockLedger(DEBUG, "");
+  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
 
   // update fee first time
-  mock_ledger.fee_.set(3);
+  ignore mock_ledger.fee_.stage_unlocked(?3);
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 3;
   assert journal.hasEvents([
@@ -28,7 +29,7 @@ do {
   ]);
 
   // deposit via allowance < amount + fee
-  mock_ledger.transfer_from_.set(#Err(#InsufficientAllowance({ allowance = 8 })));
+  ignore mock_ledger.transfer_from_.stage_unlocked(?#Err(#InsufficientAllowance({ allowance = 8 })));
   assert (await* handler.depositFromAllowance(user1, user1_account, 4, null)) == #err(#InsufficientAllowance({ allowance = 8 }));
   assert state() == (0, 0, 0);
   assert journal.hasEvents([
@@ -36,10 +37,10 @@ do {
   ]);
 
   // deposit via allowance >= amount + fee
-  mock_ledger.transfer_from_.set(#Ok 42);
+  ignore mock_ledger.transfer_from_.stage_unlocked(?#Ok 42);
   assert (await* handler.depositFromAllowance(user1, user1_account, 3, null)) == #ok(3, 42);
   assert handler.userCredit(user1) == 3;
-  assert handler.state().credit == { pool = 2; total = 5};
+  assert state() == (0, 5, 0);
   assert journal.hasEvents([
     #allowanceDrawn({ amount = 3 }),
     #issued(+3), // credit to user
@@ -47,11 +48,11 @@ do {
   ]);
 
   // deposit from allowance >= amount
-  // caller principal != source account owner
-  mock_ledger.transfer_from_.set(#Ok 42);
+  // caller principal != account owner
+  ignore mock_ledger.transfer_from_.stage_unlocked(?#Ok 42);
   assert (await* handler.depositFromAllowance(user1, user2_account, 7, null)) == #ok(7, 42);
   assert handler.userCredit(user1) == 10;
-  assert handler.state().credit == { pool = 4; total = 14};
+  assert state() == (0, 14, 0);
   assert journal.hasEvents([
     #allowanceDrawn({ amount = 7 }),
     #issued(+7), // credit to user
@@ -60,13 +61,11 @@ do {
 
   // deposit via allowance with fee expectation
   // expected_fee != ledger_fee
-  mock_ledger.transfer_from_.set(#Ok 42); // should be not called
-  var transfer_from_count = await mock_ledger.transfer_from_count();
+  // not staging a response to assert that no call is happening
   // allowance fee = 5
   assert (await* handler.depositFromAllowance(user1, user1_account, 2, ?100)) == #err(#BadFee({ expected_fee = 5 }));
   assert handler.userCredit(user1) == 10; // not changed
-  assert handler.state().credit == { pool = 4; total = 14}; // not changed
-  assert transfer_from_count == (await mock_ledger.transfer_from_count());
+  assert state() == (0, 14, 0); // not changed
   assert journal.hasEvents([
     #allowanceError(#BadFee({ expected_fee = 5 }))
   ]);
