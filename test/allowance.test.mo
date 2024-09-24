@@ -3,7 +3,7 @@ import Principal "mo:base/Principal";
 import MockLedger "util/mock_ledger";
 import Util "util/common";
 
-let DEBUG = true;
+let DEBUG = false;
 let user1 = Principal.fromBlob("1");
 let user2 = Principal.fromBlob("2");
 let user1_account = { owner = user1; subaccount = null };
@@ -29,7 +29,7 @@ do {
   ]);
 
   // deposit via allowance < amount + fee
-  ignore mock_ledger.transfer_from_.stage_unlocked(?#Err(#InsufficientAllowance({ allowance = 8 })));
+  ignore mock_ledger.transfer_from_.stage_unlocked(? #Err(#InsufficientAllowance({ allowance = 8 })));
   assert (await* handler.depositFromAllowance(user1, user1_account, 4, null)) == #err(#InsufficientAllowance({ allowance = 8 }));
   assert state() == (0, 0, 0);
   assert journal.hasEvents([
@@ -37,10 +37,10 @@ do {
   ]);
 
   // deposit via allowance >= amount + fee
-  ignore mock_ledger.transfer_from_.stage_unlocked(?#Ok 42);
+  ignore mock_ledger.transfer_from_.stage_unlocked(? #Ok 42);
   assert (await* handler.depositFromAllowance(user1, user1_account, 3, null)) == #ok(3, 42);
   assert handler.userCredit(user1) == 3;
-  assert state() == (0, 5, 0);
+  assert handler.state().credit == { pool = 2; total = 5 };
   assert journal.hasEvents([
     #allowanceDrawn({ amount = 3 }),
     #issued(+3), // credit to user
@@ -49,10 +49,10 @@ do {
 
   // deposit from allowance >= amount
   // caller principal != account owner
-  ignore mock_ledger.transfer_from_.stage_unlocked(?#Ok 42);
+  ignore mock_ledger.transfer_from_.stage_unlocked(? #Ok 42);
   assert (await* handler.depositFromAllowance(user1, user2_account, 7, null)) == #ok(7, 42);
   assert handler.userCredit(user1) == 10;
-  assert state() == (0, 14, 0);
+  assert handler.state().credit == { pool = 4; total = 14 };
   assert journal.hasEvents([
     #allowanceDrawn({ amount = 7 }),
     #issued(+7), // credit to user
@@ -65,7 +65,7 @@ do {
   // allowance fee = 5
   assert (await* handler.depositFromAllowance(user1, user1_account, 2, ?100)) == #err(#BadFee({ expected_fee = 5 }));
   assert handler.userCredit(user1) == 10; // not changed
-  assert state() == (0, 14, 0); // not changed
+  assert handler.state().credit == { pool = 4; total = 14 }; // not changed
   assert journal.hasEvents([
     #allowanceError(#BadFee({ expected_fee = 5 }))
   ]);
