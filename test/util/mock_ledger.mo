@@ -2,52 +2,26 @@ import ICRC1 "../../src/icrc1-api";
 import AsyncTester "mo:await-async";
 
 module {
-  public class MockLedger() {
-    public let fee_ = AsyncTester.VariableTester<Nat>(0, null);
-
-    public let balance_ = AsyncTester.VariableTester<Nat>(0, null);
-
-    public let transfer_ = AsyncTester.VariableTester<ICRC1.TransferResult>(#Ok 42, null);
-    var transfer_count_ = 0;
-
-    public let transfer_from_ = AsyncTester.VariableTester<ICRC1.TransferFromResult>(#Ok 42, null);
-    var transfer_from_count_ = 0;
-
-    public func reset_state() : async () {
-      fee_.reset();
-      balance_.reset();
-
-      transfer_.reset();
-      transfer_count_ := 0;
-
-      transfer_from_.reset();
-      transfer_from_count_ := 0;
-    };
-
+  public class MockLedger(debug_ : Bool, key : Text) {
+    public let fee_ = AsyncTester.SimpleStageTester<Nat>(?(key # " fee"), null, debug_);
+    public let balance_ = AsyncTester.SimpleStageTester<Nat>(?(key # " balance"), null, debug_);
+    public let transfer_ = AsyncTester.SimpleStageTester<ICRC1.TransferResult>(?(key # " transfer"), null, debug_);
+    public let transfer_from_ = AsyncTester.SimpleStageTester<ICRC1.TransferFromResult>(?(key # " transfer_from"), null, debug_);
+    
     public shared func fee() : async Nat {
-      await* fee_.await_unlock();
-      fee_.get();
+      fee_.call_result(await* fee_.call());
     };
-
+    
     public shared func balance_of(_ : ICRC1.Account) : async Nat {
-      await* balance_.await_unlock();
-      balance_.get();
+      balance_.call_result(await* balance_.call());
     };
-
+    
     public shared func transfer(_ : ICRC1.TransferArgs) : async ICRC1.TransferResult {
-      await* transfer_.await_unlock();
-      transfer_count_ += 1;
-      transfer_.get();
+      transfer_.call_result(await* transfer_.call());
     };
-
-    public func transfer_count() : async Nat = async transfer_count_;
-
+    
     public shared func transfer_from(_ : ICRC1.TransferFromArgs) : async ICRC1.TransferFromResult {
-      await* transfer_from_.await_unlock();
-      transfer_from_count_ += 1;
-      transfer_from_.get();
+      transfer_from_.call_result(await* transfer_from_.call());
     };
-
-    public func transfer_from_count() : async Nat = async transfer_from_count_;
   };
 };

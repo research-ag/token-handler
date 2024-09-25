@@ -13,7 +13,7 @@ icrc84 = "https://github.com/research-ag/icrc-84#main"
 [dev-dependencies]
 test = "2.0.0"
 vector = "0.4.1"
-await-async = "https://github.com/research-ag/await-async#dd50b92b7b455c6e3cc5ec136574461539a2d08a"
+await-async = "https://github.com/research-ag/await-async#45092cb97f0b66a513b476e7b586998ac561149c"
 
 [toolchain]
 moc = "0.13.0"

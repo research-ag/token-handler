@@ -3,7 +3,7 @@ import Principal "mo:base/Principal";
 
 do {
   let anon_p = Principal.fromBlob("");
-  let journal = TestJournal.TestJournal(false);
+  let journal = TestJournal.TestJournal();
 
   // initial state
   assert journal.hasEvents([]);
