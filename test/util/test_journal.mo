@@ -1,8 +1,8 @@
-import Vec "mo:vector";
-import Time "mo:base/Time";
 import Array "mo:base/Array";
+import Debug "mo:base/Debug";
 import Iter "mo:base/Iter";
-import { print } "mo:base/Debug";
+import Time "mo:base/Time";
+import Vec "mo:vector";
 
 import TokenHandler "../../src";
 
@@ -13,11 +13,16 @@ module {
     let journal : Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)> = Vec.new();
 
     var counter_ = 0;
-
     public func counter() : Nat = counter_;
 
+    var verbose = false;
+    public func verboseOn() = verbose := true;
+    public func verboseOff() = verbose := false;
+
     public func log(p : Principal, e : TokenHandler.LogEvent) {
-      Vec.add(journal, (Time.now(), p, e));
+      let event = (Time.now(), p, e);
+      if (verbose) Debug.print("logging: " # debug_show event);
+      Vec.add(journal, event);
     };
 
     public func hasEvents(events : [TokenHandler.LogEvent]) : Bool {
@@ -35,7 +40,7 @@ module {
     public func size() : Nat = Vec.size(journal);
 
     public func debugShow(startFrom : Nat) : () {
-      print(
+      Debug.print(
         debug_show (
           Vec.toArray(journal)
           |> Array.slice(_, startFrom, _.size())
