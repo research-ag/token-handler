@@ -6,7 +6,6 @@
 
 import Principal "mo:base/Principal";
 import Int "mo:base/Int";
-import Debug "mo:base/Debug";
 import Text "mo:base/Text";
 import Nat "mo:base/Nat";
 import Result "mo:base/Result";
@@ -22,7 +21,7 @@ import CreditRegistry "CreditRegistry";
 
 module {
   public type StableData = (
-//    AccountManager.StableData, // account manager
+    DepositManager.StableData, // account manager
     CreditRegistry.StableData, // credit registry
   );
 
@@ -65,8 +64,8 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  //public func defaultStableData() : StableData = (((#leaf, 0, 0, 1), 0, 0, 0, 0), ([], 0, 0));
-  public func defaultStableData() : StableData = (([], 0, 0));
+  public func defaultStableData() : StableData = ((((#leaf, 0, 0, 1), 0), 0), ([], 0, 0));
+  //public func defaultStableData() : StableData = (([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = ICRC84.toSubaccount(p);
@@ -385,15 +384,14 @@ module {
 
     /// Serializes the token handler data.
     public func share() : StableData = (
-//      accountManager.share(),
+      depositManager.share(),
       creditRegistry.share(),
     );
 
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
-//      accountManager.unshare(values.0);
-//      creditRegistry.unshare(values.1);
-      creditRegistry.unshare(values);
+      depositManager.unshare(values.0);
+      creditRegistry.unshare(values.1);
     };
   };
 };
