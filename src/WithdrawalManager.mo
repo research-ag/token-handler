@@ -46,7 +46,7 @@ module {
     func process_withdraw(p : ?Principal, to : ICRC1.Account, creditAmount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
       let realFee = switch (p) {
         case (null) icrc84.fee(); // withdrawal from pool
-        case (_) fee(); // withdrawal from credit
+        case _ fee(); // withdrawal from credit
       };
       switch (userExpectedFee) {
         case (null) {};

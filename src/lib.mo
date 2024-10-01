@@ -13,7 +13,6 @@ import Result "mo:base/Result";
 import ICRC84 "mo:icrc84";
 import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
-//import AccountManager "AccountManager";
 import DepositManager "DepositManager";
 import AllowanceManager "AllowanceManager";
 import WithdrawalManager "WithdrawalManager";
@@ -186,8 +185,8 @@ module {
         locked = _.nLocks;
       };
       depositManager = depositManager.state();
-//      withdrawalManager = withdrawalManager.state();
-//      allowanceManager = allowanceManager.state();
+      // withdrawalManager = withdrawalManager.state();
+      // allowanceManager = allowanceManager.state();
     });
 
     /// Gets the current credit amount associated with a specific principal.

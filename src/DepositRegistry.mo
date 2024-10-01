@@ -3,7 +3,7 @@ import NatMap "NatMapWithLock";
 
 module {
   public type StableData = (NatMap.StableData<Principal>, Nat);
-  
+
   // TODO: remove this type later
   public type StableDataMap = NatMap.StableData<Principal>;
 
@@ -45,5 +45,4 @@ module {
       fee := values.1;
     };
   };
-
 };

@@ -22,19 +22,24 @@ module {
   public type TransferError = ICRC1.TransferError or {
     #CallIcrc1LedgerError;
   };
+
   public type TransferFromError = ICRC1.TransferFromError or {
     #CallIcrc1LedgerError;
   };
 
   public type TransferResult = R.Result<Nat, TransferError>;
+
   public type TransferFromResult = R.Result<Nat, TransferFromError>;
-  public type BalanceResult = R.Result<Nat, { #CallIcrc1LedgerError }>; 
-  public type FeeResult = R.Result<Nat, { #CallIcrc1LedgerError }>; 
+
+  public type BalanceResult = R.Result<Nat, { #CallIcrc1LedgerError }>;
+
+  public type FeeResult = R.Result<Nat, { #CallIcrc1LedgerError }>;
 
   public class LedgerAgent(api : ICRC1.API) {
     var fee_ = 0;
 
     public func fee() : Nat = fee_;
+
     public func setFee(x : Nat) = fee_ := x;
 
     public func fetchFee() : async* FeeResult {
@@ -85,6 +90,5 @@ module {
         #err(#CallIcrc1LedgerError);
       };
     };
-
   };
 };

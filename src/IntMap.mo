@@ -6,6 +6,7 @@ module {
   /// Map is a full (not partial) map from K to Int with default value 0 for all keys.
   public class Map<K>(compare : (K, K) -> { #equal; #less; #greater }) {
     var map : RBTree.RBTree<K, Int> = RBTree.RBTree<K, Int>(compare);
+
     var sum_ : Int = 0;
 
     /// Get a value.
@@ -13,9 +14,7 @@ module {
 
     /// Set a value.
     public func set(x : K, v : Int) {
-      (
-        if (v != 0) map.replace(x, v) else map.remove(x)
-      )
+      (if (v != 0) map.replace(x, v) else map.remove(x))
       |> Option.get(_, 0)
       |> (sum_ += v - _);
     };

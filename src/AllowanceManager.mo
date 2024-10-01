@@ -3,12 +3,14 @@ import R "mo:base/Result";
 import ICRC84Helper "icrc84-helper";
 
 module {
-
   public type DepositFromAllowanceError = ICRC1.TransferFromError or {
     #CallIcrc1LedgerError;
   };
+
   type DepositFromAllowanceResult = (credited : Nat, txid : Nat);
+  
   public type DepositFromAllowanceResponse = R.Result<DepositFromAllowanceResult, DepositFromAllowanceError>;
+  
   public type LogEvent = {
     #allowanceDrawn : { amount : Nat };
     #allowanceError : DepositFromAllowanceError;

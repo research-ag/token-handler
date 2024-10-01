@@ -151,7 +151,7 @@ module {
           clean(k, v);
           old_value;
         };
-        case (_) 0;
+        case _ 0;
       };
     };
 

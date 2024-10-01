@@ -96,5 +96,4 @@ module ICRC1 {
     transfer = x.icrc1_transfer;
     transfer_from = x.icrc2_transfer_from;
   };
-
 };

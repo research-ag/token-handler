@@ -13,7 +13,9 @@ import ICRC84 "mo:icrc84";
 /// The functions in this module do not retry any ledger calls if they fail.
 module {
   type BalanceResult = ICRC1Agent.BalanceResult;
+  
   type TransferResult = ICRC1Agent.TransferResult;
+  
   type DrawResult = ICRC1Agent.TransferFromResult;
 
   public class Ledger(api : ICRC1.API, ownPrincipal : Principal, initial_fee : Nat) {
@@ -39,7 +41,7 @@ module {
       try {
         switch (await* agent.fetchFee()) {
           case (#ok(fee)) { setFee(fee); ?fee };
-          case (_) null;
+          case _ null;
         };
       } finally feeLock := false;
     };
@@ -49,7 +51,7 @@ module {
         case (#err(#BadFee { expected_fee })) {
           setFee(expected_fee);
         };
-        case (_) {};
+        case _ {};
       };
     };
 

@@ -171,7 +171,7 @@ module {
         if (triggerOnNotifications) {
           // schedule a canister self-call to initiate the consolidation
           // we need try-catch so that we don't trap if scheduling fails synchronously
-          try { ignore async { await* trigger(1) } } catch (_) {};
+          try { ignore async await* trigger(1) } catch (_) {};
         };
       };
 
@@ -227,7 +227,7 @@ module {
         underwayFunds -= deposit;
         switch (result) {
           case (#err(#CallIcrc1LedgerError)) return;
-          case (_) {};
+          case _ {};
         };
       };
     };

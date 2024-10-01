@@ -13,6 +13,7 @@ import TokenHandler "../src";
 
 actor class Example() = self {
   stable var journalData : Journal = Vec.new();
+
   stable var assetsData : Vec.Vector<StableAssetInfo> = Vec.new();
 
   type Journal = Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)>;
@@ -21,6 +22,7 @@ actor class Example() = self {
     ledgerPrincipal : Principal;
     handler : TokenHandler.TokenHandler;
   };
+
   type StableAssetInfo = {
     ledgerPrincipal : Principal;
     handler : TokenHandler.StableData;
@@ -220,7 +222,7 @@ actor class Example() = self {
           case (#InsufficientFunds({ balance })) #Err(#TransferError({ message = "Insufficient funds" }));
           case (#InsufficientAllowance({ allowance })) #Err(#TransferError({ message = "Insufficient allowance" }));
           case (#CallIcrc1LedgerError) #Err(#CallLedgerError({ message = "Call error" }));
-          case (_) #Err(#CallLedgerError({ message = "Try later" }));
+          case _ #Err(#CallLedgerError({ message = "Try later" }));
         };
       };
     };
@@ -247,7 +249,7 @@ actor class Example() = self {
           case (#BadFee({ expected_fee })) #Err(#BadFee({ expected_fee }));
           case (#TooLowQuantity) #Err(#AmountBelowMinimum({}));
           case (#CallIcrc1LedgerError) #Err(#CallLedgerError({ message = "Call error" }));
-          case (_) #Err(#CallLedgerError({ message = "Try later" }));
+          case _ #Err(#CallLedgerError({ message = "Try later" }));
         };
       };
     };
