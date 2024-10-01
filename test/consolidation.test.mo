@@ -38,7 +38,7 @@ do {
     #newDeposit(10),
   ]);
   assert state() == (10, 0, 1);
-  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 10 }));
+  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 10 }));
   await* handler.trigger(1);
   assert handler.userCredit(user1) == 0; // credit has been corrected after consolidation
   assert state() == (0, 0, 0); // consolidation failed with deposit reset
@@ -58,7 +58,7 @@ do {
     #newDeposit(20),
   ]);
   assert state() == (20, 0, 1);
-  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 15 }));
+  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 15 }));
   await* handler.trigger(1);
   assert handler.userCredit(user1) == 3; // credit has been corrected after consolidation
   assert state() == (20, 0, 1); // consolidation failed with updated deposit scheduled
@@ -75,7 +75,7 @@ do {
   assert handler.userCredit(user1) == 3; // initial credit
   assert journal.hasEvents([]);
   assert state() == (20, 0, 1);
-  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 100 }));
+  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 100 }));
   ignore mock_ledger.fee_.stage_unlocked(?100);
   let f1 = async { await* handler.trigger(1) };
   ignore await* handler.fetchFee();
@@ -105,7 +105,7 @@ do {
     #newDeposit(20),
   ]);
   assert state() == (20, 0, 1);
-  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 6 }));
+  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 6 }));
   ignore mock_ledger.fee_.stage_unlocked(?6);
   let f2 = async { await* handler.trigger(1) };
   ignore await* handler.fetchFee();
@@ -126,7 +126,7 @@ do {
   //
   // We are only staging one transfer response, despite two trigger calls below.
   // We are thereby asserting that only the first trigger call will call transfer().
-  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
+  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 42);
   let f3 = async { await* handler.trigger(1) };
   let f4 = async { await* handler.trigger(1) };
   await f3;
@@ -166,7 +166,7 @@ do {
   // notify with balance > fee
   ignore mock_ledger.balance_.stage_unlocked(?8);
   // TODO try with null
-  let i = mock_ledger.transfer_.stage_unlocked(?#Ok 42);
+  let i = mock_ledger.transfer_.stage_unlocked(? #Ok 42);
   assert (await* handler.notify(user1)) == ?(8, 1);
   assert state() == (8, 0, 1);
   assert journal.hasEvents([
@@ -175,7 +175,7 @@ do {
   ]);
 
   // Wait for consolidation
-  // Wait for transfer() response to be ready 
+  // Wait for transfer() response to be ready
   await* mock_ledger.transfer_.wait(i, #ready);
 
   assert state() == (0, 3, 0); // consolidation successful

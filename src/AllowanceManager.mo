@@ -8,9 +8,9 @@ module {
   };
 
   type DepositFromAllowanceResult = (credited : Nat, txid : Nat);
-  
+
   public type DepositFromAllowanceResponse = R.Result<DepositFromAllowanceResult, DepositFromAllowanceError>;
-  
+
   public type LogEvent = {
     #allowanceDrawn : { amount : Nat };
     #allowanceError : DepositFromAllowanceError;

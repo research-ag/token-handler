@@ -36,7 +36,7 @@ do {
   ]);
 
   // trigger consolidation
-  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
+  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 42);
   await* handler.trigger(1);
   ignore mock_ledger.balance_.stage_unlocked(?0);
   assert state() == (0, 17, 0); // consolidation successful
@@ -54,7 +54,7 @@ do {
 
   // withdraw from credit (fee < amount <= credit)
   // should be successful
-  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
+  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 42);
   assert (await* handler.withdrawFromCredit(user1, account, 5, null)) == #ok(42, 2);
   assert handler.userCredit(user1) == 10;
   assert handler.poolCredit() == 4;
@@ -86,7 +86,7 @@ do {
 
   // increase fee while withdraw is being underway
   // withdraw should fail, fee should be updated
-  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 2 })); // the second call should not be executed
+  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 2 })); // the second call should not be executed
   let f2 = async { await* handler.withdrawFromCredit(user1, account, 5, null) };
   assert (await f2) == #err(#BadFee { expected_fee = 4 });
   assert state() == (0, 14, 0); // state unchanged
@@ -106,7 +106,7 @@ do {
 
   // withdraw from pool (ledger_fee < amount <= pool_credit)
   // should be successful
-  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
+  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 42);
   assert (await* handler.withdrawFromPool(account, 4, null)) == #ok(42, 2);
   assert handler.poolCredit() == 10;
   assert state() == (0, 10, 0);

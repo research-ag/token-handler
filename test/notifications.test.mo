@@ -94,7 +94,7 @@ do {
   // increase fee while notify is underway (and item still in queue)
   // scenario 1: old_fee < previous = latest <= new_fee
   // this means no new deposit has happened (latest = previous)
-//  mock_ledger.balance_.lock("INCREASE_FEE_WHILE_NOTIFY_IS_UNDERWAY_SCENARIO_1");
+  //  mock_ledger.balance_.lock("INCREASE_FEE_WHILE_NOTIFY_IS_UNDERWAY_SCENARIO_1");
   ignore mock_ledger.balance_.stage_unlocked(?7);
   ignore mock_ledger.fee_.stage_unlocked(?10); // fee 6 -> 10
   let f1 = async { await* handler.notify(user1) };
@@ -138,7 +138,7 @@ do {
 
   // decrease fee while notify is underway (and item still in queue)
   // new_fee < old_fee < previous == latest
-//  mock_ledger.balance_.lock("DECREASE_FEE_WHILE_NOTIFY_IS_UNDERWAY");
+  //  mock_ledger.balance_.lock("DECREASE_FEE_WHILE_NOTIFY_IS_UNDERWAY");
   let i = mock_ledger.balance_.stage(?20);
   ignore mock_ledger.fee_.stage_unlocked(?10); // fee 15 -> 10
   let f3 = async { await* handler.notify(user1) };

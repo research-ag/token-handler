@@ -10,7 +10,9 @@ module {
     #TooLowQuantity;
     #InsufficientCredit;
   };
+
   type WithdrawResult = (transactionIndex : Nat, withdrawnAmount : Nat);
+
   public type WithdrawResponse = R.Result<WithdrawResult, WithdrawError>;
 
   public type LogEvent = {
@@ -26,7 +28,9 @@ module {
     trap : (text : Text) -> (),
   ) {
     func fee() : Nat = icrc84.fee() + surcharge();
+
     var totalWithdrawn_ = 0;
+
     let noPrincipal = Principal.fromBlob("");
 
     public func totalWithdrawn() : Nat = totalWithdrawn_;
@@ -45,17 +49,17 @@ module {
     // Without logging
     func process_withdraw(p : ?Principal, to : ICRC1.Account, creditAmount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
       let realFee = switch (p) {
-        case (null) icrc84.fee(); // withdrawal from pool
+        case null icrc84.fee(); // withdrawal from pool
         case _ fee(); // withdrawal from credit
       };
       switch (userExpectedFee) {
-        case (null) {};
+        case null {};
         case (?f) if (f != realFee) return #err(#BadFee { expected_fee = realFee });
       };
       if (creditAmount <= realFee) return #err(#TooLowQuantity);
 
       let amountToSend : Nat = switch (p) {
-        case (null) creditAmount;
+        case null creditAmount;
         case (?p) creditAmount - surcharge();
       };
       let surcharge_ = surcharge();
@@ -92,8 +96,7 @@ module {
 
       log(Option.get(p, noPrincipal), event);
 
-      res
+      res;
     };
-
   };
 };

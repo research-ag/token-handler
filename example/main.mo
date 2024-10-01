@@ -179,7 +179,7 @@ actor class Example() = self {
     let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
     switch (assetInfo.handler.trackedDeposit(caller)) {
       case (?d) #Ok(d);
-      case (null) #Err(#NotAvailable({ message = "Unknown caller" }));
+      case null #Err(#NotAvailable({ message = "Unknown caller" }));
     };
   };
 
@@ -199,7 +199,7 @@ actor class Example() = self {
           credit = assetInfo.handler.userCredit(caller);
         });
       };
-      case (null) {
+      case null {
         #Err(#NotAvailable({ message = "" }));
       };
     };
@@ -237,7 +237,7 @@ actor class Example() = self {
         let bytes = Blob.toArray(subaccount);
         if (bytes.size() != 32) throw Error.reject("Invalid subaccount");
       };
-      case (null) {};
+      case null {};
     };
 
     let res = await* assetInfo.handler.withdrawFromCredit(caller, args.to, args.amount, args.expected_fee);

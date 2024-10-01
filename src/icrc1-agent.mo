@@ -58,7 +58,11 @@ module {
       };
     };
 
-    public func transfer(from_subaccount : ?ICRC1.Subaccount, to : ICRC1.Account, amount : Nat) : async* TransferResult {
+    public func transfer(
+      from_subaccount : ?ICRC1.Subaccount,
+      to : ICRC1.Account,
+      amount : Nat,
+    ) : async* TransferResult {
       let args = {
         from_subaccount;
         to;
@@ -74,7 +78,12 @@ module {
       };
     };
 
-    public func transfer_from(from : ICRC1.Account, to : ICRC1.Account, amount : Nat, spender : ?ICRC1.Subaccount) : async* TransferFromResult {
+    public func transfer_from(
+      from : ICRC1.Account,
+      to : ICRC1.Account,
+      amount : Nat,
+      spender : ?ICRC1.Subaccount,
+    ) : async* TransferFromResult {
       let args = {
         spender_subaccount = spender;
         from;
