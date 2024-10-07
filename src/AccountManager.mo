@@ -262,10 +262,6 @@ module {
           updateFee(expected_fee);
           #err(#BadFee { expected_fee = fee(#allowance) });
         };
-        case (#err(#InsufficientFunds x)) {
-          ignore fetchFee();
-          #err(#InsufficientFunds x);
-        };
         case (#err err) #err(err);
       };
     };
@@ -307,7 +303,6 @@ module {
       // catch #BadFee
       switch (res) {
         case (#err(#BadFee { expected_fee })) updateFee(expected_fee);
-        case (#err(#InsufficientFunds _)) ignore fetchFee();
         case (_) {};
       };
 
