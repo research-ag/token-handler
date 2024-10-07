@@ -1,0 +1,7 @@
+[dependencies]
+base = "0.13.0"
+vector = "0.4.1"
+icrc84 = "https://github.com/research-ag/icrc-84#main"
+
+[toolchain]
+moc = "0.13.0"
