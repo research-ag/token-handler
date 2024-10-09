@@ -132,6 +132,9 @@ module {
 
     /// Returns the current `TokenHandler` state.
     public func state() : {
+      ledger : {
+        fee : Nat;
+      };
       balance : {
         deposited : Nat;
         underway : Nat;
@@ -150,6 +153,9 @@ module {
         queued : Nat;
       };
     } = {
+      ledger = {
+        fee = accountManager.ledgerFee(); 
+      };
       balance = {
         deposited = accountManager.depositedFunds();
         underway = accountManager.underwayFunds();

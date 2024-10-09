@@ -323,7 +323,7 @@ module {
           credited += benefit;
           ignore release(null);
         };
-        case (#err err) {
+        case (#err _) {
           burn(p, credit);
           ignore process_deposit(p, deposit, release);
         };
