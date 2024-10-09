@@ -1,5 +1,6 @@
 import Principal "mo:base/Principal";
 import NatMap "NatMapWithLock";
+import Data "Data";
 
 module {
   public type StableData = (NatMap.StableData<Principal>, Nat);
@@ -12,37 +13,24 @@ module {
   // The fee argument is the initial deposit fee (aka forwarding fee or consolidation fee).
   // This class does not know about the individual components that make up the deposit fee.
   // In practice, the deposit fee will consist of the ledger fee and a surcharge.
-  public class DepositRegistry(fee_ : Nat, trap : Text -> ()) {
-    public var fee : Nat = fee_;
+  public class DepositRegistry(data : Data.Data, trap : Text -> ()) {
+    let { map; queue; } = data;
 
-    public let map = NatMap.NatMapWithLock<Principal>(
-      Principal.compare,
-      fee + 1,
-    );
-
-    public func updateFee(
-      newFee : Nat,
-      changeBy : (Principal, Int) -> (), // callback for changed deposit values
-    ) {
-      let oldFee = fee;
-      fee := newFee;
-      // update the deposit minimum depending on the new fee
-      // the callback reports the principal for deposits that are removed in this step
-      map.setMinimum(newFee + 1, func(p, v) = changeBy(p, oldFee - v));
-      // report adjusted values for all queued deposits
-      map.iterate(
-        func(p, v) {
-          if (v <= newFee) trap("deposit <= newFee should have been erased in previous step");
-          changeBy(p, oldFee - newFee);
-        }
-      );
+    public func obtainLock(p : Principal) : ?Data.Entry<Principal> {
+      null;
     };
 
-    public func share() : StableData = (map.share(), fee);
+    public func release(entry : Data.Entry<Principal>, deposit : Nat) {
+      // let prev = entry.setDeposit(deposit);
+      // if (prev > deposit) {
 
-    public func unshare(values : StableData) {
-      map.unshare(values.0);
-      fee := values.1;
+      // }
+      // if (prev == 0) {
+      //   queue.push(entry);
+      // };
+      // assert entry.unlock();
     };
+
+    public func unlock(entry : Data.Entry<Principal>) = assert entry.unlock();
   };
 };
