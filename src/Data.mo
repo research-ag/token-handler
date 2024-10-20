@@ -94,7 +94,7 @@ module {
       let value = state.tree.get(key);
       switch (value) {
         case (?v) ?Entry<K>(true, key, v, state);
-        case (null) null;
+        case null null;
       };
     };
 
@@ -103,25 +103,44 @@ module {
       let value = state.tree.get(key);
       switch (value) {
         case (?v) Entry<K>(true, key, v, state);
-        case (null) Entry<K>(false, key, { var lock = false; var credit = 0; var deposit = 0 }, state);
+        case null Entry<K>(false, key, { var lock = false; var credit = 0; var deposit = 0 }, state);
       };
     };
+
+    public func lookupCount() : Nat = state.lookupCount;
+    
+    public func size() : Nat = state.size;
+    
+    public func locks() : Nat = state.locks;
+    
+    public func creditSum() : Nat = state.credit_sum;
+    
+    public func depositsCount() : Nat = state.deposits_count;
+    
+    public func depositSum() : Nat = state.deposit_sum;
   };
 
-  class Queue<K>() {
+  public class Queue<K>() {
     var queue = Deque.empty<Entry<K>>();
 
-    public func popFirst(f : (entry : Entry<K>) -> Bool) : ?Entry<K> {
-      label l loop {
-        let ?(entry, d) = Deque.popFront(queue) else break l;
-        queue := d;
-        if (f(entry)) return ?entry;
-      };
-      return null;
+    public func popFront() : ?Entry<K> {
+      let ?(entry, d) = Deque.popFront(queue) else return null;
+      queue := d;
+      ?entry;
     };
 
-    public func push(entry : Entry<K>) {
+    public func pushFront(e : Entry<K>) {
+      queue := Deque.pushFront(queue, e);
+    };
+
+    public func pushBack(entry : Entry<K>) {
       queue := Deque.pushBack(queue, entry);
+    };
+
+    public func popBack() : ?Entry<K> {
+      let ?(d, entry) = Deque.popBack(queue) else return null;
+      queue := d;
+      ?entry;
     };
   };
 

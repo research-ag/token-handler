@@ -17,6 +17,8 @@ import DepositManager "DepositManager";
 import AllowanceManager "AllowanceManager";
 import WithdrawalManager "WithdrawalManager";
 import CreditRegistry "CreditRegistry";
+import Data "Data";
+import FeeManager "FeeManager";
 
 module {
   public type StableData = (
@@ -63,7 +65,7 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = ((((#leaf, 0, 0, 1), 0), 0), ([], 0, 0));
+  public func defaultStableData() : StableData = ((0), ([], 0, 0));
   //public func defaultStableData() : StableData = (([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
@@ -113,10 +115,15 @@ module {
 
     let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
 
+    let data = Data.Data();
+
+    let feeManager = FeeManager.FeeManager(data);
+
     let depositManager = DepositManager.DepositManager(
       Ledger,
       triggerOnNotifications,
-      creditRegistry.issue,
+      data,
+      feeManager,
       log,
       freezeTokenHandler
     );
@@ -132,7 +139,7 @@ module {
     public func surcharge() : Nat = depositManager.state().fee.surcharge;
 
     /// Sets new surcharge amount.
-    public func setSurcharge(s : Nat) = depositManager.setSurcharge(s);
+    public func setSurcharge(s : Nat) = feeManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.
     public func fee(_ : { #deposit; #allowance; #withdrawal }) : Nat = depositManager.state().fee.deposit;

@@ -1,5 +1,4 @@
 import Principal "mo:base/Principal";
-import Int "mo:base/Int";
 import R "mo:base/Result";
 import Text "mo:base/Text";
 import Nat "mo:base/Nat";
@@ -7,13 +6,11 @@ import Iter "mo:base/Iter";
 
 import ICRC1 "icrc1-api"; // only needed for error types
 import ICRC84Helper "icrc84-helper";
-import DepositRegistry "DepositRegistry";
 import Data "Data";
 import FeeManager "FeeManager";
 
 module {
   public type StableData = (
-    DepositRegistry.StableData, // depositRegistry
     Nat, // totalConsolidated
   );
 
@@ -64,12 +61,11 @@ module {
     /// If `true` new notifications are paused.
     var paused : Bool = false;
 
-    /// Manages deposit balances for each user.
-    // let depositRegistry = DepositRegistry.DepositRegistry(icrc84.fee(), trap);
-    // let depositMap = depositRegistry.map;
-
     /// Total amount consolidated. Accumulated value.
     var totalConsolidated : Nat = 0;
+
+    /// Total amount of credited to users.
+    var totalCredited : Nat = 0;
 
     /// Total funds underway for consolidation.
     var underwayFunds : Nat = 0;
@@ -82,16 +78,16 @@ module {
         surcharge = feeManager.surcharge();
       };
       flow = {
-        credited = Int.abs(credit.flow);
+        credited = totalCredited;
       };
       totalConsolidated = totalConsolidated;
       funds = {
-        deposited = depositMap.sum() + underwayFunds;
+        deposited = map.depositSum() + underwayFunds;
         underway = underwayFunds;
-        queued = depositMap.sum();
+        queued = map.depositSum();
       };
-      nDeposits = depositMap.size();
-      nLocks = depositMap.locks();
+      nDeposits = map.depositsCount();
+      nLocks = map.locks();
     };
 
     /// Pause or unpause notifications.
@@ -109,46 +105,6 @@ module {
       case (?entry) ?entry.deposit();
     };
 
-    /// Object to track all credit flows initiated from within DepositManager.
-    /// The flow should never become negative.
-    // let credit = object {
-    //   public var flow : Int = 0;
-    //   public func change(who : { #user : Principal; #pool }, amount : Int) {
-    //     changeCredit(who, amount);
-    //     flow += amount;
-    //     if (flow < 0) trap("credit flow went negative");
-    //   };
-    //   public func changeUser(p : Principal, amount : Int) = change(#user p, amount);
-    //   public func changePool(amount : Int) = change(#pool, amount);
-    // };
-
-    // get informed by updated ledger fee
-    // public func registerFeeChange(oldFee : Nat, newFee : Nat) {
-    //   assert oldFee != newFee;
-    //   // set new deposit fee such that the surcharge remains the same
-    //   depositRegistry.updateFee(depositRegistry.fee + newFee - oldFee, credit.changeUser);
-    //   log(Principal.fromBlob(""), #feeUpdated({ old = oldFee; new = newFee }));
-    // };
-
-    func process_deposit(p : Principal, deposit : Nat, release : ?Nat -> Int) : (Nat, Nat) {
-      if (deposit <= feeManager.fee()) {
-        ignore release(null);
-        return (0, 0);
-      };
-      let delta = release(?deposit);
-      if (delta < 0) trap("latestDeposit < prevDeposit on notify");
-      if (delta == 0) return (0, 0);
-      let inc = Int.abs(delta);
-
-      let creditInc : Nat = switch (deposit == inc) {
-        case true { deposit - feeManager.fee() }; // former value in DepositRegistry was 0
-        case false { inc }; // former value in DepositRegistry was > 0
-      };
-
-      credit.changeUser(p, creditInc);
-      (inc, creditInc);
-    };
-
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit if successful.
     /// Returns null if:
@@ -157,48 +113,45 @@ module {
     /// - notifications are paused entirely
     /// This function never throws.
     public func notify(p : Principal) : async* ?(Nat, Nat) {
+      func do_notify() : async* ?(Nat, Nat) {
+        let #ok latestDeposit = await* icrc84.loadDeposit(p) else return null;
+
+        if (latestDeposit <= feeManager.fee()) {
+          return ?(0, 0);
+        };
+        let prevDeposit = entry.deposit();
+        if (latestDeposit < prevDeposit) trap("latestDeposit < prevDeposit on notify");
+        if (latestDeposit == prevDeposit) return ?(0, 0);
+
+        let depositInc = latestDeposit - prevDeposit : Nat;
+        let creditInc = if (prevDeposit == 0) latestDeposit - feeManager.fee() : Nat else depositInc;
+
+        if (prevDeposit == 0) {
+          queue.pushBack(entry);
+        };
+
+        entry.setDeposit(latestDeposit);
+        assert entry.changeCredit(creditInc);
+        totalCredited += creditInc;
+
+        log(p, #newDeposit(depositInc));
+
+        if (triggerOnNotifications) {
+          // schedule a canister self-call to initiate the consolidation
+          // we need try-catch so that we don't trap if scheduling fails synchronously
+          try ignore async await* trigger(1) catch (_) {};
+        };
+        return ?(depositInc, creditInc);
+      };
+
       if (paused) return null;
       let entry = map.get(p);
       if (not entry.lock()) return null;
 
-      let latestDeposit = switch (await* icrc84.loadDeposit(p)) {
-        case (#ok x) x;
-        case (#err _) {
-          assert entry.unlock();
-          return null;
-        };
-      };
+      let ret = await* do_notify();
 
-      // This function calls release() to release the lock
-      // let (inc, creditInc) = process_deposit(p, latestDeposit, release);
-      if (latestDeposit <= feeManager.fee()) {
-        assert entry.unlock();
-        return ?(0, 0);
-      };
-      let prevDeposit = entry.deposit();
-      if (latestDeposit < prevDeposit) trap("latestDeposit < prevDeposit on notify");
-      if (latestDeposit == prevDeposit) return ?(0, 0);
-
-      let depositInc = latestDeposit - prevDeposit : Nat;
-      let creditInc = if (prevDeposit == 0) latestDeposit - feeManager.fee() : Nat else depositInc;
-
-      if (prevDeposit == 0) {
-        queue.push(entry);
-      };
-
-      entry.setDeposit(latestDeposit);
-      assert entry.changeCredit(creditInc);
       assert entry.unlock();
-
-      log(p, #newDeposit(depositInc));
-
-      if (triggerOnNotifications) {
-        // schedule a canister self-call to initiate the consolidation
-        // we need try-catch so that we don't trap if scheduling fails synchronously
-        try ignore async await* trigger(1) catch (_) {};
-      };
-
-      return ?(depositInc, creditInc);
+      return ret;
     };
 
     /// Attempts to consolidate the funds for a particular principal.
@@ -231,10 +184,8 @@ module {
           data.pool += feeManager.surcharge();
         };
         case (#err _) {
+          queue.pushBack(entry);
           entry.setDeposit(deposit);
-          // credit.changeUser(p, -credited);
-          // // the fees may have changed in the meantime, hence we process the exising deposit as a new one
-          // ignore process_deposit(p, deposit, release);
         };
       };
       assert entry.unlock();
@@ -246,12 +197,30 @@ module {
     /// n - desired number of potential consolidations.
     public func trigger(n : Nat) : async* () {
       for (i in Iter.range(1, n)) {
-        func condition(e : Data.Entry<Principal>) : Bool {
-          let ok = e.deposit() > feeManager.fee();
-          if (not ok) e.setDeposit(0);
-          ok;
+        let stack = Data.Queue<Principal>();
+
+        func search() : ?Data.Entry<Principal> {
+          loop {
+            let ?entry = queue.popFront() else return null;
+
+            if (entry.deposit() > feeManager.fee()) {
+              if (entry.locked()) stack.pushBack(entry) else return ?entry;
+            } else {
+              entry.setDeposit(0);
+            };
+          };
         };
-        let ?entry = queue.popFirst(condition) else return;
+
+        func addBack() {
+          loop {
+            let ?entry = stack.popBack() else return;
+            queue.pushFront(entry);
+          };
+        };
+
+        let ?entry = search() else return;
+        addBack();
+
         underwayFunds += entry.deposit();
         let result = await* consolidate(entry);
         underwayFunds -= entry.deposit();
@@ -264,14 +233,12 @@ module {
 
     /// Serializes the token handler data.
     public func share() : StableData = (
-      depositRegistry.share(),
-      totalConsolidated,
+      totalConsolidated
     );
 
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
-      depositRegistry.unshare(values.0);
-      totalConsolidated := values.1;
+      totalConsolidated := values;
     };
   };
 };
