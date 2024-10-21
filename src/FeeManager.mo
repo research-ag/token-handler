@@ -1,19 +1,20 @@
-import Data "Data";
-
 module {
-  public class FeeManager(data : Data.Data) {
-    public func fee() : Nat = data.ledgerFee + data.surcharge;
+  public class FeeManager(initialFee : Nat) {
+    var ledgerFee_ = initialFee;
+    var surcharge_ = 0;
 
-    public func ledgerFee() : Nat = data.ledgerFee;
+    public func fee() : Nat = ledgerFee_ + surcharge_;
 
-    public func surcharge() : Nat = data.surcharge;
+    public func ledgerFee() : Nat = ledgerFee_;
+
+    public func surcharge() : Nat = surcharge_;
 
     public func setSurcharge(s : Nat) {
-      data.surcharge := s;
+      surcharge_ := s;
     };
 
     public func setLedgerFee(f : Nat) {
-      data.ledgerFee := f;
+      ledgerFee_ := f;
     };
   };
 };

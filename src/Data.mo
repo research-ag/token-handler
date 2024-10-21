@@ -13,7 +13,6 @@ module {
 
   class State<K>(compare : (K, K) -> Order.Order) {
     public let tree = RbTree.RBTree<K, Value>(compare);
-    public var queue = Deque.empty<Value>();
     public var lookupCount = 0;
     public var size : Nat = 0;
     public var locks : Nat = 0;
@@ -86,7 +85,7 @@ module {
     };
   };
 
-  class Map<K>(compare : (K, K) -> Order.Order) {
+  public class Map<K>(compare : (K, K) -> Order.Order) {
     let state : State<K> = State<K>(compare);
 
     public func getOpt(key : K) : ?Entry<K> {
@@ -148,7 +147,5 @@ module {
     public let map : Map<Principal> = Map<Principal>(Principal.compare);
     public let queue : Queue<Principal> = Queue<Principal>();
     public var pool = 0;
-    public var ledgerFee = 0;
-    public var surcharge = 0;
   };
 };
