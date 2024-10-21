@@ -1,5 +1,6 @@
 import ICRC1 "icrc1-api";
 import R "mo:base/Result";
+import FeeManager "FeeManager";
 
 /// This module is built on top of icrc1-api.
 /// It wraps the ICRC1 ledger API calls in try-catch blocks
@@ -35,13 +36,7 @@ module {
 
   public type FeeResult = R.Result<Nat, { #CallIcrc1LedgerError }>;
 
-  public class LedgerAgent(api : ICRC1.API) {
-    var fee_ = 0;
-
-    public func fee() : Nat = fee_;
-
-    public func setFee(x : Nat) = fee_ := x;
-
+  public class LedgerAgent(api : ICRC1.API, feeManager : FeeManager.FeeManager) {
     public func fetchFee() : async* FeeResult {
       try {
         #ok(await api.fee());
@@ -67,7 +62,7 @@ module {
         from_subaccount;
         to;
         amount;
-        fee = ?fee_;
+        fee = ?feeManager.ledgerFee();
         memo = null;
         created_at_time = null;
       };
@@ -89,7 +84,7 @@ module {
         from;
         to;
         amount;
-        fee = ?fee_;
+        fee = ?feeManager.ledgerFee();
         memo = null;
         created_at_time = null;
       };

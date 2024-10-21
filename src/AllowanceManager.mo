@@ -1,6 +1,10 @@
 import ICRC1 "icrc1-api";
 import R "mo:base/Result";
+import Principal "mo:base/Principal";
 import ICRC84Helper "icrc84-helper";
+import Data "Data";
+import FeeManager "FeeManager";
+import CreditManager "CreditManager";
 
 module {
   public type DepositFromAllowanceError = ICRC1.TransferFromError or {
@@ -18,25 +22,11 @@ module {
 
   public class AllowanceManager(
     icrc84 : ICRC84Helper.Ledger,
-    surcharge : () -> Nat,
-    changeCredit : ({ #pool; #user : Principal }, Int) -> (),
+    map : Data.Map<Principal>,
+    creditManager : CreditManager.CreditManager,
+    feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
-    trap : (text : Text) -> (),
   ) {
-
-    func fee() : Nat = icrc84.fee() + surcharge();
-
-    /// Object to track all credit flows initiated from within DepositManager.
-    /// The flow should never become negative.
-    let credit = object {
-      public var flow : Int = 0;
-      public func change(who : { #user : Principal; #pool }, amount : Int) {
-        changeCredit(who, amount);
-        flow += amount;
-        if (flow < 0) trap("credit flow went negative");
-      };
-    };
-
     /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
@@ -44,16 +34,16 @@ module {
     public func depositFromAllowance(p : Principal, source : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
       switch (expectedFee) {
         case null {};
-        case (?f) if (f != fee()) {
-          let err = #BadFee { expected_fee = fee() };
+        case (?f) if (f != feeManager.fee()) {
+          let err = #BadFee { expected_fee = feeManager.fee() };
           log(p, #allowanceError err);
           return #err(err);
         };
       };
 
-      let surcharge_ = surcharge();
+      let surcharge_ = feeManager.surcharge();
 
-      let res = await* icrc84.draw(p, source, creditAmount + fee());
+      let res = await* icrc84.draw(p, source, creditAmount + feeManager.fee());
 
       let event = switch (res) {
         case (#ok _) #allowanceDrawn { amount = creditAmount };
@@ -63,8 +53,8 @@ module {
       log(p, event);
 
       if (R.isOk(res)) {
-        credit.change(#user p, creditAmount);
-        credit.change(#pool, surcharge_);
+        assert map.get(p).changeCredit(creditAmount);
+        assert creditManager.changePool(surcharge_);
       };
 
       switch (res) {

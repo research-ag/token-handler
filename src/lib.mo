@@ -8,7 +8,6 @@ import Principal "mo:base/Principal";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import Nat "mo:base/Nat";
-import Result "mo:base/Result";
 
 import ICRC84 "mo:icrc84";
 import ICRC1 "icrc1-api";
@@ -16,15 +15,17 @@ import ICRC84Helper "icrc84-helper";
 import DepositManager "DepositManager";
 import AllowanceManager "AllowanceManager";
 import WithdrawalManager "WithdrawalManager";
-import CreditRegistry "CreditRegistry";
+import CreditManager "CreditManager";
+import Data "Data";
+import FeeManager "FeeManager";
 
 module {
   public type StableData = (
     DepositManager.StableData, // account manager
-    CreditRegistry.StableData, // credit registry
+    CreditManager.StableData, // credit registry
   );
 
-  public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditRegistry.LogEvent or {
+  public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditManager.LogEvent or {
     #error : Text;
   };
 
@@ -63,8 +64,7 @@ module {
   };
 
   /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = ((((#leaf, 0, 0, 1), 0), 0), ([], 0, 0));
-  //public func defaultStableData() : StableData = (([], 0, 0));
+  public func defaultStableData() : StableData = (0, 0);
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = ICRC84.toSubaccount(p);
@@ -108,22 +108,23 @@ module {
       log(ownPrincipal, #error(errorText));
     };
 
-    /// Tracks credited funds (usable balance) associated with each principal.
-    let creditRegistry = CreditRegistry.CreditRegistry(log);
+    let data = Data.Data();
 
-    let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
+    let feeManager = FeeManager.FeeManager(initialFee);
+
+    /// Tracks credited funds (usable balance) associated with each principal.
+    let creditManager = CreditManager.CreditManager(data.map, log);
+
+    let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, feeManager);
 
     let depositManager = DepositManager.DepositManager(
       Ledger,
       triggerOnNotifications,
-      creditRegistry.issue,
+      data,
+      feeManager,
       log,
       freezeTokenHandler
     );
-
-    Ledger.callback := func(oldFee : Nat, newFee : Nat) {
-      depositManager.registerFeeChange(oldFee, newFee);
-    };
 
     /// Returns the ledger fee.
     public func ledgerFee() : Nat = depositManager.state().fee.ledger;
@@ -132,7 +133,7 @@ module {
     public func surcharge() : Nat = depositManager.state().fee.surcharge;
 
     /// Sets new surcharge amount.
-    public func setSurcharge(s : Nat) = depositManager.setSurcharge(s);
+    public func setSurcharge(s : Nat) = feeManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.
     public func fee(_ : { #deposit; #allowance; #withdrawal }) : Nat = depositManager.state().fee.deposit;
@@ -149,18 +150,19 @@ module {
 
     let allowanceManager = AllowanceManager.AllowanceManager(
       Ledger,
-      surcharge, // surcharge
-      creditRegistry.issue,
-      log,
-      freezeTokenHandler
+      data.map,
+      creditManager,
+      feeManager,
+      log
     );
 
     let withdrawalManager = WithdrawalManager.WithdrawalManager(
+      ownPrincipal,
       Ledger,
-      surcharge, // surcharge
-      creditRegistry.issue,
-      log,
-      freezeTokenHandler
+      data.map,
+      creditManager,
+      feeManager,
+      log
     );
 
     /// Returns the current `TokenHandler` state.
@@ -177,8 +179,8 @@ module {
         withdrawn = withdrawalManager.totalWithdrawn();
       };
       credit = {
-        total = creditRegistry.totalBalance();
-        pool = creditRegistry.poolBalance();
+        total = creditManager.totalBalance();
+        pool = creditManager.poolBalance();
       };
       users = {
         queued = _.nDeposits;
@@ -190,10 +192,10 @@ module {
     });
 
     /// Gets the current credit amount associated with a specific principal.
-    public func userCredit(p : Principal) : Int = creditRegistry.userBalance(p);
+    public func userCredit(p : Principal) : Int = creditManager.userBalance(p);
 
     /// Gets the current credit amount in the pool.
-    public func poolCredit() : Int = creditRegistry.poolBalance();
+    public func poolCredit() : Int = creditManager.poolBalance();
 
     /// Adds amount to P’s credit.
     /// With checking the availability of sufficient funds.
@@ -209,7 +211,7 @@ module {
     ///   // Handle fail
     /// };
     /// ```
-    public func creditUser(p : Principal, amount : Nat) : Bool = creditRegistry.creditUser(p, amount);
+    public func creditUser(p : Principal, amount : Nat) : Bool = creditManager.creditUser(p, amount);
 
     /// Deducts amount from P’s credit.
     /// With checking the availability of sufficient funds in the pool.
@@ -225,13 +227,13 @@ module {
     ///   // Handle fail
     /// };
     /// ```
-    public func debitUser(p : Principal, amount : Nat) : Bool = creditRegistry.debitUser(p, amount);
+    public func debitUser(p : Principal, amount : Nat) : Bool = creditManager.debitUser(p, amount);
 
     /// For debug and testing purposes only.
     /// Issue credit directly to a principal or burn from a principal.
     /// A negative amount means burn.
     /// Without checking the availability of sufficient funds.
-    public func issue_(account : CreditRegistry.Account, amount : Int) = creditRegistry.issue(account, amount);
+    // public func issue_(account : CreditManager.Account, amount : Int) = creditManager.issue(account, amount);
 
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit and credit funds if successful, otherwise `null`.
@@ -315,21 +317,7 @@ module {
     ///   };
     /// ```
     public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
-      // try to burn from pool
-      creditRegistry.burn(#pool, amount) 
-      |> (
-        if (not _) {
-          let err = #InsufficientCredit;
-          log(ownPrincipal, #withdrawalError(err));
-          return #err(err);
-        }
-      );
-      let result = await* withdrawalManager.withdraw(null, to, amount, expectedFee);
-      if (Result.isErr(result)) {
-        // re-issue credit if unsuccessful
-        creditRegistry.issue(#pool, amount);
-      };
-      result;
+      await* withdrawalManager.withdraw(null, to, amount, expectedFee);
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
@@ -360,21 +348,7 @@ module {
     ///   };
     /// ```
     public func withdrawFromCredit(p : Principal, to : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
-      // try to burn from user
-      creditRegistry.burn(#user p, creditAmount)
-      |> (
-        if (not _) { 
-          let err = #InsufficientCredit;
-          log(ownPrincipal, #withdrawalError(err));
-          return #err(err);
-        }
-      );
-      let result = await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
-      if (Result.isErr(result)) {
-        // re-issue credit if unsuccessful
-        creditRegistry.issue(#user p, creditAmount);
-      };
-      result;
+      await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
     };
 
     /// For testing purposes.
@@ -384,13 +358,13 @@ module {
     /// Serializes the token handler data.
     public func share() : StableData = (
       depositManager.share(),
-      creditRegistry.share(),
+      creditManager.share(),
     );
 
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
       depositManager.unshare(values.0);
-      creditRegistry.unshare(values.1);
+      creditManager.unshare(values.1);
     };
   };
 };

@@ -1,6 +1,7 @@
 import ICRC1 "icrc1-api";
 import ICRC1Agent "icrc1-agent";
 import ICRC84 "mo:icrc84";
+import FeeManager "FeeManager";
 
 /// This module wraps around the icrc1-agent and further simplifies the arguments
 /// for all calls required for ICRC-84 support.
@@ -18,21 +19,8 @@ module {
 
   type DrawResult = ICRC1Agent.TransferFromResult;
 
-  public class Ledger(api : ICRC1.API, ownPrincipal : Principal, initial_fee : Nat) {
-    public var callback : (Nat, Nat) -> () = func(_, _) {};
-
-    let agent = ICRC1Agent.LedgerAgent(api);
-    agent.setFee(initial_fee);
-
-    public func fee() : Nat = agent.fee();
-
-    public func setFee(newFee : Nat) {
-      let oldFee = agent.fee();
-      if (newFee != oldFee) {
-        agent.setFee(newFee);
-        callback(oldFee, newFee);
-      };
-    };
+  public class Ledger(api : ICRC1.API, ownPrincipal : Principal, feeManager : FeeManager.FeeManager) {
+    let agent = ICRC1Agent.LedgerAgent(api, feeManager);
 
     var feeLock = false;
     public func loadFee() : async* ?Nat {
@@ -40,7 +28,10 @@ module {
       feeLock := true;
       try {
         switch (await* agent.fetchFee()) {
-          case (#ok(fee)) { setFee(fee); ?fee };
+          case (#ok(fee)) {
+            feeManager.setLedgerFee(fee);
+            ?fee;
+          };
           case _ null;
         };
       } finally feeLock := false;
@@ -49,7 +40,7 @@ module {
     func checkFee(res : TransferResult or DrawResult) : () {
       switch (res) {
         case (#err(#BadFee { expected_fee })) {
-          setFee(expected_fee);
+          feeManager.setLedgerFee(expected_fee);
         };
         case _ {};
       };
@@ -65,7 +56,7 @@ module {
 
     // Amount is the amount to transfer out, amount - fee is received
     func transfer(from_subaccount : ?ICRC1.Subaccount, to : ICRC1.Account, amount : Nat) : async* TransferResult {
-      let fee = agent.fee();
+      let fee = feeManager.ledgerFee();
       assert amount >= fee;
       let res = await* agent.transfer(from_subaccount, to, amount - fee);
       checkFee(res);
@@ -90,13 +81,12 @@ module {
     /// <amount> is the amount including fees subtracted from the allowance
     /// <amount - fee will be received in the main account
     public func draw(p : Principal, from : ICRC1.Account, amount : Nat) : async* DrawResult {
-      let fee = agent.fee();
+      let fee = feeManager.ledgerFee();
       assert amount >= fee;
       let to = { owner = ownPrincipal; subaccount = null };
       let res = await* agent.transfer_from(from, to, amount - fee, ?ICRC84.toSubaccount(p));
       checkFee(res);
       res;
     };
-
   };
 };
