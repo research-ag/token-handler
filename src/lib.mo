@@ -25,7 +25,7 @@ module {
     CreditManager.StableData, // credit registry
   );
 
-  public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditManager.LogEvent or {
+  public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditManager.LogEvent or FeeManager.LogEvent or {
     #error : Text;
   };
 
@@ -110,12 +110,12 @@ module {
 
     let data = Data.Data();
 
-    let feeManager = FeeManager.FeeManager(initialFee);
+    let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
+
+    let feeManager = FeeManager.FeeManager(Ledger, log);
 
     /// Tracks credited funds (usable balance) associated with each principal.
     let creditManager = CreditManager.CreditManager(data.map, log);
-
-    let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, feeManager);
 
     let depositManager = DepositManager.DepositManager(
       Ledger,

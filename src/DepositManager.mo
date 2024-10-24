@@ -29,8 +29,6 @@ module {
   };
 
   public type LogEvent = {
-    #feeUpdated : { old : Nat; new : Nat };
-    #surchargeUpdated : { old : Nat; new : Nat };
     #newDeposit : Nat;
     #consolidated : { deducted : Nat; credited : Nat };
     #consolidationError : Errors.TransferMin;
@@ -92,12 +90,6 @@ module {
 
     /// Pause or unpause notifications.
     public func pause(b : Bool) = paused := b;
-
-    /// Sets new surcharge amount.
-    // public func setSurcharge(s : Nat) {
-    //   log(Principal.fromBlob(""), #surchargeUpdated({ old = surcharge(); new = s }));
-    //   depositRegistry.updateFee(icrc84.fee() + s, credit.changeUser);
-    // };
 
     /// Retrieves the deposit of a principal.
     public func getDeposit(p : Principal) : ?Nat = switch (map.getOpt(p)) {

@@ -1,20 +1,33 @@
+import Principal "mo:base/Principal";
+
 module {
-  public class FeeManager(initialFee : Nat) {
-    var ledgerFee_ = initialFee;
+  public type LogEvent = {
+    #feeUpdated : { old : Nat; new : Nat };
+    #surchargeUpdated : { old : Nat; new : Nat };
+  };
+
+  public class FeeManager(
+    ledger : {
+      fee : () -> Nat;
+      var onFeeChanged : (Nat, Nat) -> ();
+    },
+    log : (Principal, LogEvent) -> (),
+  ) {
     var surcharge_ = 0;
 
-    public func fee() : Nat = ledgerFee_ + surcharge_;
+    ledger.onFeeChanged := func(old : Nat, new : Nat) {
+      log(Principal.fromBlob(""), #feeUpdated({ old; new }));
+    };
 
-    public func ledgerFee() : Nat = ledgerFee_;
+    public func fee() : Nat = ledgerFee() + surcharge_;
+
+    public func ledgerFee() : Nat = ledger.fee();
 
     public func surcharge() : Nat = surcharge_;
 
     public func setSurcharge(s : Nat) {
+      log(Principal.fromBlob(""), #surchargeUpdated({ old = surcharge_; new = s }));
       surcharge_ := s;
-    };
-
-    public func setLedgerFee(f : Nat) {
-      ledgerFee_ := f;
     };
   };
 };
