@@ -54,7 +54,7 @@ module {
     log : (Principal, LogEvent) -> (),
     trap : (text : Text) -> (),
   ) {
-    let { map; queue } = data;
+    let { map } = data;
 
     /// If `true` new notifications are paused.
     var paused : Bool = false;
@@ -97,6 +97,36 @@ module {
       case (?entry) ?entry.deposit();
     };
 
+    func do_notify(p : Principal, entry : Data.Entry<Principal>) : async* ?(Nat, Nat) {
+      let #ok latestDeposit = await* icrc84.loadDeposit(p) else return null;
+
+      if (latestDeposit <= feeManager.fee()) {
+        return ?(0, 0);
+      };
+
+      let prevDeposit = entry.deposit();
+      if (latestDeposit < prevDeposit) trap("latestDeposit < prevDeposit on notify");
+      if (latestDeposit == prevDeposit) return ?(0, 0);
+      entry.setDeposit(latestDeposit);
+
+      let depositInc = latestDeposit - prevDeposit : Nat;
+      let creditInc = depositInc - (if (prevDeposit == 0) feeManager.fee() else 0) : Nat;
+
+      if (prevDeposit == 0) entry.putToHeap();
+
+      assert entry.changeCredit(creditInc);
+      totalCredited += creditInc;
+
+      log(p, #newDeposit(depositInc));
+
+      if (triggerOnNotifications) {
+        // schedule a canister self-call to initiate the consolidation
+        // we need try-catch so that we don't trap if scheduling fails synchronously
+        try ignore async await* trigger(1) catch (_) {};
+      };
+      return ?(depositInc, creditInc);
+    };
+
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit if successful.
     /// Returns null if:
@@ -105,42 +135,11 @@ module {
     /// - notifications are paused entirely
     /// This function never throws.
     public func notify(p : Principal) : async* ?(Nat, Nat) {
-      func do_notify() : async* ?(Nat, Nat) {
-        let #ok latestDeposit = await* icrc84.loadDeposit(p) else return null;
-
-        if (latestDeposit <= feeManager.fee()) {
-          return ?(0, 0);
-        };
-        let prevDeposit = entry.deposit();
-        if (latestDeposit < prevDeposit) trap("latestDeposit < prevDeposit on notify");
-        if (latestDeposit == prevDeposit) return ?(0, 0);
-
-        let depositInc = latestDeposit - prevDeposit : Nat;
-        let creditInc = if (prevDeposit == 0) latestDeposit - feeManager.fee() : Nat else depositInc;
-
-        if (prevDeposit == 0) {
-          queue.pushBack(entry);
-        };
-
-        entry.setDeposit(latestDeposit);
-        assert entry.changeCredit(creditInc);
-        totalCredited += creditInc;
-
-        log(p, #newDeposit(depositInc));
-
-        if (triggerOnNotifications) {
-          // schedule a canister self-call to initiate the consolidation
-          // we need try-catch so that we don't trap if scheduling fails synchronously
-          try ignore async await* trigger(1) catch (_) {};
-        };
-        return ?(depositInc, creditInc);
-      };
-
       if (paused) return null;
       let entry = map.get(p);
       if (not entry.lock()) return null;
 
-      let ret = await* do_notify();
+      let ret = await* do_notify(p, entry);
 
       assert entry.unlock();
       return ret;
@@ -151,10 +150,12 @@ module {
       // read deposit amount from registry and erase it
       // we will add it again if the consolidation fails
       let deposit = entry.deposit();
+      underwayFunds += deposit;
       entry.setDeposit(0);
 
       let consolidated : Nat = deposit - feeManager.ledgerFee();
       let credited : Nat = deposit - feeManager.fee();
+      let surcharge = feeManager.surcharge();
 
       // transfer funds to the main account
       let res = await* icrc84.consolidate(entry.key(), deposit);
@@ -173,13 +174,16 @@ module {
       switch (res) {
         case (#ok _) {
           totalConsolidated += consolidated;
-          data.pool += feeManager.surcharge();
+          data.pool += surcharge;
         };
         case (#err _) {
-          queue.pushBack(entry);
           entry.setDeposit(deposit);
+          entry.putToHeap();
         };
       };
+
+      underwayFunds -= deposit;
+
       assert entry.unlock();
 
       res;
@@ -189,33 +193,11 @@ module {
     /// n - desired number of potential consolidations.
     public func trigger(n : Nat) : async* () {
       for (i in Iter.range(1, n)) {
-        let stack = Data.Queue<Principal>();
+        if (map.maxDeposit() <= feeManager.fee()) return;
+        let ?entry = map.popWithMaxDeposit() else return;
 
-        func search() : ?Data.Entry<Principal> {
-          loop {
-            let ?entry = queue.popFront() else return null;
-
-            if (entry.deposit() > feeManager.fee()) {
-              if (entry.locked()) stack.pushBack(entry) else return ?entry;
-            } else {
-              entry.setDeposit(0);
-            };
-          };
-        };
-
-        func addBack() {
-          loop {
-            let ?entry = stack.popBack() else return;
-            queue.pushFront(entry);
-          };
-        };
-
-        let ?entry = search() else return;
-        addBack();
-
-        underwayFunds += entry.deposit();
         let result = await* consolidate(entry);
-        underwayFunds -= entry.deposit();
+
         switch (result) {
           case (#err(#CallIcrc1LedgerError)) return;
           case _ {};

@@ -3,6 +3,7 @@ import Order "mo:base/Order";
 import Int "mo:base/Int";
 import Deque "mo:base/Deque";
 import Principal "mo:base/Principal";
+import Heap "mo:base/Heap";
 
 module {
   type Value = {
@@ -13,6 +14,16 @@ module {
 
   class State<K>(compare : (K, K) -> Order.Order) {
     public let tree = RbTree.RBTree<K, Value>(compare);
+
+    public let heap : Heap.Heap<(K, Value)> = Heap.Heap<(K, Value)>(func (a, b) {
+      let (k1, v1) = a;
+      let (k2, v2) = b;
+      // by deposit reverse
+      if (v1.deposit > v2.deposit) return #less;
+      if (v1.deposit < v2.deposit) return #greater;
+      compare(k1, k2);
+    });
+
     public var lookupCount = 0;
     public var size : Nat = 0;
     public var locks : Nat = 0;
@@ -21,7 +32,7 @@ module {
     public var deposit_sum : Nat = 0;
   };
 
-  public class Entry<K>(inside_ : Bool, key_ : K, value : Value, state : State<K>) {
+  public class Entry<K>(inside_ : Bool, key_ : K, value : Value, state : State<K>) = self {
     var inside = inside_;
 
     func cleanOrAdd() {
@@ -83,6 +94,11 @@ module {
 
       cleanOrAdd();
     };
+
+    public func putToHeap() {
+      assert value.deposit > 0;
+      state.heap.put((key_, value));
+    };
   };
 
   public class Map<K>(compare : (K, K) -> Order.Order) {
@@ -117,6 +133,16 @@ module {
     public func depositsCount() : Nat = state.deposits_count;
     
     public func depositSum() : Nat = state.deposit_sum;
+
+    public func maxDeposit() : Nat {
+      let ?(_, max) = state.heap.peekMin() else return 0;
+      max.deposit;
+    };
+
+    public func popWithMaxDeposit() : ?Entry<K> {
+      let ?(key, value) = state.heap.removeMin() else return null;
+      ?Entry(true, key, value, state);
+    };
   };
 
   public class Queue<K>() {
