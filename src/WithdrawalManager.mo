@@ -3,6 +3,9 @@ import Principal "mo:base/Principal";
 import R "mo:base/Result";
 import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
+import FeeManager "FeeManager";
+import CreditManager "CreditManager";
+import Data "Data";
 
 module {
   public type WithdrawError = ICRC1.TransferError or {
@@ -21,36 +24,24 @@ module {
   };
 
   public class WithdrawalManager(
+    ownPrincipal : Principal,
     icrc84 : ICRC84Helper.Ledger,
-    surcharge : () -> Nat,
-    changeCredit : ({ #pool; #user : Principal }, Int) -> (),
+    map : Data.Map<Principal>,
+    creditManager : CreditManager.CreditManager,
+    feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
-    trap : (text : Text) -> (),
   ) {
-    func fee() : Nat = icrc84.fee() + surcharge();
-
     var totalWithdrawn_ = 0;
 
     let noPrincipal = Principal.fromBlob("");
 
     public func totalWithdrawn() : Nat = totalWithdrawn_;
 
-    /// Object to track all credit flows initiated from within DepositManager.
-    /// The flow should never become negative.
-    let credit = object {
-      public var flow : Int = 0;
-      public func change(who : { #user : Principal; #pool }, amount : Int) {
-        changeCredit(who, amount);
-        flow += amount;
-        if (flow < 0) trap("credit flow went negative");
-      };
-    };
-
     // Without logging
     func process_withdraw(p : ?Principal, to : ICRC1.Account, creditAmount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
       let realFee = switch (p) {
-        case null icrc84.fee(); // withdrawal from pool
-        case _ fee(); // withdrawal from credit
+        case null feeManager.ledgerFee(); // withdrawal from pool
+        case _ feeManager.fee(); // withdrawal from credit
       };
       switch (userExpectedFee) {
         case null {};
@@ -60,22 +51,22 @@ module {
 
       let amountToSend : Nat = switch (p) {
         case null creditAmount;
-        case (?p) creditAmount - surcharge();
+        case (?p) creditAmount - feeManager.surcharge();
       };
-      let surcharge_ = surcharge();
+      let surcharge_ = feeManager.surcharge();
 
       let res = await* icrc84.send(to, amountToSend);
 
       if (R.isOk(res)) {
         totalWithdrawn_ += amountToSend;
-        if (p != null) credit.change(#pool, surcharge_);
+        if (p != null) assert creditManager.changePool(surcharge_);
       };
 
       // return value
       switch (res) {
         case (#ok txid) #ok(txid, creditAmount - realFee); // = amount arrived
         case (#err(#BadFee _)) {
-          #err(#BadFee { expected_fee = fee() }); // return the expected fee value from now
+          #err(#BadFee { expected_fee = feeManager.fee() }); // return the expected fee value from now
         };
         case (#err err) #err(err);
       };
@@ -86,6 +77,15 @@ module {
     /// creditAmount = amount of credit being deducted
     /// amount of tokens that the `to` account receives = creditAmount - userExpectedFee
     public func withdraw(p : ?Principal, to : ICRC1.Account, creditAmount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
+      let ok = switch(p) {
+        case null creditManager.burnPool(creditAmount);
+        case (?pp) creditManager.burn(pp, creditAmount);
+      };
+      if (not ok) {
+        let err = #InsufficientCredit;
+        log(ownPrincipal, #withdrawalError(err));
+        return #err(err);
+      };
       let res = await* process_withdraw(p, to, creditAmount, userExpectedFee);
 
       // logging
@@ -95,7 +95,13 @@ module {
       };
 
       log(Option.get(p, noPrincipal), event);
-
+      if (R.isErr(res)) {
+        // re-issue credit if unsuccessful
+        switch (p) {
+          case null assert creditManager.changePool(creditAmount);
+          case (?pp) assert map.get(pp).changeCredit(creditAmount);
+        };
+      };
       res;
     };
   };
