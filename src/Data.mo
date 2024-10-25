@@ -83,13 +83,15 @@ module {
     public func deposit() : Nat = value.credit;
 
     public func setDeposit(deposit : Nat) {
-      state.depositsTree.delete((deposit, key_));
-      if (value.deposit != 0) state.deposits_count -= 1;
+      if (value.deposit != 0) {
+        state.depositsTree.delete((value.deposit, key_));
+        state.deposits_count -= 1;
+      };
       state.deposit_sum -= value.deposit;
 
       value.deposit := deposit;
+      
       state.deposit_sum += value.deposit;
-
       if (value.deposit != 0) {
         state.deposits_count += 1;
         state.depositsTree.put((deposit, key_), value);
