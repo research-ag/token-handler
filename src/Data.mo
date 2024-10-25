@@ -3,7 +3,7 @@ import Order "mo:base/Order";
 import Int "mo:base/Int";
 import Deque "mo:base/Deque";
 import Principal "mo:base/Principal";
-import Heap "mo:base/Heap";
+import Nat "mo:base/Nat";
 
 module {
   type Value = {
@@ -15,14 +15,13 @@ module {
   class State<K>(compare : (K, K) -> Order.Order) {
     public let tree = RbTree.RBTree<K, Value>(compare);
 
-    public let heap : Heap.Heap<(K, Value)> = Heap.Heap<(K, Value)>(func (a, b) {
-      let (k1, v1) = a;
-      let (k2, v2) = b;
-      // by deposit reverse
-      if (v1.deposit > v2.deposit) return #less;
-      if (v1.deposit < v2.deposit) return #greater;
-      compare(k1, k2);
-    });
+    public let depositsTree = RbTree.RBTree<(deposit : Nat, key : K), Value>(
+      func((d1, k1), (d2, k2)) {
+        let c = Nat.compare(d1, d2);
+        if (c != #equal) return c;
+        compare(k1, k2);
+      }
+    );
 
     public var lookupCount = 0;
     public var size : Nat = 0;
@@ -84,20 +83,19 @@ module {
     public func deposit() : Nat = value.credit;
 
     public func setDeposit(deposit : Nat) {
+      state.depositsTree.delete((deposit, key_));
       if (value.deposit != 0) state.deposits_count -= 1;
       state.deposit_sum -= value.deposit;
 
       value.deposit := deposit;
-
-      if (value.deposit != 0) state.deposits_count += 1;
       state.deposit_sum += value.deposit;
 
-      cleanOrAdd();
-    };
+      if (value.deposit != 0) {
+        state.deposits_count += 1;
+        state.depositsTree.put((deposit, key_), value);
+      };
 
-    public func putToHeap() {
-      assert value.deposit > 0;
-      state.heap.put((key_, value));
+      cleanOrAdd();
     };
   };
 
@@ -123,25 +121,23 @@ module {
     };
 
     public func lookupCount() : Nat = state.lookupCount;
-    
+
     public func size() : Nat = state.size;
-    
+
     public func locks() : Nat = state.locks;
-    
+
     public func creditSum() : Nat = state.credit_sum;
-    
+
     public func depositsCount() : Nat = state.deposits_count;
-    
+
     public func depositSum() : Nat = state.deposit_sum;
 
-    public func maxDeposit() : Nat {
-      let ?(_, max) = state.heap.peekMin() else return 0;
-      max.deposit;
-    };
-
-    public func popWithMaxDeposit() : ?Entry<K> {
-      let ?(key, value) = state.heap.removeMin() else return null;
-      ?Entry(true, key, value, state);
+    public func getMaxEligibleDeposit(threshold : Nat) : ?Entry<K> {
+      for (((deposit, key), value) in state.depositsTree.entriesRev()) {
+        if (deposit <= threshold) return null;
+        if (not value.lock) return ?Entry(true, key, value, state);
+      };
+      return null;
     };
   };
 

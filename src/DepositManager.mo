@@ -112,8 +112,6 @@ module {
       let depositInc = latestDeposit - prevDeposit : Nat;
       let creditInc = depositInc - (if (prevDeposit == 0) feeManager.fee() else 0) : Nat;
 
-      if (prevDeposit == 0) entry.putToHeap();
-
       assert entry.changeCredit(creditInc);
       totalCredited += creditInc;
 
@@ -151,6 +149,7 @@ module {
       // we will add it again if the consolidation fails
       let deposit = entry.deposit();
       underwayFunds += deposit;
+      // also deletes from depositsTree
       entry.setDeposit(0);
 
       let consolidated : Nat = deposit - feeManager.ledgerFee();
@@ -177,8 +176,8 @@ module {
           data.pool += surcharge;
         };
         case (#err _) {
+          // also adds to depositsTree
           entry.setDeposit(deposit);
-          entry.putToHeap();
         };
       };
 
@@ -193,10 +192,11 @@ module {
     /// n - desired number of potential consolidations.
     public func trigger(n : Nat) : async* () {
       for (i in Iter.range(1, n)) {
-        if (map.maxDeposit() <= feeManager.fee()) return;
-        let ?entry = map.popWithMaxDeposit() else return;
+        let ?entry = map.getMaxEligibleDeposit(feeManager.fee()) else return;
 
+        assert entry.lock();
         let result = await* consolidate(entry);
+        assert entry.unlock();
 
         switch (result) {
           case (#err(#CallIcrc1LedgerError)) return;
