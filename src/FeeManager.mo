@@ -15,7 +15,9 @@ module {
   ) {
     var surcharge_ = 0;
 
+    let oldCallback = ledger.onFeeChanged;
     ledger.onFeeChanged := func(old : Nat, new : Nat) {
+      oldCallback(old, new);
       log(Principal.fromBlob(""), #feeUpdated({ old; new }));
     };
 

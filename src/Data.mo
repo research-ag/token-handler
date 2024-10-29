@@ -29,6 +29,10 @@ module {
     public var credit_sum : Nat = 0;
     public var deposits_count : Nat = 0;
     public var deposit_sum : Nat = 0;
+    public var unusable_deposit = {
+      var correct = true;
+      var sum = 0;
+    };
   };
 
   public class Entry<K>(inside_ : Bool, key_ : K, value : Value, state : State<K>) = self {
@@ -136,11 +140,21 @@ module {
 
     public func getMaxEligibleDeposit(threshold : Nat) : ?Entry<K> {
       for (((deposit, key), value) in state.depositsTree.entriesRev()) {
-        if (deposit <= threshold) return null;
+        if (deposit <= threshold) {
+          state.unusable_deposit.sum := state.deposit_sum;
+          state.unusable_deposit.correct := true;
+          return null;
+        };
         if (not value.lock) return ?Entry(true, key, value, state);
       };
       return null;
     };
+    
+    public func feeChanged() {
+      state.unusable_deposit.correct := false;
+    };
+
+    public func usableDeposit() : (deposit : Int, correct : Bool) = (state.deposit_sum : Int - state.unusable_deposit.sum : Int, state.unusable_deposit.correct);
   };
 
   public class Queue<K>() {

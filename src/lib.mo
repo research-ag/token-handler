@@ -108,10 +108,16 @@ module {
       log(ownPrincipal, #error(errorText));
     };
 
-    let data = Data.Data();
-
     let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
 
+    let data = Data.Data();
+
+    let oldCallback = Ledger.onFeeChanged;
+    Ledger.onFeeChanged := func (old, new) {
+      data.map.feeChanged();
+      oldCallback(old, new);
+    };
+    
     let feeManager = FeeManager.FeeManager(Ledger, log);
 
     /// Tracks credited funds (usable balance) associated with each principal.
