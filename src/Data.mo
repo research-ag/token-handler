@@ -94,7 +94,7 @@ module {
       state.deposit_sum -= value.deposit;
 
       value.deposit := deposit;
-      
+
       state.deposit_sum += value.deposit;
       if (value.deposit != 0) {
         state.deposits_count += 1;
@@ -138,20 +138,26 @@ module {
 
     public func depositSum() : Nat = state.deposit_sum;
 
+    func maxDeposit() : Nat {
+      let ?((deposit, _), _) = state.depositsTree.entriesRev().next() else return 0;
+      deposit;
+    };
+
     public func getMaxEligibleDeposit(threshold : Nat) : ?Entry<K> {
+      if (maxDeposit() <= threshold) {
+        state.unusable_deposit.sum := state.deposit_sum;
+        state.unusable_deposit.correct := true;
+        return null;
+      };
       for (((deposit, key), value) in state.depositsTree.entriesRev()) {
-        if (deposit <= threshold) {
-          state.unusable_deposit.sum := state.deposit_sum;
-          state.unusable_deposit.correct := true;
-          return null;
-        };
+        if (deposit <= threshold) return null;
         if (not value.lock) return ?Entry(true, key, value, state);
       };
       return null;
     };
-    
-    public func feeChanged() {
-      state.unusable_deposit.correct := false;
+
+    public func feeChanged(newThreshold : Nat) {
+      state.unusable_deposit.correct := maxDeposit() <= newThreshold;
     };
 
     public func usableDeposit() : (deposit : Int, correct : Bool) = (state.deposit_sum : Int - state.unusable_deposit.sum : Int, state.unusable_deposit.correct);

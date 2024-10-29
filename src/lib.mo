@@ -114,7 +114,7 @@ module {
 
     let oldCallback = Ledger.onFeeChanged;
     Ledger.onFeeChanged := func (old, new) {
-      data.map.feeChanged();
+      data.map.feeChanged(new);
       oldCallback(old, new);
     };
     
