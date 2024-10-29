@@ -120,7 +120,8 @@ module {
 
       if (triggerOnNotifications) {
         // schedule a canister self-call to initiate the consolidation
-        // we need try-catch so that we don't trap if scheduling fails synchronously
+        // we need try-catch so that we don't throw if scheduling fails synchronously
+        // Try this out in practice: https://play.motoko.org/?tag=2588339575
         try ignore async await* trigger(1) catch (_) {};
       };
       return ?(depositInc, creditInc);
