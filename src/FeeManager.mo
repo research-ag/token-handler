@@ -29,5 +29,7 @@ module {
       log(Principal.fromBlob(""), #surchargeUpdated({ old = surcharge_; new = s }));
       surcharge_ := s;
     };
+
+    public func share() : (Nat, Nat) = (ledger.fee(), surcharge_);
   };
 };

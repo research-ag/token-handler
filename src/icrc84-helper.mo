@@ -11,6 +11,7 @@ import ICRC84 "mo:icrc84";
 /// The class in this module also tracks the underlying ledger fee and
 /// automatically updates the tracked value if it changes.
 /// The functions in this module do not retry any ledger calls if they fail.
+/// The functions in this module never throw.
 module {
   type BalanceResult = ICRC1Agent.BalanceResult;
 
