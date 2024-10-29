@@ -149,8 +149,6 @@ module {
       // we will add it again if the consolidation fails
       let deposit = entry.deposit();
       underwayFunds += deposit;
-      // also deletes from depositsTree
-      entry.setDeposit(0);
 
       let consolidated : Nat = deposit - feeManager.ledgerFee();
       let credited : Nat = deposit - feeManager.fee();
@@ -175,15 +173,10 @@ module {
           totalConsolidated += consolidated;
           data.pool += surcharge;
         };
-        case (#err _) {
-          // also adds to depositsTree
-          entry.setDeposit(deposit);
-        };
+        case (_) {};
       };
 
       underwayFunds -= deposit;
-
-      assert entry.unlock();
 
       res;
     };
@@ -200,7 +193,8 @@ module {
 
         switch (result) {
           case (#err(#CallIcrc1LedgerError)) return;
-          case _ {};
+          case (#err _) {};
+          case (#ok _) entry.setDeposit(0);
         };
       };
     };
