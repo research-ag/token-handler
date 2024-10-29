@@ -14,7 +14,7 @@ import ICRC84 "mo:icrc84";
 module {
   type BalanceResult = ICRC1Agent.BalanceResult;
 
-  type TransferResult = ICRC1Agent.TransferResult;
+  public type TransferResult = ICRC1Agent.TransferResult;
 
   type DrawResult = ICRC1Agent.TransferFromResult;
 

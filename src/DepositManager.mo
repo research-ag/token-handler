@@ -98,6 +98,7 @@ module {
     };
 
     func do_notify(p : Principal, entry : Data.Entry<Principal>) : async* ?(Nat, Nat) {
+      // This call never throws:
       let #ok latestDeposit = await* icrc84.loadDeposit(p) else return null;
 
       if (latestDeposit <= feeManager.fee()) {
@@ -137,32 +138,22 @@ module {
       let entry = map.get(p);
       if (not entry.lock()) return null;
 
-      let ret = await* do_notify(p, entry);
+      let ret = try {
+        await* do_notify(p, entry);
+      } finally assert entry.unlock();
 
-      assert entry.unlock();
       return ret;
     };
 
-    /// Attempts to consolidate the funds for a particular principal.
-    func consolidate(entry : Data.Entry<Principal>) : async* TransferResponse {
-      // read deposit amount from registry and erase it
-      // we will add it again if the consolidation fails
-      assert entry.lock();
+    func post_transfer(entry : Data.Entry<Principal>, (ledgerFee, surcharge) : (Nat, Nat), res : ICRC84Helper.TransferResult) {
       let deposit = entry.deposit();
-      underwayFunds += deposit;
-
-      let consolidated : Nat = deposit - feeManager.ledgerFee();
-      let credited : Nat = deposit - feeManager.fee();
-      let surcharge = feeManager.surcharge();
-
-      // transfer funds to the main account
-      let res = await* icrc84.consolidate(entry.key(), deposit);
+      underwayFunds -= deposit;
 
       // log event
       let event = switch (res) {
         case (#ok _) #consolidated({
           deducted = deposit;
-          credited;
+          credited = deposit - ledgerFee - surcharge : Nat;
         });
         case (#err err) #consolidationError(err);
       };
@@ -171,16 +162,42 @@ module {
       // process result
       switch (res) {
         case (#ok _) {
-          totalConsolidated += consolidated;
+          totalConsolidated += deposit - ledgerFee;
           data.pool += surcharge;
           entry.setDeposit(0);
         };
         case (#err _) {}
       };
 
-      underwayFunds -= deposit;
-
       assert entry.unlock();
+    };
+
+    /// Attempts to consolidate the funds for a particular principal.
+    /// This function never throws.
+    func consolidate(entry : Data.Entry<Principal>) : async* TransferResponse {
+      assert entry.lock();
+      underwayFunds += entry.deposit();
+
+      let fees = feeManager.share();
+
+      // transfer funds to the main account
+      var trapped = true;
+      let res = try {
+        // TODO: put a unique memo in this call
+        let res = await* icrc84.consolidate(entry.key(), entry.deposit()); // this call never throws
+        trapped := false;
+        res
+      } finally {
+        if (trapped) {
+          // we leave underwayFunds intentionally unchanged
+          // we leave the entry intentionally locked
+          // TODO:
+          // log the context: (entry.key(), fees, memo)
+          // then we can later figure out res and replay post_transfer(entry, fees, res)
+        }
+      };
+
+      post_transfer(entry, fees, res);
 
       res;
     };
@@ -190,13 +207,8 @@ module {
     public func trigger(n : Nat) : async* () {
       for (i in Iter.range(1, n)) {
         let ?entry = map.getMaxEligibleDeposit(feeManager.fee()) else return;
-
-        let result = await* consolidate(entry);
-
-        switch (result) {
-          case (#err(#CallIcrc1LedgerError)) return;
-          case _ {};
-        };
+        let res = await* consolidate(entry); // this call never throws
+        if (res == #err(#CallIcrc1LedgerError)) return;
       };
     };
 
