@@ -147,10 +147,9 @@ module {
     func consolidate(entry : Data.Entry<Principal>) : async* TransferResponse {
       // read deposit amount from registry and erase it
       // we will add it again if the consolidation fails
+      assert entry.lock();
       let deposit = entry.deposit();
       underwayFunds += deposit;
-      // also deletes from depositsTree
-      entry.setDeposit(0);
 
       let consolidated : Nat = deposit - feeManager.ledgerFee();
       let credited : Nat = deposit - feeManager.fee();
@@ -174,11 +173,9 @@ module {
         case (#ok _) {
           totalConsolidated += consolidated;
           data.pool += surcharge;
+          entry.setDeposit(0);
         };
-        case (#err _) {
-          // also adds to depositsTree
-          entry.setDeposit(deposit);
-        };
+        case (#err _) {}
       };
 
       underwayFunds -= deposit;
@@ -194,9 +191,7 @@ module {
       for (i in Iter.range(1, n)) {
         let ?entry = map.getMaxEligibleDeposit(feeManager.fee()) else return;
 
-        assert entry.lock();
         let result = await* consolidate(entry);
-        assert entry.unlock();
 
         switch (result) {
           case (#err(#CallIcrc1LedgerError)) return;
