@@ -191,5 +191,6 @@ module {
     public let map : Map<Principal> = Map<Principal>(Principal.compare);
     public let queue : Queue<Principal> = Queue<Principal>();
     public var pool = 0;
+    public var surplus : Int = 0;
   };
 };

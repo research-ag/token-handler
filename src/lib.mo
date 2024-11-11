@@ -115,6 +115,7 @@ module {
     let oldCallback = Ledger.onFeeChanged;
     Ledger.onFeeChanged := func (old, new) {
       data.map.feeChanged(new);
+      data.surplus -= (new - old) * data.map.depositsCount();
       oldCallback(old, new);
     };
     

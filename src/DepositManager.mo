@@ -26,6 +26,7 @@ module {
     };
     nDeposits : Nat;
     nLocks : Nat;
+    surplus : Int;
   };
 
   public type LogEvent = {
@@ -86,6 +87,7 @@ module {
       };
       nDeposits = map.depositsCount();
       nLocks = map.locks();
+      surplus = data.surplus;
     };
 
     /// Pause or unpause notifications.
@@ -110,7 +112,9 @@ module {
       entry.setDeposit(latestDeposit);
 
       let depositInc = latestDeposit - prevDeposit : Nat;
-      let creditInc = depositInc - (if (prevDeposit == 0) feeManager.fee() else 0) : Nat;
+      let keep = if (prevDeposit == 0) feeManager.fee() else 0;
+      let creditInc = depositInc - keep : Nat;
+      data.surplus += keep;
 
       assert entry.changeCredit(creditInc);
       totalCredited += creditInc;
