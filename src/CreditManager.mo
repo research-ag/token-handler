@@ -8,24 +8,23 @@ module {
   public type LogEvent = {
     #credited : Nat;
     #debited : Nat;
-    #issued : Int;
     #burned : Nat;
   };
 
   /// Tracks credited funds (usable balance) associated with each principal.
-  public class CreditManager(map : Data.Map<Principal>, log : (Principal, LogEvent) -> ()) {
-    var pool_ = 0;
+  public class CreditManager(data : Data.Data, log : (Principal, LogEvent) -> ()) {
+    let { map } = data;
 
     /// Retrieves the total credited funds in the credit registry.
-    public func totalBalance() : Nat = map.creditSum() + pool_;
+    public func totalBalance() : Nat = map.creditSum() + data.pool;
 
     /// Retrieves the total credited funds in the pool.
-    public func poolBalance() : Nat = pool_;
+    public func poolBalance() : Nat = data.pool;
 
     public func changePool(amount : Int) : Bool {
-      let sum = pool_ + amount;
+      let sum = data.pool + amount;
       if (sum < 0) return false;
-      pool_ := Int.abs(sum);
+      data.pool := Int.abs(sum);
       true;
     };
 
@@ -68,11 +67,11 @@ module {
     };
 
     /// Serializes the credit registry data.
-    public func share() : StableData = pool_;
+    public func share() : StableData = data.pool;
 
     /// Deserializes the credit registry data.
     public func unshare(values : StableData) {
-      pool_ := values;
+      data.pool := values;
     };
   };
 };

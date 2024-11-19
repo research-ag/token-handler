@@ -29,6 +29,7 @@ module {
   };
 
   public type LogEvent = {
+    #issued : Int;
     #newDeposit : Nat;
     #consolidated : { deducted : Nat; credited : Nat };
     #consolidationError : Errors.TransferMin;
@@ -115,6 +116,7 @@ module {
       assert entry.changeCredit(creditInc);
       totalCredited += creditInc;
 
+      log(p, #issued(creditInc));
       log(p, #newDeposit(depositInc));
 
       if (triggerOnNotifications) {
@@ -173,6 +175,7 @@ module {
         case (#ok _) {
           totalConsolidated += consolidated;
           data.pool += surcharge;
+          log(Principal.fromBlob(""), #issued(surcharge));
           entry.setDeposit(0);
         };
         case (#err _) {}

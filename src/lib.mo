@@ -121,7 +121,7 @@ module {
     let feeManager = FeeManager.FeeManager(Ledger, log);
 
     /// Tracks credited funds (usable balance) associated with each principal.
-    let creditManager = CreditManager.CreditManager(data.map, log);
+    let creditManager = CreditManager.CreditManager(data, log);
 
     let depositManager = DepositManager.DepositManager(
       Ledger,
