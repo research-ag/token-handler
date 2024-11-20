@@ -21,6 +21,7 @@ module {
   public type LogEvent = {
     #withdraw : { to : ICRC1.Account; amount : Nat };
     #withdrawalError : WithdrawError;
+    #issued : Int;
   };
 
   public class WithdrawalManager(
@@ -59,7 +60,10 @@ module {
 
       if (R.isOk(res)) {
         totalWithdrawn_ += amountToSend;
-        if (p != null) assert creditManager.changePool(surcharge_);
+        if (p != null) {
+          log(Principal.fromBlob(""), #issued(surcharge_));
+          assert creditManager.changePool(surcharge_);
+        };
       };
 
       // return value
@@ -77,7 +81,7 @@ module {
     /// creditAmount = amount of credit being deducted
     /// amount of tokens that the `to` account receives = creditAmount - userExpectedFee
     public func withdraw(p : ?Principal, to : ICRC1.Account, creditAmount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
-      let ok = switch(p) {
+      let ok = switch (p) {
         case null creditManager.burnPool(creditAmount);
         case (?pp) creditManager.burn(pp, creditAmount);
       };
@@ -98,8 +102,14 @@ module {
       if (R.isErr(res)) {
         // re-issue credit if unsuccessful
         switch (p) {
-          case null assert creditManager.changePool(creditAmount);
-          case (?pp) assert map.get(pp).changeCredit(creditAmount);
+          case null {
+            assert creditManager.changePool(creditAmount);
+            log(Principal.fromBlob(""), #issued(creditAmount));
+          };
+          case (?pp) {
+            assert map.get(pp).changeCredit(creditAmount);
+            log(pp, #issued(creditAmount));
+          };
         };
       };
       res;

@@ -18,6 +18,7 @@ module {
   public type LogEvent = {
     #allowanceDrawn : { amount : Nat };
     #allowanceError : DepositFromAllowanceError;
+    #issued : Int;
   };
 
   public class AllowanceManager(
@@ -54,7 +55,9 @@ module {
 
       if (R.isOk(res)) {
         assert map.get(p).changeCredit(creditAmount);
+        log(p, #issued(creditAmount));
         assert creditManager.changePool(surcharge_);
+        log(Principal.fromBlob(""), #issued(surcharge_));
       };
 
       switch (res) {
