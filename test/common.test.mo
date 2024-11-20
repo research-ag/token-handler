@@ -60,34 +60,31 @@ do {
     #newDeposit(5),
   ]);
 
-  // Recalculate credits related to deposits when fee changes
+  // Don't recalculate credits related to deposits when fee changes
 
-  // // scenario 1: new_fee < prev_fee < deposit
-  // ignore mock_ledger.fee_.stage_unlocked(?1);
-  // ignore await* handler.fetchFee();
-  // assert journal.hasEvents([
-  //   #issued(+1),
-  //   #feeUpdated({ new = 1; old = 2 }),
-  // ]);
-  // assert handler.userCredit(user1) == 2; // credit corrected
+  // scenario 1: new_fee < prev_fee < deposit
+  ignore mock_ledger.fee_.stage_unlocked(?1);
+  ignore await* handler.fetchFee();
+  assert journal.hasEvents([
+    #feeUpdated({ new = 1; old = 2 }),
+  ]);
+  assert handler.userCredit(user1) == 1; // credit not corrected
 
-  // // scenario 2: prev_fee < new_fee < deposit
-  // ignore mock_ledger.fee_.stage_unlocked(?2);
-  // ignore await* handler.fetchFee();
-  // assert journal.hasEvents([
-  //   #issued(-1),
-  //   #feeUpdated({ new = 2; old = 1 }),
-  // ]);
-  // assert handler.userCredit(user1) == 1; // credit corrected
+  // scenario 2: prev_fee < new_fee < deposit
+  ignore mock_ledger.fee_.stage_unlocked(?2);
+  ignore await* handler.fetchFee();
+  assert journal.hasEvents([
+    #feeUpdated({ new = 2; old = 1 }),
+  ]);
+  assert handler.userCredit(user1) == 1; // credit not corrected
 
-  // // scenario 3: prev_fee < deposit <= new_fee
-  // ignore mock_ledger.fee_.stage_unlocked(?5);
-  // ignore await* handler.fetchFee();
-  // assert journal.hasEvents([
-  //   #issued(-1),
-  //   #feeUpdated({ new = 5; old = 2 }),
-  // ]);
-  // assert handler.userCredit(user1) == 0; // credit corrected
+  // scenario 3: prev_fee < deposit <= new_fee
+  ignore mock_ledger.fee_.stage_unlocked(?5);
+  ignore await* handler.fetchFee();
+  assert journal.hasEvents([
+    #feeUpdated({ new = 5; old = 2 }),
+  ]);
+  assert handler.userCredit(user1) == 1; // credit not corrected
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
