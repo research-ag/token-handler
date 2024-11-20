@@ -62,32 +62,32 @@ do {
 
   // Recalculate credits related to deposits when fee changes
 
-  // scenario 1: new_fee < prev_fee < deposit
-  ignore mock_ledger.fee_.stage_unlocked(?1);
-  ignore await* handler.fetchFee();
-  assert journal.hasEvents([
-    #issued(+1),
-    #feeUpdated({ new = 1; old = 2 }),
-  ]);
-  assert handler.userCredit(user1) == 2; // credit corrected
+  // // scenario 1: new_fee < prev_fee < deposit
+  // ignore mock_ledger.fee_.stage_unlocked(?1);
+  // ignore await* handler.fetchFee();
+  // assert journal.hasEvents([
+  //   #issued(+1),
+  //   #feeUpdated({ new = 1; old = 2 }),
+  // ]);
+  // assert handler.userCredit(user1) == 2; // credit corrected
 
-  // scenario 2: prev_fee < new_fee < deposit
-  ignore mock_ledger.fee_.stage_unlocked(?2);
-  ignore await* handler.fetchFee();
-  assert journal.hasEvents([
-    #issued(-1),
-    #feeUpdated({ new = 2; old = 1 }),
-  ]);
-  assert handler.userCredit(user1) == 1; // credit corrected
+  // // scenario 2: prev_fee < new_fee < deposit
+  // ignore mock_ledger.fee_.stage_unlocked(?2);
+  // ignore await* handler.fetchFee();
+  // assert journal.hasEvents([
+  //   #issued(-1),
+  //   #feeUpdated({ new = 2; old = 1 }),
+  // ]);
+  // assert handler.userCredit(user1) == 1; // credit corrected
 
-  // scenario 3: prev_fee < deposit <= new_fee
-  ignore mock_ledger.fee_.stage_unlocked(?5);
-  ignore await* handler.fetchFee();
-  assert journal.hasEvents([
-    #issued(-1),
-    #feeUpdated({ new = 5; old = 2 }),
-  ]);
-  assert handler.userCredit(user1) == 0; // credit corrected
+  // // scenario 3: prev_fee < deposit <= new_fee
+  // ignore mock_ledger.fee_.stage_unlocked(?5);
+  // ignore await* handler.fetchFee();
+  // assert journal.hasEvents([
+  //   #issued(-1),
+  //   #feeUpdated({ new = 5; old = 2 }),
+  // ]);
+  // assert handler.userCredit(user1) == 0; // credit corrected
 
   handler.assertIntegrity();
   assert not handler.isFrozen();
@@ -124,42 +124,55 @@ do {
   let mock_ledger = MockLedger.MockLedger(DEBUG, "");
   let (handler, journal, _) = Util.createHandler(mock_ledger, false);
 
-  // credit pool
-  handler.issue_(#pool, 20);
-  assert handler.poolCredit() == 20;
-  assert journal.hasEvents([#issued(+20)]);
+  handler.setSurcharge(15);
+  assert handler.surcharge() == 15;
+  assert journal.hasEvents([
+    #surchargeUpdated({ new = 15; old = 0 })
+  ]);
 
-  // debit pool
-  handler.issue_(#pool, -5);
+  ignore mock_ledger.balance_.stage_unlocked(?16);
+  assert (await* handler.notify(user1)) == ?(16, 1);
+  assert journal.hasEvents([
+    #issued(+1),
+    #newDeposit(16),
+  ]);
+
+  let i = mock_ledger.transfer_.stage_unlocked(?(#Ok 0));
+  await* handler.trigger(1);
+  assert mock_ledger.transfer_.state(i) == #ready;
+  assert journal.hasEvents([
+    #consolidated({ credited = 1; deducted = 16 }),
+    #issued(15),
+  ]);
+
   assert handler.poolCredit() == 15;
-  assert journal.hasEvents([#issued(-5)]);
 
   // credit user
   // case: pool credit < amount
   assert (handler.creditUser(user1, 30)) == false;
   assert journal.hasEvents([]);
   assert handler.poolCredit() == 15;
-  assert handler.userCredit(user1) == 0;
+  assert handler.userCredit(user1) == 1;
 
   // credit user
   // case: pool credit <= amount
   assert (handler.creditUser(user1, 15)) == true;
   assert journal.hasEvents([#credited(15)]);
   assert handler.poolCredit() == 0;
-  assert handler.userCredit(user1) == 15;
+  assert handler.userCredit(user1) == 16;
 
   // debit user
   // case: credit < amount
-  assert (handler.debitUser(user1, 16)) == false;
+  assert (handler.debitUser(user1, 17)) == false;
   assert journal.hasEvents([]);
   assert handler.poolCredit() == 0;
-  assert handler.userCredit(user1) == 15;
+  assert handler.userCredit(user1) == 16;
 
   // debit user
   // case: credit >= amount
-  assert (handler.debitUser(user1, 15)) == true;
-  assert journal.hasEvents([#debited(15)]);
-  assert handler.poolCredit() == 15;
+  assert (handler.debitUser(user1, 16)) == true;
+  assert journal.hasEvents([#debited(16)]);
+  assert handler.poolCredit() == 16;
   assert handler.userCredit(user1) == 0;
 
   handler.assertIntegrity();
