@@ -6,6 +6,10 @@ module {
     #surchargeUpdated : { old : Nat; new : Nat };
   };
 
+  public type StableData = {
+    surcharge : Nat;
+  };
+
   public class FeeManager(
     ledger : {
       fee : () -> Nat;
@@ -30,6 +34,14 @@ module {
     public func setSurcharge(s : Nat) {
       log(Principal.fromBlob(""), #surchargeUpdated({ old = surcharge_; new = s }));
       surcharge_ := s;
+    };
+
+    public func share() : StableData = {
+      surcharge = surcharge_;
+    };
+
+    public func unshare(data : StableData) {
+      surcharge_ := data.surcharge;
     };
   };
 };

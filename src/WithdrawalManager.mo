@@ -8,6 +8,10 @@ import CreditManager "CreditManager";
 import Data "Data";
 
 module {
+  public type StableData = {
+    totalWithdrawn : Nat;
+  };
+
   public type WithdrawError = ICRC1.TransferError or {
     #CallIcrc1LedgerError;
     #TooLowQuantity;
@@ -27,7 +31,7 @@ module {
   public class WithdrawalManager(
     ownPrincipal : Principal,
     icrc84 : ICRC84Helper.Ledger,
-    map : Data.Map<Principal>,
+    data : Data.Data<Principal>,
     creditManager : CreditManager.CreditManager,
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
@@ -62,7 +66,7 @@ module {
         totalWithdrawn_ += amountToSend;
         if (p != null) {
           log(Principal.fromBlob(""), #issued(surcharge_));
-          assert creditManager.changePool(surcharge_);
+          assert data.changePool(surcharge_);
         };
       };
 
@@ -103,16 +107,24 @@ module {
         // re-issue credit if unsuccessful
         switch (p) {
           case null {
-            assert creditManager.changePool(creditAmount);
+            assert data.changePool(creditAmount);
             log(Principal.fromBlob(""), #issued(creditAmount));
           };
           case (?pp) {
-            assert map.get(pp).changeCredit(creditAmount);
+            assert data.get(pp).changeCredit(creditAmount);
             log(pp, #issued(creditAmount));
           };
         };
       };
       res;
+    };
+
+    public func share() : StableData = {
+      totalWithdrawn = totalWithdrawn_;
+    };
+
+    public func unshare(data : StableData) {
+      totalWithdrawn_ := data.totalWithdrawn;
     };
   };
 };

@@ -20,10 +20,12 @@ import Data "Data";
 import FeeManager "FeeManager";
 
 module {
-  public type StableData = (
-    DepositManager.StableData, // account manager
-    CreditManager.StableData, // credit registry
-  );
+  public type StableData = {
+    data : Data.StableData<Principal>;
+    depositManager : DepositManager.StableData;
+    feeManager : FeeManager.StableData;
+    ledger : ICRC84Helper.StableData;
+  };
 
   public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditManager.LogEvent or FeeManager.LogEvent or {
     #error : Text;
@@ -62,9 +64,6 @@ module {
     };
     depositManager : DepositManager.State;
   };
-
-  /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = (0, 0);
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = ICRC84.toSubaccount(p);
@@ -108,23 +107,23 @@ module {
       log(ownPrincipal, #error(errorText));
     };
 
-    let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
+    let ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
 
-    let data = Data.Data();
+    let data = Data.Data<Principal>(Principal.compare);
 
-    let oldCallback = Ledger.onFeeChanged;
-    Ledger.onFeeChanged := func (old, new) {
-      data.map.feeChanged(new);
+    let oldCallback = ledger.onFeeChanged;
+    ledger.onFeeChanged := func (old, new) {
+      data.thresholdChanged(new);
       oldCallback(old, new);
     };
     
-    let feeManager = FeeManager.FeeManager(Ledger, log);
+    let feeManager = FeeManager.FeeManager(ledger, log);
 
     /// Tracks credited funds (usable balance) associated with each principal.
     let creditManager = CreditManager.CreditManager(data, log);
 
     let depositManager = DepositManager.DepositManager(
-      Ledger,
+      ledger,
       triggerOnNotifications,
       data,
       feeManager,
@@ -146,26 +145,23 @@ module {
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
-    public func fetchFee() : async* ?Nat {
-      await* Ledger.loadFee();
-    };
+    public func fetchFee() : async* ?Nat = async* await* ledger.loadFee();
 
     /// Returns a user's last know (= tracked) deposit
     /// Null means the principal is locked, hence no value is available.
     public func trackedDeposit(p : Principal) : ?Nat = depositManager.getDeposit(p);
 
     let allowanceManager = AllowanceManager.AllowanceManager(
-      Ledger,
-      data.map,
-      creditManager,
+      ledger,
+      data,
       feeManager,
       log
     );
 
     let withdrawalManager = WithdrawalManager.WithdrawalManager(
       ownPrincipal,
-      Ledger,
-      data.map,
+      ledger,
+      data,
       creditManager,
       feeManager,
       log
@@ -186,7 +182,7 @@ module {
       };
       credit = {
         total = creditManager.totalBalance();
-        pool = creditManager.poolBalance();
+        pool = data.poolBalance();
       };
       users = {
         queued = _.nDeposits;
@@ -201,7 +197,7 @@ module {
     public func userCredit(p : Principal) : Int = creditManager.userBalance(p);
 
     /// Gets the current credit amount in the pool.
-    public func poolCredit() : Int = creditManager.poolBalance();
+    public func poolCredit() : Int = data.poolBalance();
 
     /// Adds amount to P’s credit.
     /// With checking the availability of sufficient funds.
@@ -362,15 +358,19 @@ module {
     public func assertIntegrity() {};
 
     /// Serializes the token handler data.
-    public func share() : StableData = (
-      depositManager.share(),
-      creditManager.share(),
-    );
+    public func share() : StableData = {
+      data = data.share();
+      depositManager = depositManager.share();
+      feeManager = feeManager.share();
+      ledger = ledger.share();
+    };
 
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
-      depositManager.unshare(values.0);
-      creditManager.unshare(values.1);
+      data.unshare(values.data);
+      depositManager.unshare(values.depositManager);
+      feeManager.unshare(values.feeManager);
+      ledger.unshare(values.ledger);
     };
   };
 };

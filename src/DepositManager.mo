@@ -10,9 +10,12 @@ import Data "Data";
 import FeeManager "FeeManager";
 
 module {
-  public type StableData = (
-    Nat, // totalConsolidated
-  );
+  public type StableData = {
+    totalConsolidated : Nat;
+    paused : Bool;
+    totalCredited : Nat;
+    underwayFunds : Nat;
+  };
 
   public type State = {
     paused : Bool;
@@ -50,13 +53,11 @@ module {
   public class DepositManager(
     icrc84 : ICRC84Helper.Ledger,
     triggerOnNotifications : Bool,
-    data : Data.Data,
+    data : Data.Data<Principal>,
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
     trap : (text : Text) -> (),
   ) {
-    let { map } = data;
-
     /// If `true` new notifications are paused.
     var paused : Bool = false;
 
@@ -81,19 +82,19 @@ module {
       };
       totalConsolidated = totalConsolidated;
       funds = {
-        deposited = map.depositSum() + underwayFunds;
+        deposited = data.depositSum();
         underway = underwayFunds;
-        queued = map.depositSum();
+        queued = data.depositSum() - underwayFunds;
       };
-      nDeposits = map.depositsCount();
-      nLocks = map.locks();
+      nDeposits = data.depositsCount();
+      nLocks = data.locks();
     };
 
     /// Pause or unpause notifications.
     public func pause(b : Bool) = paused := b;
 
     /// Retrieves the deposit of a principal.
-    public func getDeposit(p : Principal) : ?Nat = switch (map.getOpt(p)) {
+    public func getDeposit(p : Principal) : ?Nat = switch (data.getOpt(p)) {
       case null null;
       case (?entry) ?entry.deposit();
     };
@@ -136,7 +137,7 @@ module {
     /// This function never throws.
     public func notify(p : Principal) : async* ?(Nat, Nat) {
       if (paused) return null;
-      let entry = map.get(p);
+      let entry = data.get(p);
       if (not entry.lock()) return null;
 
       let ret = await* do_notify(p, entry);
@@ -174,7 +175,7 @@ module {
       switch (res) {
         case (#ok _) {
           totalConsolidated += consolidated;
-          data.pool += surcharge;
+          assert data.changePool(surcharge);
           log(Principal.fromBlob(""), #issued(surcharge));
           entry.setDeposit(0);
         };
@@ -192,7 +193,7 @@ module {
     /// n - desired number of potential consolidations.
     public func trigger(n : Nat) : async* () {
       for (i in Iter.range(1, n)) {
-        let ?entry = map.getMaxEligibleDeposit(feeManager.fee()) else return;
+        let ?entry = data.getMaxEligibleDeposit(feeManager.fee()) else return;
 
         let result = await* consolidate(entry);
 
@@ -204,13 +205,19 @@ module {
     };
 
     /// Serializes the token handler data.
-    public func share() : StableData = (
-      totalConsolidated
-    );
+    public func share() : StableData = {
+      totalConsolidated;
+      paused;
+      totalCredited;
+      underwayFunds;
+    };
 
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
-      totalConsolidated := values;
+      totalConsolidated := values.totalConsolidated;
+      paused := values.paused;
+      totalCredited := values.totalCredited;
+      underwayFunds := values.underwayFunds;
     };
   };
 };

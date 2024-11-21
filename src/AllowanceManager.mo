@@ -4,7 +4,6 @@ import Principal "mo:base/Principal";
 import ICRC84Helper "icrc84-helper";
 import Data "Data";
 import FeeManager "FeeManager";
-import CreditManager "CreditManager";
 
 module {
   public type DepositFromAllowanceError = ICRC1.TransferFromError or {
@@ -23,8 +22,7 @@ module {
 
   public class AllowanceManager(
     icrc84 : ICRC84Helper.Ledger,
-    map : Data.Map<Principal>,
-    creditManager : CreditManager.CreditManager,
+    data : Data.Data<Principal>,
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
   ) {
@@ -54,9 +52,9 @@ module {
       log(p, event);
 
       if (R.isOk(res)) {
-        assert map.get(p).changeCredit(creditAmount);
+        assert data.get(p).changeCredit(creditAmount);
         log(p, #issued(creditAmount));
-        assert creditManager.changePool(surcharge_);
+        assert data.changePool(surcharge_);
         log(Principal.fromBlob(""), #issued(surcharge_));
       };
 
