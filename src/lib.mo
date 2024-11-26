@@ -63,6 +63,7 @@ module {
       queued : Nat;
     };
     depositManager : DepositManager.State;
+    feeManager : FeeManager.State;
   };
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
@@ -132,16 +133,16 @@ module {
     );
 
     /// Returns the ledger fee.
-    public func ledgerFee() : Nat = depositManager.state().fee.ledger;
+    public func ledgerFee() : Nat = feeManager.ledgerFee();
 
     /// Returns the current surcharge amount.
-    public func surcharge() : Nat = depositManager.state().fee.surcharge;
+    public func surcharge() : Nat = feeManager.surcharge();
 
     /// Sets new surcharge amount.
     public func setSurcharge(s : Nat) = feeManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.
-    public func fee(_ : { #deposit; #allowance; #withdrawal }) : Nat = depositManager.state().fee.deposit;
+    public func fee(_ : { #deposit; #allowance; #withdrawal }) : Nat = feeManager.fee();
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
@@ -189,6 +190,7 @@ module {
         locked = _.nLocks;
       };
       depositManager = depositManager.state();
+      feeManager = feeManager.state();
       // withdrawalManager = withdrawalManager.state();
       // allowanceManager = allowanceManager.state();
     });

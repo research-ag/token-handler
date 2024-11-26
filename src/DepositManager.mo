@@ -19,7 +19,6 @@ module {
 
   public type State = {
     paused : Bool;
-    fee : { ledger : Nat; deposit : Nat; surcharge : Nat };
     flow : { credited : Nat };
     totalConsolidated : Nat;
     funds : {
@@ -72,11 +71,6 @@ module {
 
     public func state() : State = {
       paused = paused;
-      fee = {
-        ledger = feeManager.ledgerFee();
-        deposit = feeManager.fee();
-        surcharge = feeManager.surcharge();
-      };
       flow = {
         credited = totalCredited;
       };

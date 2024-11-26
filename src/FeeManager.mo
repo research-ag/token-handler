@@ -10,6 +10,12 @@ module {
     surcharge : Nat;
   };
 
+  public type State = {
+    ledger : Nat;
+    deposit : Nat;
+    surcharge : Nat;
+  };
+
   public class FeeManager(
     ledger : {
       fee : () -> Nat;
@@ -34,6 +40,12 @@ module {
     public func setSurcharge(s : Nat) {
       log(Principal.fromBlob(""), #surchargeUpdated({ old = surcharge_; new = s }));
       surcharge_ := s;
+    };
+
+    public func state() : State = {
+      ledger = ledgerFee();
+      surcharge = surcharge();
+      deposit = fee();
     };
 
     public func share() : StableData = {
