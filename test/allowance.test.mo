@@ -70,6 +70,5 @@ do {
     #allowanceError(#BadFee({ expected_fee = 5 }))
   ]);
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };

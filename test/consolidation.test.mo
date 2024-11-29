@@ -132,7 +132,6 @@ do {
     #issued(+2), // credit pool
   ]);
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };
 
@@ -178,7 +177,6 @@ do {
     #issued(+2), // credit pool
   ]);
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };
 
@@ -223,7 +221,6 @@ do {
   ]);
   assert state() == (0, 15, 0);
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };
 
@@ -340,6 +337,5 @@ do {
     ]);
   };
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };

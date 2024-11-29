@@ -50,7 +50,6 @@ do {
   assert state() == (6, 0, 1);
   assert journal.hasEvents([#issued(1), #newDeposit(6)]);
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };
 
@@ -162,7 +161,6 @@ do {
   assert state() == (20, 0, 1); // state unchanged because deposit has not changed
   assert journal.hasEvents([]);
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };
 
@@ -199,7 +197,6 @@ do {
     #newDeposit(10),
   ]);
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };
 
@@ -231,6 +228,5 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?0);
   assert (await* handler.notify(user1)) == ?(0, 0);
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };

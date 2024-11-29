@@ -12,18 +12,23 @@ module {
     totalWithdrawn : Nat;
   };
 
+  public type State = {
+    totalWithdrawn : Nat;
+  };
+
   public type WithdrawError = ICRC1.TransferError or {
     #CallIcrc1LedgerError;
     #TooLowQuantity;
     #InsufficientCredit;
   };
 
-  type WithdrawResult = (transactionIndex : Nat, withdrawnAmount : Nat);
-
-  public type WithdrawResponse = R.Result<WithdrawResult, WithdrawError>;
+  public type WithdrawResponse = R.Result<(transactionIndex : Nat, withdrawnAmount : Nat), WithdrawError>;
 
   public type LogEvent = {
-    #withdraw : { to : ICRC1.Account; amount : Nat };
+    #withdraw : {
+      to : ICRC1.Account;
+      amount : Nat;
+    };
     #withdrawalError : WithdrawError;
     #issued : Int;
   };
@@ -36,11 +41,13 @@ module {
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
   ) {
-    var totalWithdrawn_ = 0;
+    var totalWithdrawn = 0;
 
     let noPrincipal = Principal.fromBlob("");
 
-    public func totalWithdrawn() : Nat = totalWithdrawn_;
+    public func state() : State = {
+      totalWithdrawn;
+    };
 
     // Without logging
     func process_withdraw(p : ?Principal, to : ICRC1.Account, creditAmount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
@@ -63,7 +70,7 @@ module {
       let res = await* icrc84.send(to, amountToSend);
 
       if (R.isOk(res)) {
-        totalWithdrawn_ += amountToSend;
+        totalWithdrawn += amountToSend;
         if (p != null) {
           log(Principal.fromBlob(""), #issued(surcharge_));
           assert data.changePool(surcharge_);
@@ -73,9 +80,11 @@ module {
       // return value
       switch (res) {
         case (#ok txid) #ok(txid, creditAmount - realFee); // = amount arrived
-        case (#err(#BadFee _)) {
-          #err(#BadFee { expected_fee = feeManager.fee() }); // return the expected fee value from now
-        };
+        case (#err(#BadFee _)) #err(
+          #BadFee {
+            expected_fee = feeManager.fee();
+          }
+        ); // return the expected fee value from now
         case (#err err) #err(err);
       };
     };
@@ -94,6 +103,7 @@ module {
         log(ownPrincipal, #withdrawalError(err));
         return #err(err);
       };
+
       let res = await* process_withdraw(p, to, creditAmount, userExpectedFee);
 
       // logging
@@ -120,11 +130,11 @@ module {
     };
 
     public func share() : StableData = {
-      totalWithdrawn = totalWithdrawn_;
+      totalWithdrawn;
     };
 
     public func unshare(data : StableData) {
-      totalWithdrawn_ := data.totalWithdrawn;
+      totalWithdrawn := data.totalWithdrawn;
     };
   };
 };

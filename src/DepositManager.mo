@@ -19,33 +19,30 @@ module {
 
   public type State = {
     paused : Bool;
-    flow : { credited : Nat };
     totalConsolidated : Nat;
+    totalCredited : Nat;
     funds : {
       deposited : Nat;
       underway : Nat;
       queued : Nat;
     };
-    nDeposits : Nat;
-    nLocks : Nat;
+  };
+
+  public type ConsolidationError = ICRC1.TransferError or {
+    #CallIcrc1LedgerError;
   };
 
   public type LogEvent = {
     #issued : Int;
     #newDeposit : Nat;
-    #consolidated : { deducted : Nat; credited : Nat };
-    #consolidationError : Errors.TransferMin;
-  };
-
-  module Errors {
-    public type Transfer = ICRC1.TransferError or { #CallIcrc1LedgerError };
-    public type TransferFrom = ICRC1.TransferFromError or {
-      #CallIcrc1LedgerError;
+    #consolidated : {
+      deducted : Nat;
+      credited : Nat;
     };
-    public type TransferMin = Transfer or { #TooLowQuantity };
+    #consolidationError : ConsolidationError;
   };
 
-  public type TransferResponse = R.Result<Nat, Errors.Transfer>;
+  public type TransferResponse = R.Result<Nat, ConsolidationError>;
 
   /// Manages deposits from users, handles consolidation operations.
   /// icrc84 must be configured with the correct previous fee after an upgrade
@@ -71,27 +68,17 @@ module {
 
     public func state() : State = {
       paused = paused;
-      flow = {
-        credited = totalCredited;
-      };
-      totalConsolidated = totalConsolidated;
+      totalCredited;
+      totalConsolidated;
       funds = {
         deposited = data.depositSum();
         underway = underwayFunds;
         queued = data.depositSum() - underwayFunds;
       };
-      nDeposits = data.depositsCount();
-      nLocks = data.locks();
     };
 
     /// Pause or unpause notifications.
     public func pause(b : Bool) = paused := b;
-
-    /// Retrieves the deposit of a principal.
-    public func getDeposit(p : Principal) : ?Nat = switch (data.getOpt(p)) {
-      case null null;
-      case (?entry) ?entry.deposit();
-    };
 
     func do_notify(p : Principal, entry : Data.Entry<Principal>) : async* ?(Nat, Nat) {
       let #ok latestDeposit = await* icrc84.loadDeposit(p) else return null;
@@ -173,7 +160,7 @@ module {
           log(Principal.fromBlob(""), #issued(surcharge));
           entry.setDeposit(0);
         };
-        case (#err _) {}
+        case (#err _) {};
       };
 
       underwayFunds -= deposit;

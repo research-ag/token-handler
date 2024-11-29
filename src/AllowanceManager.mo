@@ -10,9 +10,7 @@ module {
     #CallIcrc1LedgerError;
   };
 
-  type DepositFromAllowanceResult = (credited : Nat, txid : Nat);
-
-  public type DepositFromAllowanceResponse = R.Result<DepositFromAllowanceResult, DepositFromAllowanceError>;
+  public type DepositFromAllowanceResponse = R.Result<(credited : Nat, txid : Nat), DepositFromAllowanceError>;
 
   public type LogEvent = {
     #allowanceDrawn : { amount : Nat };
@@ -30,7 +28,12 @@ module {
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
     /// `amount` = credit-side amount.
-    public func depositFromAllowance(p : Principal, source : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* DepositFromAllowanceResponse {
+    public func depositFromAllowance(
+      p : Principal,
+      source : ICRC1.Account,
+      creditAmount : Nat,
+      expectedFee : ?Nat,
+    ) : async* DepositFromAllowanceResponse {
       switch (expectedFee) {
         case null {};
         case (?f) if (f != feeManager.fee()) {

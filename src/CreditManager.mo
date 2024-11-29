@@ -1,10 +1,7 @@
 import Principal "mo:base/Principal";
-import Int "mo:base/Int";
 import Data "Data";
 
 module {
-  public type StableData = (Nat);
-
   public type LogEvent = {
     #credited : Nat;
     #debited : Nat;
@@ -13,12 +10,6 @@ module {
 
   /// Tracks credited funds (usable balance) associated with each principal.
   public class CreditManager(data : Data.Data<Principal>, log : (Principal, LogEvent) -> ()) {
-    /// Retrieves the total credited funds in the credit registry.
-    public func totalBalance() : Nat = data.creditSum() + data.poolBalance();
-
-    /// Gets the current credit amount associated with a specific principal.
-    public func userBalance(p : Principal) : Int = data.get(p).credit();
-
     // The creditUser/debitUser functions transfer credit from the
     // user to/from the pool.
     public func creditUser(p : Principal, amount : Nat) : Bool {

@@ -31,11 +31,6 @@ module {
     #error : Text;
   };
 
-  public type AccountInfo = {
-    deposit : Nat;
-    credit : Int;
-  };
-
   public type TokenHandlerOptions = {
     ledgerApi : LedgerAPI;
     ownPrincipal : Principal;
@@ -50,6 +45,7 @@ module {
       underway : Nat;
       queued : Nat;
       consolidated : Nat;
+      usableDeposit : (deposit : Int, correct : Bool);
     };
     flow : {
       consolidated : Nat;
@@ -61,8 +57,11 @@ module {
     };
     users : {
       queued : Nat;
+      locked : Nat;
+      total : Nat;
     };
     depositManager : DepositManager.State;
+    withdrawalManager : WithdrawalManager.State;
     feeManager : FeeManager.State;
   };
 
@@ -150,7 +149,10 @@ module {
 
     /// Returns a user's last know (= tracked) deposit
     /// Null means the principal is locked, hence no value is available.
-    public func trackedDeposit(p : Principal) : ?Nat = depositManager.getDeposit(p);
+    public func trackedDeposit(p : Principal) : ?Nat = switch (data.getOpt(p)) {
+      case null null;
+      case (?entry) ?entry.deposit();
+    };
 
     let allowanceManager = AllowanceManager.AllowanceManager(
       ledger,
@@ -169,34 +171,38 @@ module {
     );
 
     /// Returns the current `TokenHandler` state.
-    public func state() : State = ( 
-      depositManager.state() |> {
-      balance = {
-        deposited = _.funds.deposited;
-        underway = _.funds.underway;
-        queued = _.funds.queued;
-        consolidated = _.totalConsolidated - withdrawalManager.totalWithdrawn();
+    public func state() : State {
+      let d = depositManager.state();
+      let w = withdrawalManager.state();
+      {
+        balance = {
+          deposited = d.funds.deposited;
+          underway = d.funds.underway;
+          queued = d.funds.queued;
+          consolidated = d.totalConsolidated - w.totalWithdrawn;
+          usableDeposit = data.usableDeposit();
+        };
+        flow = {
+          consolidated = d.totalConsolidated;
+          withdrawn = w.totalWithdrawn;
+        };
+        credit = {
+          total = data.creditSum() + data.poolBalance();
+          pool = data.poolBalance();
+        };
+        users = {
+          queued = data.depositsCount();
+          locked = data.locks();
+          total = data.size();
+        };
+        depositManager = d;
+        withdrawalManager = w;
+        feeManager = feeManager.state();
       };
-      flow = {
-        consolidated = _.totalConsolidated;
-        withdrawn = withdrawalManager.totalWithdrawn();
-      };
-      credit = {
-        total = creditManager.totalBalance();
-        pool = data.poolBalance();
-      };
-      users = {
-        queued = _.nDeposits;
-        locked = _.nLocks;
-      };
-      depositManager = depositManager.state();
-      feeManager = feeManager.state();
-      // withdrawalManager = withdrawalManager.state();
-      // allowanceManager = allowanceManager.state();
-    });
+    };
 
     /// Gets the current credit amount associated with a specific principal.
-    public func userCredit(p : Principal) : Int = creditManager.userBalance(p);
+    public func userCredit(p : Principal) : Int = data.get(p).credit();
 
     /// Gets the current credit amount in the pool.
     public func poolCredit() : Int = data.poolBalance();
@@ -354,10 +360,6 @@ module {
     public func withdrawFromCredit(p : Principal, to : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
       await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
     };
-
-    /// For testing purposes.
-    //public func assertIntegrity() { accountManager.assertIntegrity() };
-    public func assertIntegrity() {};
 
     /// Serializes the token handler data.
     public func share() : StableData = {

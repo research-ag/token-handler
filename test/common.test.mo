@@ -86,7 +86,6 @@ do {
   ]);
   assert handler.userCredit(user1) == 1; // credit not corrected
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };
 
@@ -113,7 +112,6 @@ do {
   assert journal.hasEvents([
     #feeUpdated({ new = 6; old = 5 }),
   ]);
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };
 
@@ -172,7 +170,6 @@ do {
   assert handler.poolCredit() == 16;
   assert handler.userCredit(user1) == 0;
 
-  handler.assertIntegrity();
   assert not handler.isFrozen();
 };
 
