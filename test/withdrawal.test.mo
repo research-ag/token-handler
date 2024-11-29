@@ -82,7 +82,7 @@ do {
   // We are not staging a transfer_ response because no call will happen.
   assert (await* handler.withdrawFromCredit(user1, account, 100, null)) == #err(#InsufficientCredit);
   assert state() == (0, 14, 0); // state unchanged
-  assert journal.hasEvents([#withdrawalError(#InsufficientCredit)]);
+  assert journal.hasEvents([]);
 
   // increase fee while withdraw is being underway
   // withdraw should fail, fee should be updated
@@ -130,5 +130,5 @@ do {
   // We are not staging a transfer_ response because no call will happen.
   assert (await* handler.withdrawFromPool(account, 100, null)) == #err(#InsufficientCredit);
   assert state() == (0, 10, 0); // state unchanged
-  assert journal.hasEvents([#withdrawalError(#InsufficientCredit)]);
+  assert journal.hasEvents([]);
 };

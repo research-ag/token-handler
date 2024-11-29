@@ -34,7 +34,6 @@ module {
   };
 
   public class WithdrawalManager(
-    ownPrincipal : Principal,
     icrc84 : ICRC84Helper.Ledger,
     data : Data.Data<Principal>,
     creditManager : CreditManager.CreditManager,
@@ -99,9 +98,7 @@ module {
         case (?pp) creditManager.burn(pp, creditAmount);
       };
       if (not ok) {
-        let err = #InsufficientCredit;
-        log(ownPrincipal, #withdrawalError(err));
-        return #err(err);
+        return #err(#InsufficientCredit);
       };
 
       let res = await* process_withdraw(p, to, creditAmount, userExpectedFee);
@@ -118,7 +115,7 @@ module {
         switch (p) {
           case null {
             assert data.changePool(creditAmount);
-            log(Principal.fromBlob(""), #issued(creditAmount));
+            log(noPrincipal, #issued(creditAmount));
           };
           case (?pp) {
             assert data.get(pp).changeCredit(creditAmount);

@@ -162,7 +162,6 @@ module {
     );
 
     let withdrawalManager = WithdrawalManager.WithdrawalManager(
-      ownPrincipal,
       ledger,
       data,
       creditManager,
