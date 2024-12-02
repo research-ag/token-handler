@@ -19,10 +19,6 @@ import R "mo:base/Result";
 ///
 /// This module is general-purpose. It is not specific to the TokenHandler.
 module {
-  public type StableData = {
-    fee : Nat;
-  };
-
   public type TransferError = ICRC1.TransferError or {
     #CallIcrc1LedgerError;
   };
@@ -102,14 +98,6 @@ module {
       } catch (_) {
         #err(#CallIcrc1LedgerError);
       };
-    };
-
-    public func share() : StableData = {
-      fee = fee_;
-    };
-
-    public func unshare(data : StableData) {
-      fee_ := data.fee;
     };
   };
 };

@@ -12,7 +12,9 @@ import ICRC84 "mo:icrc84";
 /// automatically updates the tracked value if it changes.
 /// The functions in this module do not retry any ledger calls if they fail.
 module {
-  public type StableData = ICRC1Agent.StableData;
+  public type StableData = {
+    fee : Nat;
+  };
 
   type BalanceResult = ICRC1Agent.BalanceResult;
 
@@ -101,8 +103,10 @@ module {
       res;
     };
 
-    public func share() : StableData = agent.share();
+    public func share() : StableData = {
+      fee = agent.fee();
+    };
 
-    public func unshare(data : StableData) = agent.unshare(data);
+    public func unshare(data : StableData) = agent.setFee(data.fee);
   };
 };
