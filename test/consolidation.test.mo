@@ -48,7 +48,7 @@ do {
 
   // increase fee while deposit is being consolidated (implicitly)
   // scenario 2: old_ledger_fee < new_ledger_fee < deposit
-  // consolidation should fail and credit should be adjusted with new fee
+  // consolidation should fail
   ignore mock_ledger.balance_.stage_unlocked(?20);
   assert (await* handler.notify(user1)) == ?(10, 10);
   assert journal.hasEvents([

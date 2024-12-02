@@ -124,7 +124,7 @@ do {
     #feeUpdated({ new = 15; old = 10 }),
   ]);
   assert state() == (15, 0, 1); // state not changed
-  assert (await f2) == ?(5, 5); // credit = latest - new_fee
+  assert (await f2) == ?(5, 5); // credit = latest - old balance
   assert state() == (20, 0, 1); // state should have changed
   assert journal.hasEvents([
     #issued(5),
