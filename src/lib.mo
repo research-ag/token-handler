@@ -23,6 +23,7 @@ module {
   public type StableData = {
     data : Data.StableData<Principal>;
     depositManager : DepositManager.StableData;
+    creditManager : CreditManager.StableData;
     feeManager : FeeManager.StableData;
     ledger : ICRC84Helper.StableData;
   };
@@ -186,8 +187,8 @@ module {
           withdrawn = w.totalWithdrawn;
         };
         credit = {
-          total = data.creditSum() + data.poolBalance();
-          pool = data.poolBalance();
+          total = data.creditSum() + data.handlerPoolBalance();
+          pool = data.handlerPoolBalance();
         };
         users = {
           queued = data.depositsCount();
@@ -204,7 +205,7 @@ module {
     public func userCredit(p : Principal) : Int = data.get(p).credit();
 
     /// Gets the current credit amount in the pool.
-    public func poolCredit() : Int = data.poolBalance();
+    public func poolCredit() : Int = data.handlerPoolBalance();
 
     /// Adds amount to P’s credit.
     /// With checking the availability of sufficient funds.
@@ -360,9 +361,18 @@ module {
       await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
     };
 
+    public func assertInvariant() {
+      let { totalConsolidated; funds = { deposited } } = depositManager.state();
+      let { totalWithdrawn } = withdrawalManager.state();
+      let { totalCredited } = allowanceManager.state();
+      let assets = deposited + totalConsolidated + totalCredited - totalWithdrawn : Nat;
+
+    };
+
     /// Serializes the token handler data.
     public func share() : StableData = {
       data = data.share();
+      creditManager = creditManager.share();
       depositManager = depositManager.share();
       feeManager = feeManager.share();
       ledger = ledger.share();
@@ -371,6 +381,7 @@ module {
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
       data.unshare(values.data);
+      creditManager.unshare(values.creditManager);
       depositManager.unshare(values.depositManager);
       feeManager.unshare(values.feeManager);
       ledger.unshare(values.ledger);

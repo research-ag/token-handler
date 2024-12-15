@@ -72,7 +72,7 @@ module {
         totalWithdrawn += amountToSend;
         if (p != null) {
           log(Principal.fromBlob(""), #issued(surcharge_));
-          assert data.changePool(surcharge_);
+          assert data.changeHandlerPool(surcharge_);
         };
       };
 
@@ -113,10 +113,7 @@ module {
       if (R.isErr(res)) {
         // re-issue credit if unsuccessful
         switch (p) {
-          case null {
-            assert data.changePool(creditAmount);
-            log(noPrincipal, #issued(creditAmount));
-          };
+          case null creditManager.changePool(creditAmount);
           case (?pp) {
             assert data.get(pp).changeCredit(creditAmount);
             log(pp, #issued(creditAmount));

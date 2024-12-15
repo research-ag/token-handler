@@ -6,14 +6,22 @@ module {
     #credited : Nat;
     #debited : Nat;
     #burned : Nat;
+    #issued : Nat;
+  };
+
+  public type StableData = {
+    pool : Nat;
   };
 
   /// Tracks credited funds (usable balance) associated with each principal.
   public class CreditManager(data : Data.Data<Principal>, log : (Principal, LogEvent) -> ()) {
+    var pool = 0;
+
     // The creditUser/debitUser functions transfer credit from the
     // user to/from the pool.
     public func creditUser(p : Principal, amount : Nat) : Bool {
-      if (not data.changePool(-amount)) return false;
+      if (amount > pool) return false;
+      pool -= amount;
 
       let entry = data.get(p);
       assert entry.changeCredit(amount);
@@ -25,7 +33,7 @@ module {
       let entry = data.get(p);
       if (not entry.changeCredit(-amount)) return false;
 
-      assert data.changePool(amount);
+      pool += amount;
       log(p, #debited(amount));
       true;
     };
@@ -39,10 +47,20 @@ module {
       true;
     };
 
+    public func changePool(amount : Nat) {
+      pool += amount;
+      log(Principal.fromBlob(""), #issued(amount));
+    };
+
     public func burnPool(amount : Nat) : Bool {
-      if (not data.changePool(-amount)) return false;
+      if (amount > pool) return false;
+      pool -= amount;
       log(Principal.fromBlob(""), #burned(amount));
       true;
     };
+
+    public func share() : StableData = { pool = pool };
+
+    public func unshare(data : StableData) = pool := data.pool;
   };
 };

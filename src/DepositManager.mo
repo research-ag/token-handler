@@ -97,6 +97,10 @@ module {
 
       assert entry.changeCredit(creditInc);
       totalCredited += creditInc;
+      
+      let surcharge = feeManager.surcharge();
+      assert data.changeHandlerPool(surcharge);
+      log(Principal.fromBlob(""), #issued(surcharge));
 
       log(p, #issued(creditInc));
       log(p, #newDeposit(depositInc));
@@ -137,7 +141,6 @@ module {
 
       let consolidated : Nat = deposit - feeManager.ledgerFee();
       let credited : Nat = deposit - feeManager.fee();
-      let surcharge = feeManager.surcharge();
 
       // transfer funds to the main account
       let res = await* icrc84.consolidate(entry.key(), deposit);
@@ -156,8 +159,6 @@ module {
       switch (res) {
         case (#ok _) {
           totalConsolidated += consolidated;
-          assert data.changePool(surcharge);
-          log(Principal.fromBlob(""), #issued(surcharge));
           entry.setDeposit(0);
         };
         case (#err _) {};

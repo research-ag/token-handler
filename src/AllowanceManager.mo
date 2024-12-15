@@ -18,12 +18,17 @@ module {
     #issued : Int;
   };
 
+  public type State = {
+    totalCredited : Nat;
+  };
+
   public class AllowanceManager(
     icrc84 : ICRC84Helper.Ledger,
     data : Data.Data<Principal>,
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
   ) {
+    var totalCredited = 0;
     /// Transfers the specified amount from the user's allowance to the service, crediting the user accordingly.
     /// This method allows a user to deposit tokens by setting up an allowance on their account with the service
     /// principal as the spender and then calling this method to transfer the allowed tokens.
@@ -56,8 +61,10 @@ module {
 
       if (R.isOk(res)) {
         assert data.get(p).changeCredit(creditAmount);
+        totalCredited += creditAmount;
         log(p, #issued(creditAmount));
-        assert data.changePool(surcharge_);
+
+        assert data.changeHandlerPool(surcharge_);
         log(Principal.fromBlob(""), #issued(surcharge_));
       };
 
@@ -65,6 +72,10 @@ module {
         case (#ok txid) #ok(creditAmount, txid);
         case (#err err) #err(err);
       };
+    };
+
+    public func state() : State = {
+      totalCredited = totalCredited;
     };
   };
 };
