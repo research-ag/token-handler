@@ -17,6 +17,8 @@ module {
   public class CreditManager(data : Data.Data<Principal>, log : (Principal, LogEvent) -> ()) {
     var pool = 0;
 
+    public func poolBalance() : Nat = pool;
+
     // The creditUser/debitUser functions transfer credit from the
     // user to/from the pool.
     public func creditUser(p : Principal, amount : Nat) : Bool {

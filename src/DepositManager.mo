@@ -98,8 +98,10 @@ module {
       assert entry.changeCredit(creditInc);
       totalCredited += creditInc;
       
+      feeManager.addFee();
+
       let surcharge = feeManager.surcharge();
-      assert data.changeHandlerPool(surcharge);
+      data.changeHandlerPool(surcharge);
       log(Principal.fromBlob(""), #issued(surcharge));
 
       log(p, #issued(creditInc));
@@ -140,7 +142,6 @@ module {
       underwayFunds += deposit;
 
       let consolidated : Nat = deposit - feeManager.ledgerFee();
-      let credited : Nat = deposit - feeManager.fee();
 
       // transfer funds to the main account
       let res = await* icrc84.consolidate(entry.key(), deposit);
@@ -149,7 +150,7 @@ module {
       let event = switch (res) {
         case (#ok _) #consolidated({
           deducted = deposit;
-          credited;
+          credited = consolidated;
         });
         case (#err err) #consolidationError(err);
       };
@@ -175,7 +176,7 @@ module {
     /// n - desired number of potential consolidations.
     public func trigger(n : Nat) : async* () {
       for (i in Iter.range(1, n)) {
-        let ?entry = data.getMaxEligibleDeposit(feeManager.fee()) else return;
+        let ?entry = data.getMaxEligibleDeposit(feeManager.ledgerFee()) else return;
 
         let result = await* consolidate(entry);
 

@@ -72,7 +72,7 @@ module {
         totalWithdrawn += amountToSend;
         if (p != null) {
           log(Principal.fromBlob(""), #issued(surcharge_));
-          assert data.changeHandlerPool(surcharge_);
+          data.changeHandlerPool(surcharge_);
         };
       };
 

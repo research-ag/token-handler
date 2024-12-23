@@ -13,7 +13,7 @@ module {
   public type StableData<K> = {
     tree : RbTree.Tree<K, Value>;
     depositsTree : RbTree.Tree<(deposit : Nat, key : K), Value>;
-    handlerPool : Nat;
+    handlerPool : Int;
     lookupCount : Nat;
     size : Nat;
     locks : Nat;
@@ -37,9 +37,9 @@ module {
       }
     );
 
-    public var handlerPool : Nat = 0;
+    public var handlerPool : Int = 0;
 
-    public var lookupCount = 0;
+    public var lookupCount : Nat = 0;
 
     public var size : Nat = 0;
 
@@ -163,13 +163,10 @@ module {
     let state : State<K> = State<K>(compare);
 
     /// Retrieves the total credited funds in the pool.
-    public func handlerPoolBalance() : Nat = state.handlerPool;
+    public func handlerPoolBalance() : Int = state.handlerPool;
 
-    public func changeHandlerPool(amount : Int) : Bool {
-      let sum = state.handlerPool + amount;
-      if (sum < 0) return false;
-      state.handlerPool := Int.abs(sum);
-      true;
+    public func changeHandlerPool(amount : Int) {
+      state.handlerPool += amount;
     };
 
     public func getOpt(key : K) : ?Entry<K> {

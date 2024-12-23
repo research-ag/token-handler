@@ -64,7 +64,7 @@ module {
         totalCredited += creditAmount;
         log(p, #issued(creditAmount));
 
-        assert data.changeHandlerPool(surcharge_);
+        data.changeHandlerPool(surcharge_);
         log(Principal.fromBlob(""), #issued(surcharge_));
       };
 

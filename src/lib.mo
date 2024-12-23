@@ -118,7 +118,7 @@ module {
       oldCallback(old, new);
     };
     
-    let feeManager = FeeManager.FeeManager(ledger, log);
+    let feeManager = FeeManager.FeeManager(ledger, data, log);
 
     /// Tracks credited funds (usable balance) associated with each principal.
     let creditManager = CreditManager.CreditManager(data, log);
@@ -367,6 +367,15 @@ module {
       let { totalCredited } = allowanceManager.state();
       let assets = deposited + totalConsolidated + totalCredited - totalWithdrawn : Nat;
 
+      let creditSum = data.creditSum();
+      let handlerPool = data.handlerPoolBalance();
+      let pool = creditManager.poolBalance();
+      let { outstandingFees } = feeManager.state();
+      let liabilities = creditSum + handlerPool + pool + outstandingFees : Int;
+
+      if (assets != liabilities) {
+        freezeTokenHandler("Invariant violation: assets != liabilities");
+      };
     };
 
     /// Serializes the token handler data.
