@@ -48,7 +48,11 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?6);
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state() == (6, 0, 1);
-  assert journal.hasEvents([#issued(1), #newDeposit(6)]);
+  assert journal.hasEvents([
+    #issued(2),
+    #issued(1),
+    #newDeposit(6),
+  ]);
 
   assert not handler.isFrozen();
 };
@@ -70,7 +74,11 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?6);
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state() == (6, 0, 1);
-  assert journal.hasEvents([#issued(1), #newDeposit(6)]);
+  assert journal.hasEvents([
+    #issued(0),
+    #issued(1),
+    #newDeposit(6),
+  ]);
 
   // increase fee while item still in queue (trigger did not run yet)
   ignore mock_ledger.fee_.stage_unlocked(?6);
@@ -183,6 +191,7 @@ do {
   assert handler.userCredit(user1) == 2;
   assert state() == (7, 0, 1);
   assert journal.hasEvents([
+    #issued(0),
     #issued(2),
     #newDeposit(7),
   ]);

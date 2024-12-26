@@ -98,12 +98,14 @@ module {
       assert entry.changeCredit(creditInc);
       totalCredited += creditInc;
       
-      feeManager.addFee();
+      if (prevDeposit == 0) {
+        feeManager.addFee();
 
-      let surcharge = feeManager.surcharge();
-      data.changeHandlerPool(surcharge);
-      log(Principal.fromBlob(""), #issued(surcharge));
-
+        let surcharge = feeManager.surcharge();
+        data.changeHandlerPool(surcharge);
+        log(Principal.fromBlob(""), #issued(surcharge));
+      };
+      
       log(p, #issued(creditInc));
       log(p, #newDeposit(depositInc));
 

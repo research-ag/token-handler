@@ -33,6 +33,7 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?10);
   assert (await* handler.notify(user1)) == ?(10, 5);
   assert journal.hasEvents([
+    #issued(2),
     #issued(5),
     #newDeposit(10),
   ]);
@@ -128,8 +129,7 @@ do {
   assert handler.userCredit(user1) == 3; // credit unchanged
   assert state() == (0, 14, 0); // consolidation successful
   assert journal.hasEvents([
-    #consolidated({ credited = 12; deducted = 20 }),
-    #issued(+2), // credit pool
+    #consolidated({ credited = 14; deducted = 20 }),
   ]);
 
   assert not handler.isFrozen();
@@ -163,6 +163,7 @@ do {
   assert (await* handler.notify(user1)) == ?(8, 1);
   assert state() == (8, 0, 1);
   assert journal.hasEvents([
+    #issued(2),
     #issued(+1),
     #newDeposit(8),
   ]);
@@ -173,8 +174,7 @@ do {
 
   assert state() == (0, 3, 0); // consolidation successful
   assert journal.hasEvents([
-    #consolidated({ credited = 1; deducted = 8 }),
-    #issued(+2), // credit pool
+    #consolidated({ credited = 3; deducted = 8 }),
   ]);
 
   assert not handler.isFrozen();
@@ -203,6 +203,7 @@ do {
   ignore ledger.balance_.stage_unlocked(?20);
   assert (await* handler.notify(user1)) == ?(20, 15); // (deposit, credit)
   assert journal.hasEvents([
+    #issued(0),
     #issued(+15),
     #newDeposit(20),
   ]);
@@ -217,7 +218,6 @@ do {
   await* handler.trigger(1);
   assert journal.hasEvents([
     #consolidated({ credited = 15; deducted = 20 }),
-    #issued(+0), // credit to pool (0)
   ]);
   assert state() == (0, 15, 0);
 
@@ -243,6 +243,7 @@ do {
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state() == (6, 0, 1);
   assert journal.hasEvents([
+    #issued(0),
     #issued(+1),
     #newDeposit(6),
   ]);
@@ -252,6 +253,7 @@ do {
   assert (await* handler.notify(user2)) == ?(10, 5);
   assert state() == (16, 0, 2);
   assert journal.hasEvents([
+    #issued(0),
     #issued(+5),
     #newDeposit(10),
   ]);
@@ -264,7 +266,6 @@ do {
     assert state() == (6, 5, 1); // user2 funds consolidated
     assert journal.hasEvents([
       #consolidated({ credited = 5; deducted = 10 }),
-      #issued(0),
     ]);
   };
 
@@ -273,6 +274,7 @@ do {
   assert (await* handler.notify(user2)) == ?(10, 5);
   assert state() == (16, 5, 2);
   assert journal.hasEvents([
+    #issued(0),
     #issued(+5),
     #newDeposit(10),
   ]);
@@ -287,9 +289,7 @@ do {
     assert state() == (0, 11, 0); // all deposits consolidated
     assert journal.hasEvents([
       #consolidated({ credited = 5; deducted = 10 }),
-      #issued(0),
       #consolidated({ credited = 1; deducted = 6 }),
-      #issued(0),
     ]);
   };
 
@@ -298,6 +298,7 @@ do {
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state() == (6, 11, 1);
   assert journal.hasEvents([
+    #issued(0),
     #issued(+1),
     #newDeposit(6),
   ]);
@@ -307,6 +308,7 @@ do {
   assert (await* handler.notify(user2)) == ?(10, 5);
   assert state() == (16, 11, 2);
   assert journal.hasEvents([
+    #issued(0),
     #issued(+5),
     #newDeposit(10),
   ]);
@@ -316,6 +318,7 @@ do {
   assert (await* handler.notify(user3)) == ?(8, 3);
   assert state() == (24, 11, 3);
   assert journal.hasEvents([
+    #issued(0),
     #issued(+3),
     #newDeposit(8),
   ]);
@@ -332,7 +335,6 @@ do {
     assert state() == (14, 16, 2); // only user2 deposit consolidated
     assert journal.hasEvents([
       #consolidated({ credited = 5; deducted = 10 }),
-      #issued(0),
       #consolidationError(#CallIcrc1LedgerError),
     ]);
   };

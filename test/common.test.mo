@@ -56,6 +56,7 @@ do {
   assert state() == (5, 0, 1); // state unchanged because deposit has not changed
   assert handler.userCredit(user1) == 1; // credit should not be corrected
   assert journal.hasEvents([
+    #issued(2),
     #issued(+1),
     #newDeposit(5),
   ]);
@@ -128,6 +129,7 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?16);
   assert (await* handler.notify(user1)) == ?(16, 1);
   assert journal.hasEvents([
+    #issued(15),
     #issued(+1),
     #newDeposit(16),
   ]);
@@ -136,39 +138,39 @@ do {
   await* handler.trigger(1);
   assert mock_ledger.transfer_.state(i) == #ready;
   assert journal.hasEvents([
-    #consolidated({ credited = 1; deducted = 16 }),
-    #issued(15),
+    #consolidated({ credited = 16; deducted = 16 }),
   ]);
 
-  assert handler.poolCredit() == 15;
+  assert handler.handlerCredit() == 15;
+  assert handler.poolCredit() == 0;
 
   // credit user
   // case: pool credit < amount
-  assert (handler.creditUser(user1, 30)) == false;
+  assert handler.creditUser(user1, 30) == false;
   assert journal.hasEvents([]);
-  assert handler.poolCredit() == 15;
-  assert handler.userCredit(user1) == 1;
-
-  // credit user
-  // case: pool credit <= amount
-  assert (handler.creditUser(user1, 15)) == true;
-  assert journal.hasEvents([#credited(15)]);
   assert handler.poolCredit() == 0;
-  assert handler.userCredit(user1) == 16;
+  assert handler.userCredit(user1) == 1;
 
   // debit user
   // case: credit < amount
-  assert (handler.debitUser(user1, 17)) == false;
+  assert handler.debitUser(user1, 30) == false;
   assert journal.hasEvents([]);
   assert handler.poolCredit() == 0;
-  assert handler.userCredit(user1) == 16;
+  assert handler.userCredit(user1) == 1;
 
   // debit user
   // case: credit >= amount
-  assert (handler.debitUser(user1, 16)) == true;
-  assert journal.hasEvents([#debited(16)]);
-  assert handler.poolCredit() == 16;
+  assert handler.debitUser(user1, 1) == true;
+  assert journal.hasEvents([#debited(1)]);
+  assert handler.poolCredit() == 1;
   assert handler.userCredit(user1) == 0;
+
+  // credit user
+  // case: pool credit <= amount
+  assert (handler.creditUser(user1, 1)) == true;
+  assert journal.hasEvents([#credited(1)]);
+  assert handler.poolCredit() == 0;
+  assert handler.userCredit(user1) == 1;
 
   assert not handler.isFrozen();
 };

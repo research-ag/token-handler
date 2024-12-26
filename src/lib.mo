@@ -205,7 +205,9 @@ module {
     public func userCredit(p : Principal) : Int = data.get(p).credit();
 
     /// Gets the current credit amount in the pool.
-    public func poolCredit() : Int = data.handlerPoolBalance();
+    public func handlerCredit() : Int = data.handlerPoolBalance();
+    
+    public func poolCredit() : Int = creditManager.poolBalance();
 
     /// Adds amount to P’s credit.
     /// With checking the availability of sufficient funds.
