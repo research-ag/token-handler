@@ -60,31 +60,36 @@ module {
       };
       if (creditAmount <= realFee) return #err(#TooLowQuantity);
 
-      let amountToSend : Nat = switch (p) {
-        case null creditAmount;
-        case (?p) creditAmount - feeManager.surcharge();
-      };
-      let surcharge_ = feeManager.surcharge();
+      let surcharge = feeManager.surcharge();
+
+      let amountToSend = if (not Option.isNull(p)) {
+        log(Principal.fromBlob(""), #issued(surcharge));
+        data.changeHandlerPool(surcharge);
+        creditAmount - surcharge : Nat;
+      } else creditAmount;
+
+      totalWithdrawn += amountToSend;
 
       let res = await* icrc84.send(to, amountToSend);
-
-      if (R.isOk(res)) {
-        totalWithdrawn += amountToSend;
-        if (p != null) {
-          log(Principal.fromBlob(""), #issued(surcharge_));
-          data.changeHandlerPool(surcharge_);
-        };
-      };
 
       // return value
       switch (res) {
         case (#ok txid) #ok(txid, creditAmount - realFee); // = amount arrived
-        case (#err(#BadFee _)) #err(
-          #BadFee {
-            expected_fee = feeManager.fee();
-          }
-        ); // return the expected fee value from now
-        case (#err err) #err(err);
+        case (#err(error)) {
+          let newError = switch (error) {
+            case(#BadFee _) #BadFee { expected_fee = feeManager.fee() };
+            case _ error;
+          };
+
+          totalWithdrawn -= amountToSend;
+
+          if (not Option.isNull(p)) {
+            log(Principal.fromBlob(""), #issued(-surcharge));
+            data.changeHandlerPool(-surcharge);
+          };
+          
+          #err(newError);
+        };
       };
     };
 
@@ -113,7 +118,10 @@ module {
       if (R.isErr(res)) {
         // re-issue credit if unsuccessful
         switch (p) {
-          case null creditManager.changePool(creditAmount);
+          case null {
+            creditManager.changePool(creditAmount);
+            log(Principal.fromBlob(""), #issued(creditAmount));
+          };
           case (?pp) {
             assert data.get(pp).changeCredit(creditAmount);
             log(pp, #issued(creditAmount));
