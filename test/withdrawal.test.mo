@@ -31,18 +31,21 @@ do {
   assert (await* handler.notify(user1)) == ?(20, 15);
   assert state() == (20, 0, 1);
   assert journal.hasEvents([
+    #issued(2),
     #issued(15),
     #newDeposit(20),
   ]);
 
   // trigger consolidation
-  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 42);
+  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
   await* handler.trigger(1);
   ignore mock_ledger.balance_.stage_unlocked(?0);
   assert state() == (0, 17, 0); // consolidation successful
   assert journal.hasEvents([
-    #consolidated({ credited = 15; deducted = 20 }),
-    #issued(2),
+    #consolidated({
+      credited = 17;
+      deducted = 20;
+    }),
   ]);
 
   // update ledger fee
@@ -54,10 +57,10 @@ do {
 
   // withdraw from credit (fee < amount <= credit)
   // should be successful
-  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 42);
+  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
   assert (await* handler.withdrawFromCredit(user1, account, 5, null)) == #ok(42, 2);
   assert handler.userCredit(user1) == 10;
-  assert handler.poolCredit() == 4;
+  assert handler.handlerCredit() == 4;
   assert state() == (0, 14, 0);
   assert journal.hasEvents([
     #burned(5),
@@ -86,13 +89,15 @@ do {
 
   // increase fee while withdraw is being underway
   // withdraw should fail, fee should be updated
-  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 2 })); // the second call should not be executed
+  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 2 })); // the second call should not be executed
   let f2 = async { await* handler.withdrawFromCredit(user1, account, 5, null) };
   assert (await f2) == #err(#BadFee { expected_fee = 4 });
   assert state() == (0, 14, 0); // state unchanged
   assert journal.hasEvents([
     #burned(5),
+    #issued(2),
     #feeUpdated({ new = 2; old = 1 }),
+    #issued(-2),
     #withdrawalError(#BadFee { expected_fee = 4 }),
     #issued(+5),
   ]);
@@ -102,13 +107,13 @@ do {
   assert handler.debitUser(user1, 10);
   assert journal.hasEvents([#debited(10)]);
   assert handler.userCredit(user1) == 0;
-  assert handler.poolCredit() == 14;
+  assert handler.poolCredit() == 10;
 
   // withdraw from pool (ledger_fee < amount <= pool_credit)
   // should be successful
-  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 42);
+  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
   assert (await* handler.withdrawFromPool(account, 4, null)) == #ok(42, 2);
-  assert handler.poolCredit() == 10;
+  assert handler.poolCredit() == 6;
   assert state() == (0, 10, 0);
   assert journal.hasEvents([
     #burned(4),
@@ -118,11 +123,12 @@ do {
   // withdraw from pool (amount <= ledger_fee)
   // We are not staging a transfer_ response because no call will happen.
   assert (await* handler.withdrawFromPool(account, 2, null)) == #err(#TooLowQuantity);
-  assert handler.poolCredit() == 10; // not changed
+  assert handler.poolCredit() == 6; // not changed
   assert state() == (0, 10, 0); // state unchanged
   assert journal.hasEvents([
     #burned(2),
     #withdrawalError(#TooLowQuantity),
+    #issued(2),
     #issued(2),
   ]);
 
