@@ -5,7 +5,7 @@ import Data "Data";
 
 module {
   public type LogEvent = {
-    #feeUpdated : { old : Nat; new : Nat };
+    #feeUpdated : { old : Nat; new : Nat; delta : Int };
     #surchargeUpdated : { old : Nat; new : Nat };
   };
 
@@ -41,7 +41,7 @@ module {
       let sum = outstandingFees + delta;
       assert sum >= 0;
       outstandingFees := Int.abs(sum);
-      log(Principal.fromBlob(""), #feeUpdated({ old; new }));
+      log(Principal.fromBlob(""), #feeUpdated({ old; new; delta }));
     };
 
     public func fee() : Nat = ledgerFee() + surcharge_;
@@ -57,6 +57,10 @@ module {
 
     public func addFee() {
       outstandingFees += ledgerFee();
+    };
+
+    public func subtractFee(fee : Nat) {
+      outstandingFees -= fee;
     };
 
     public func state() : State = {

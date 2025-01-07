@@ -33,13 +33,18 @@ module {
   };
 
   public type LogEvent = {
-    #issued : Int;
-    #newDeposit : Nat;
+    #newDeposit : {
+      depositInc : Nat;
+      creditInc : Nat;
+      ledgerFee : Nat;
+      surcharge : Nat;
+    };
+    #depositInc : Nat;
     #consolidated : {
       deducted : Nat;
       credited : Nat;
+      fee : Nat;
     };
-    #consolidationError : ConsolidationError;
   };
 
   public type TransferResponse = R.Result<Nat, ConsolidationError>;
@@ -97,17 +102,24 @@ module {
 
       assert entry.changeCredit(creditInc);
       totalCredited += creditInc;
-      
-      if (prevDeposit == 0) {
-        feeManager.addFee();
 
+      if (prevDeposit == 0) {
         let surcharge = feeManager.surcharge();
+        let ledgerFee = feeManager.ledgerFee();
+        feeManager.addFee();
         data.changeHandlerPool(surcharge);
-        log(Principal.fromBlob(""), #issued(surcharge));
+        log(
+          p,
+          #newDeposit {
+            depositInc;
+            creditInc;
+            ledgerFee;
+            surcharge;
+          },
+        );
+      } else {
+        log(p, #depositInc(depositInc));
       };
-      
-      log(p, #issued(creditInc));
-      log(p, #newDeposit(depositInc));
 
       if (triggerOnNotifications) {
         // schedule a canister self-call to initiate the consolidation
@@ -143,26 +155,19 @@ module {
       let deposit = entry.deposit();
       underwayFunds += deposit;
 
-      let consolidated : Nat = deposit - feeManager.ledgerFee();
+      let fee = feeManager.ledgerFee();
+      let consolidated : Nat = deposit - fee;
 
       // transfer funds to the main account
       let res = await* icrc84.consolidate(entry.key(), deposit);
-
-      // log event
-      let event = switch (res) {
-        case (#ok _) #consolidated({
-          deducted = deposit;
-          credited = consolidated;
-        });
-        case (#err err) #consolidationError(err);
-      };
-      log(entry.key(), event);
 
       // process result
       switch (res) {
         case (#ok _) {
           totalConsolidated += consolidated;
           entry.setDeposit(0);
+          feeManager.subtractFee(fee);
+          log(entry.key(), #consolidated({ deducted = deposit; credited = consolidated : Nat; fee }));
         };
         case (#err _) {};
       };

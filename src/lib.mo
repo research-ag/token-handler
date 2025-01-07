@@ -202,12 +202,12 @@ module {
     };
 
     /// Gets the current credit amount associated with a specific principal.
-    public func userCredit(p : Principal) : Int = data.get(p).credit();
+    public func userCredit(p : Principal) : Nat = data.get(p).credit();
 
     /// Gets the current credit amount in the pool.
     public func handlerCredit() : Int = data.handlerPoolBalance();
     
-    public func poolCredit() : Int = creditManager.poolBalance();
+    public func poolCredit() : Nat = creditManager.poolBalance();
 
     /// Adds amount to P’s credit.
     /// With checking the availability of sufficient funds.
