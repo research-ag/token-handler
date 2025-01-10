@@ -13,9 +13,11 @@ module {
   public type DepositFromAllowanceResponse = R.Result<(credited : Nat, txid : Nat), DepositFromAllowanceError>;
 
   public type LogEvent = {
-    #allowanceDrawn : { amount : Nat };
-    #allowanceError : DepositFromAllowanceError;
-    #issued : Int;
+    #allowanceDrawn : {
+      amount : Nat;
+      credited : Nat;
+      surcharge : Nat;
+    };
   };
 
   public type State = {
@@ -39,33 +41,28 @@ module {
       creditAmount : Nat,
       expectedFee : ?Nat,
     ) : async* DepositFromAllowanceResponse {
+      let surcharge_ = feeManager.surcharge();
+      let fee = feeManager.fee();
       switch (expectedFee) {
         case null {};
-        case (?f) if (f != feeManager.fee()) {
-          let err = #BadFee { expected_fee = feeManager.fee() };
-          log(p, #allowanceError err);
-          return #err(err);
-        };
+        case (?f) if (f != fee) return #err(#BadFee { expected_fee = fee });
       };
 
-      let surcharge_ = feeManager.surcharge();
-
-      let res = await* icrc84.draw(p, source, creditAmount + feeManager.fee());
-
-      let event = switch (res) {
-        case (#ok _) #allowanceDrawn { amount = creditAmount };
-        case (#err err) #allowanceError err;
-      };
-
-      log(p, event);
+      let res = await* icrc84.draw(p, source, creditAmount + fee);
 
       if (R.isOk(res)) {
+        totalCredited += creditAmount + surcharge_;
         assert data.get(p).changeCredit(creditAmount);
-        totalCredited += creditAmount;
-        log(p, #issued(creditAmount));
-
         data.changeHandlerPool(surcharge_);
-        log(Principal.fromBlob(""), #issued(surcharge_));
+
+        log(
+          p,
+          #allowanceDrawn {
+            amount = creditAmount + surcharge_;
+            credited = creditAmount;
+            surcharge = surcharge_;
+          },
+        );
       };
 
       switch (res) {
