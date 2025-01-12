@@ -365,9 +365,9 @@ module {
 
     public func assertInvariant() {
       let { totalConsolidated; funds = { deposited } } = depositManager.state();
-      let { totalWithdrawn } = withdrawalManager.state();
+      let { totalWithdrawn; lockedFunds } = withdrawalManager.state();
       let { totalCredited } = allowanceManager.state();
-      let assets = deposited + totalConsolidated + totalCredited - totalWithdrawn : Nat;
+      let assets = deposited + totalConsolidated + totalCredited - lockedFunds - totalWithdrawn : Nat;
 
       let creditSum = data.creditSum();
       let handlerPool = data.handlerPoolBalance();

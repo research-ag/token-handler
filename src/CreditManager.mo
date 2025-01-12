@@ -45,7 +45,6 @@ module {
     // A check is performed, balances can not go negative
     public func burn(p : Principal, amount : Nat) : Bool {
       if (not data.get(p).changeCredit(-amount)) return false;
-      log(p, #burned(amount));
       true;
     };
 
@@ -57,7 +56,6 @@ module {
     public func burnPool(amount : Nat) : Bool {
       if (amount > pool) return false;
       pool -= amount;
-      log(Principal.fromBlob(""), #burned(amount));
       true;
     };
 
