@@ -87,7 +87,7 @@ module {
 
       let res = await* icrc84.send(to, amountToSend);
 
-      let result = switch (res) {
+      switch (res) {
         case (#ok txid) {
           switch (p) {
             case (?pp) {
@@ -115,11 +115,15 @@ module {
             case _ error;
           };
 
+          lockedFunds -= creditAmount;
+          switch (p) {
+            case (?pp) assert data.get(pp).changeCredit(creditAmount);
+            case null creditManager.changePool(creditAmount);
+          };
+
           #err(newError);
         };
       };
-
-      result;
     };
 
     public func share() : StableData = {
