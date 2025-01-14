@@ -17,7 +17,7 @@ do {
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 3;
   assert journal.hasEvents([
-    #feeUpdated({ new = 3; old = 0 }),
+    #feeUpdated({ new = 3; old = 0; delta = 0 }),
   ]);
 
   // update surcharge
@@ -33,9 +33,7 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?10);
   assert (await* handler.notify(user1)) == ?(10, 5);
   assert journal.hasEvents([
-    #issued(2),
-    #issued(5),
-    #newDeposit(10),
+    #newDeposit { creditInc = 5; depositInc = 10; ledgerFee = 3; surcharge = 2 },
   ]);
   assert state() == (10, 0, 1);
   ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 10 }));
@@ -43,8 +41,7 @@ do {
   assert handler.userCredit(user1) == 5; // credit has not been corrected after consolidation
   assert state() == (10, 0, 1);
   assert journal.hasEvents([
-    #feeUpdated({ new = 10; old = 3 }),
-    #consolidationError(#BadFee({ expected_fee = 10 })),
+    #feeUpdated({ new = 10; old = 3; delta = 7 }),
   ]);
 
   // increase fee while deposit is being consolidated (implicitly)
@@ -53,8 +50,7 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?20);
   assert (await* handler.notify(user1)) == ?(10, 10);
   assert journal.hasEvents([
-    #issued(+10),
-    #newDeposit(10),
+    #depositInc(10),
   ]);
   assert state() == (20, 0, 1);
   ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 15 }));
@@ -62,8 +58,7 @@ do {
   assert handler.userCredit(user1) == 15; // credit has not been corrected after consolidation
   assert state() == (20, 0, 1); // consolidation failed without updated deposit
   assert journal.hasEvents([
-    #feeUpdated({ new = 15; old = 10 }),
-    #consolidationError(#BadFee({ expected_fee = 15 })),
+    #feeUpdated({ new = 15; old = 10; delta = 5 }),
   ]);
 
   // increase fee while deposit is being consolidated (explicitly)
@@ -83,14 +78,12 @@ do {
   let f1 = async { await* handler.trigger(1) };
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 100; old = 15 })
+    #feeUpdated({ new = 100; old = 15; delta = 85 }),
   ]);
   await f1;
   assert handler.userCredit(user1) == 3; // credit has not been corrected
   assert state() == (20, 0, 1); // consolidation failed without deposit reset
-  assert journal.hasEvents([
-    #consolidationError(#BadFee({ expected_fee = 100 })),
-  ]);
+  assert journal.hasEvents([]);
 
   // increase fee while deposit is being consolidated (explicitly)
   // scenario 2: old_fee < new_fee < deposit
@@ -98,7 +91,7 @@ do {
   ignore mock_ledger.fee_.stage_unlocked(?5);
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 5; old = 100 })
+    #feeUpdated({ new = 5; old = 100; delta = -95 }),
   ]);
 
   assert state() == (20, 0, 1);
@@ -107,14 +100,12 @@ do {
   let f2 = async { await* handler.trigger(1) };
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 6; old = 5 }),
+    #feeUpdated({ new = 6; old = 5; delta = 1 }),
   ]);
   await f2;
   assert state() == (20, 0, 1); // consolidation failed with updated deposit scheduled
   assert handler.userCredit(user1) == 3; // credit has not been corrected
-  assert journal.hasEvents([
-    #consolidationError(#BadFee({ expected_fee = 6 })),
-  ]);
+  assert journal.hasEvents([]);
 
   // only 1 consolidation process can be triggered for same user at same time
   // consolidation with deposit > fee should be successful
@@ -129,7 +120,7 @@ do {
   assert handler.userCredit(user1) == 3; // credit unchanged
   assert state() == (0, 14, 0); // consolidation successful
   assert journal.hasEvents([
-    #consolidated({ credited = 14; deducted = 20 }),
+    #consolidated({ credited = 14; deducted = 20; fee = 6 }),
   ]);
 
   assert not handler.isFrozen();
@@ -146,7 +137,7 @@ do {
   ignore await* handler.fetchFee();
   assert handler.fee(#deposit) == 5;
   assert journal.hasEvents([
-    #feeUpdated({ new = 5; old = 0 }),
+    #feeUpdated({ new = 5; old = 0; delta = 0 }),
   ]);
 
   // update surcharge
@@ -163,9 +154,7 @@ do {
   assert (await* handler.notify(user1)) == ?(8, 1);
   assert state() == (8, 0, 1);
   assert journal.hasEvents([
-    #issued(2),
-    #issued(+1),
-    #newDeposit(8),
+    #newDeposit({ creditInc = 1; depositInc = 8; ledgerFee = 5; surcharge = 2 }),
   ]);
 
   // Wait for consolidation
@@ -174,7 +163,7 @@ do {
 
   assert state() == (0, 3, 0); // consolidation successful
   assert journal.hasEvents([
-    #consolidated({ credited = 3; deducted = 8 }),
+    #consolidated({ credited = 3; deducted = 8; fee = 5 }),
   ]);
 
   assert not handler.isFrozen();
@@ -196,28 +185,24 @@ do {
   ledger.fee_.release(i);
   assert (await fut1) == ?5;
   assert journal.hasEvents([
-    #feeUpdated({ new = 5; old = 0 }),
+    #feeUpdated({ new = 5; old = 0; delta = 0 }),
   ]);
 
   // stage a response and release it immediately
   ignore ledger.balance_.stage_unlocked(?20);
   assert (await* handler.notify(user1)) == ?(20, 15); // (deposit, credit)
   assert journal.hasEvents([
-    #issued(0),
-    #issued(+15),
-    #newDeposit(20),
+    #newDeposit({ creditInc = 15; depositInc = 20; ledgerFee = 5; surcharge = 0 }),
   ]);
   assert state() == (20, 0, 1);
   ignore ledger.transfer_.stage_unlocked(null); // error response
   await* handler.trigger(1);
-  assert journal.hasEvents([
-    #consolidationError(#CallIcrc1LedgerError),
-  ]);
+  assert journal.hasEvents([]);
   assert state() == (20, 0, 1);
   ignore ledger.transfer_.stage_unlocked(?(#Ok 0));
   await* handler.trigger(1);
   assert journal.hasEvents([
-    #consolidated({ credited = 15; deducted = 20 }),
+    #consolidated({ credited = 15; deducted = 20; fee = 5 }),
   ]);
   assert state() == (0, 15, 0);
 
@@ -235,7 +220,7 @@ do {
   ignore await* handler.fetchFee();
   assert handler.fee(#deposit) == 5;
   assert journal.hasEvents([
-    #feeUpdated({ new = 5; old = 0 }),
+    #feeUpdated({ new = 5; old = 0; delta = 0 }),
   ]);
 
   // user1 notify with balance > fee
@@ -243,9 +228,7 @@ do {
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state() == (6, 0, 1);
   assert journal.hasEvents([
-    #issued(0),
-    #issued(+1),
-    #newDeposit(6),
+    #newDeposit { creditInc = 1; depositInc = 6; ledgerFee = 5; surcharge = 0 },
   ]);
 
   // user2 notify with balance > fee
@@ -253,9 +236,7 @@ do {
   assert (await* handler.notify(user2)) == ?(10, 5);
   assert state() == (16, 0, 2);
   assert journal.hasEvents([
-    #issued(0),
-    #issued(+5),
-    #newDeposit(10),
+    #newDeposit { creditInc = 5; depositInc = 10; ledgerFee = 5; surcharge = 0 },
   ]);
 
   // trigger only 1 consolidation (the maximum one)
@@ -265,7 +246,7 @@ do {
     assert ledger.transfer_.state(i) == #ready;
     assert state() == (6, 5, 1); // user2 funds consolidated
     assert journal.hasEvents([
-      #consolidated({ credited = 5; deducted = 10 }),
+      #consolidated({ credited = 5; deducted = 10; fee = 5 }),
     ]);
   };
 
@@ -274,9 +255,7 @@ do {
   assert (await* handler.notify(user2)) == ?(10, 5);
   assert state() == (16, 5, 2);
   assert journal.hasEvents([
-    #issued(0),
-    #issued(+5),
-    #newDeposit(10),
+    #newDeposit { creditInc = 5; depositInc = 10; ledgerFee = 5; surcharge = 0 },
   ]);
 
   // trigger consolidation of all the deposits
@@ -288,8 +267,8 @@ do {
     assert (ledger.transfer_.state(i), ledger.transfer_.state(j)) == (#ready, #ready);
     assert state() == (0, 11, 0); // all deposits consolidated
     assert journal.hasEvents([
-      #consolidated({ credited = 5; deducted = 10 }),
-      #consolidated({ credited = 1; deducted = 6 }),
+      #consolidated({ credited = 5; deducted = 10; fee = 5 }),
+      #consolidated({ credited = 1; deducted = 6; fee = 5 }),
     ]);
   };
 
@@ -298,9 +277,7 @@ do {
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state() == (6, 11, 1);
   assert journal.hasEvents([
-    #issued(0),
-    #issued(+1),
-    #newDeposit(6),
+    #newDeposit { creditInc = 1; depositInc = 6; ledgerFee = 5; surcharge = 0 },
   ]);
 
   // user2 notify again
@@ -308,9 +285,7 @@ do {
   assert (await* handler.notify(user2)) == ?(10, 5);
   assert state() == (16, 11, 2);
   assert journal.hasEvents([
-    #issued(0),
-    #issued(+5),
-    #newDeposit(10),
+    #newDeposit { creditInc = 5; depositInc = 10; ledgerFee = 5; surcharge = 0 },
   ]);
 
   // user3 notify with balance > fee
@@ -318,9 +293,7 @@ do {
   assert (await* handler.notify(user3)) == ?(8, 3);
   assert state() == (24, 11, 3);
   assert journal.hasEvents([
-    #issued(0),
-    #issued(+3),
-    #newDeposit(8),
+    #newDeposit { creditInc = 3; depositInc = 8; ledgerFee = 5; surcharge = 0 },
   ]);
 
   // trigger consolidation of all the deposits (n >= deposit_number)
@@ -334,8 +307,7 @@ do {
     assert ((ledger.transfer_.state(i), ledger.transfer_.state(j), ledger.transfer_.state(k))) == (#ready, #ready, #staged);
     assert state() == (14, 16, 2); // only user2 deposit consolidated
     assert journal.hasEvents([
-      #consolidated({ credited = 5; deducted = 10 }),
-      #consolidationError(#CallIcrc1LedgerError),
+      #consolidated({ credited = 5; deducted = 10; fee = 5 }),
     ]);
   };
 

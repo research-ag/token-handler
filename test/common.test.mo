@@ -101,7 +101,6 @@ do {
   ]);
 
   // fetching fee should not overlap
-  //  let i = mock_ledger.fee_.lock("FETCHING_FEE_SHOULD_NOT_OVERLAP");
   let i = mock_ledger.fee_.stage(?6);
   let f1 = async { await* handler.fetchFee() };
   let f2 = async { await* handler.fetchFee() };
