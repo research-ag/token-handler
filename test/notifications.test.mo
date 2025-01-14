@@ -20,7 +20,7 @@ do {
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 3;
   assert journal.hasEvents([
-    #feeUpdated({ new = 3; old = 0 }),
+    #feeUpdated({ new = 3; old = 0; delta = 0 }),
   ]);
 
   // update surcharge
@@ -49,9 +49,7 @@ do {
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state() == (6, 0, 1);
   assert journal.hasEvents([
-    #issued(2),
-    #issued(1),
-    #newDeposit(6),
+    #newDeposit { creditInc = 1; depositInc = 6; ledgerFee = 3; surcharge = 2 },
   ]);
 
   assert not handler.isFrozen();
@@ -67,7 +65,7 @@ do {
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 5;
   assert journal.hasEvents([
-    #feeUpdated({ new = 5; old = 0 }),
+    #feeUpdated({ new = 5; old = 0; delta = 0 }),
   ]);
 
   // notify with balance > fee
@@ -75,9 +73,7 @@ do {
   assert (await* handler.notify(user1)) == ?(6, 1);
   assert state() == (6, 0, 1);
   assert journal.hasEvents([
-    #issued(0),
-    #issued(1),
-    #newDeposit(6),
+    #newDeposit { creditInc = 1; depositInc = 6; ledgerFee = 5; surcharge = 0 },
   ]);
 
   // increase fee while item still in queue (trigger did not run yet)
@@ -85,7 +81,7 @@ do {
   ignore await* handler.fetchFee();
   assert state() == (6, 0, 1); // recalculation after fee update
   assert journal.hasEvents([
-    #feeUpdated({ new = 6; old = 5 }),
+    #feeUpdated({ new = 6; old = 5; delta = 1 }),
   ]);
 
   // increase deposit again
@@ -93,8 +89,7 @@ do {
   assert (await* handler.notify(user1)) == ?(1, 1);
   assert state() == (7, 0, 1);
   assert journal.hasEvents([
-    #issued(1),
-    #newDeposit(1),
+    #depositInc(1),
   ]);
 
   // increase fee while notify is underway (and item still in queue)
@@ -106,7 +101,7 @@ do {
   assert state() == (7, 0, 1); // state from before
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 10; old = 6 }),
+    #feeUpdated({ new = 10; old = 6; delta = 4 }),
   ]);
   assert state() == (7, 0, 1); // state not changed
   assert (await f1) == ?(0, 0); // deposit <= new_fee
@@ -117,8 +112,7 @@ do {
   assert (await* handler.notify(user1)) == ?(8, 8);
   assert state() == (15, 0, 1);
   assert journal.hasEvents([
-    #issued(8),
-    #newDeposit(8),
+    #depositInc(8),
   ]);
 
   // increase fee while notify is underway (and item still in queue)
@@ -129,14 +123,13 @@ do {
   assert state() == (15, 0, 1); // state from before
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 15; old = 10 }),
+    #feeUpdated({ new = 15; old = 10; delta = 5 }),
   ]);
   assert state() == (15, 0, 1); // state not changed
   assert (await f2) == ?(5, 5); // credit = latest - old balance
   assert state() == (20, 0, 1); // state should have changed
   assert journal.hasEvents([
-    #issued(5),
-    #newDeposit(5),
+    #depositInc(5),
   ]);
 
   // decrease fee while notify is underway (and item still in queue)
@@ -147,7 +140,7 @@ do {
   assert state() == (20, 0, 1); // state from before
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 10; old = 15 }),
+    #feeUpdated({ new = 10; old = 15; delta = -5 }),
   ]);
   assert state() == (20, 0, 1); // state unchanged
   mock_ledger.balance_.release(i); // let notify return
@@ -182,7 +175,7 @@ do {
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 5;
   assert journal.hasEvents([
-    #feeUpdated({ new = 5; old = 0 }),
+    #feeUpdated({ new = 5; old = 0; delta = 0 }),
   ]);
 
   // notify 1
@@ -191,9 +184,7 @@ do {
   assert handler.userCredit(user1) == 2;
   assert state() == (7, 0, 1);
   assert journal.hasEvents([
-    #issued(0),
-    #issued(2),
-    #newDeposit(7),
+    #newDeposit { creditInc = 2; depositInc = 7; ledgerFee = 5; surcharge = 0 },
   ]);
 
   // notify 2
@@ -202,8 +193,7 @@ do {
   assert handler.userCredit(user1) == 12;
   assert state() == (17, 0, 1);
   assert journal.hasEvents([
-    #issued(10),
-    #newDeposit(10),
+    #depositInc(10),
   ]);
 
   assert not handler.isFrozen();
