@@ -43,6 +43,7 @@ module {
     ) : async* DepositFromAllowanceResponse {
       let surcharge_ = feeManager.surcharge();
       let fee = feeManager.fee();
+      
       switch (expectedFee) {
         case null {};
         case (?f) if (f != fee) return #err(#BadFee { expected_fee = fee });

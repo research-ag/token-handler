@@ -15,7 +15,7 @@ do {
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 2;
   assert journal.hasEvents([
-    #feeUpdated({ new = 2; old = 0 }),
+    #feeUpdated({ new = 2; old = 0; delta = 0 }),
   ]);
 
   // update surcharge
@@ -35,7 +35,7 @@ do {
   let f1 = async { await* handler.notify(user1) };
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 4; old = 2 }),
+    #feeUpdated({ new = 4; old = 2; delta = 0 }),
   ]);
   mock_ledger.balance_.release(i); // let notify return
   assert (await f1) == ?(0, 0);
@@ -49,16 +49,14 @@ do {
   let f2 = async { await* handler.notify(user1) };
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 2; old = 4 }),
+    #feeUpdated({ new = 2; old = 4; delta = 0 }),
   ]);
   mock_ledger.balance_.release(i2); // let notify return
   assert (await f2) == ?(5, 1);
   assert state() == (5, 0, 1); // state unchanged because deposit has not changed
   assert handler.userCredit(user1) == 1; // credit should not be corrected
   assert journal.hasEvents([
-    #issued(2),
-    #issued(+1),
-    #newDeposit(5),
+    #newDeposit({ creditInc = 1; depositInc = 5; ledgerFee = 2; surcharge = 2 })
   ]);
 
   // Don't recalculate credits related to deposits when fee changes
@@ -67,7 +65,7 @@ do {
   ignore mock_ledger.fee_.stage_unlocked(?1);
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 1; old = 2 }),
+    #feeUpdated({ new = 1; old = 2; delta = -1 }),
   ]);
   assert handler.userCredit(user1) == 1; // credit not corrected
 
@@ -75,7 +73,7 @@ do {
   ignore mock_ledger.fee_.stage_unlocked(?2);
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 2; old = 1 }),
+    #feeUpdated({ new = 2; old = 1; delta = 1 }),
   ]);
   assert handler.userCredit(user1) == 1; // credit not corrected
 
@@ -83,7 +81,7 @@ do {
   ignore mock_ledger.fee_.stage_unlocked(?5);
   ignore await* handler.fetchFee();
   assert journal.hasEvents([
-    #feeUpdated({ new = 5; old = 2 }),
+    #feeUpdated({ new = 5; old = 2; delta = 3 }),
   ]);
   assert handler.userCredit(user1) == 1; // credit not corrected
 
@@ -99,7 +97,7 @@ do {
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 5;
   assert journal.hasEvents([
-    #feeUpdated({ new = 5; old = 0 }),
+    #feeUpdated({ new = 5; old = 0; delta = 0 }),
   ]);
 
   // fetching fee should not overlap
@@ -111,7 +109,7 @@ do {
   mock_ledger.fee_.release(i);
   assert (await f1) == ?6;
   assert journal.hasEvents([
-    #feeUpdated({ new = 6; old = 5 }),
+    #feeUpdated({ new = 6; old = 5; delta = 0 }),
   ]);
   assert not handler.isFrozen();
 };
@@ -129,16 +127,14 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?16);
   assert (await* handler.notify(user1)) == ?(16, 1);
   assert journal.hasEvents([
-    #issued(15),
-    #issued(+1),
-    #newDeposit(16),
+    #newDeposit({ creditInc = 1; depositInc = 16; ledgerFee = 0; surcharge = 15 }),
   ]);
 
   let i = mock_ledger.transfer_.stage_unlocked(?(#Ok 0));
   await* handler.trigger(1);
   assert mock_ledger.transfer_.state(i) == #ready;
   assert journal.hasEvents([
-    #consolidated({ credited = 16; deducted = 16 }),
+    #consolidated({ credited = 16; deducted = 16; fee = 0 }),
   ]);
 
   assert handler.handlerCredit() == 15;
@@ -184,7 +180,7 @@ do {
   ignore await* handler.fetchFee();
   assert handler.ledgerFee() == 2;
   assert journal.hasEvents([
-    #feeUpdated({ new = 2; old = 0 }),
+    #feeUpdated({ new = 2; old = 0; delta = 0 }),
   ]);
 
   // update surcharge

@@ -7,8 +7,8 @@ keywords = [ ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.13.4"
-icrc84 = "https://github.com/research-ag/icrc-84#main@6475b4987a9eddbb362ee16698106c2a3007ba1c"
+base = "0.13.5"
+icrc84 = "https://github.com/research-ag/icrc-84#main@34a67ed2b16b3dd7cb2731e45708a32d49fe8c70"
 
 [dev-dependencies]
 test = "2.0.0"
@@ -16,5 +16,5 @@ vector = "0.4.1"
 await-async = "https://github.com/research-ag/await-async#45092cb97f0b66a513b476e7b586998ac561149c@45092cb97f0b66a513b476e7b586998ac561149c"
 
 [toolchain]
-moc = "0.13.4"
-wasmtime = "27.0.0"
+moc = "0.13.5"
+wasmtime = "28.0.0"
