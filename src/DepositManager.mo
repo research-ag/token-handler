@@ -167,7 +167,7 @@ module {
           totalConsolidated += consolidated;
           entry.setDeposit(0);
           feeManager.subtractFee(fee);
-          log(entry.key(), #consolidated({ deducted = deposit; credited = consolidated : Nat; fee }));
+          log(entry.key(), #consolidated({ deducted = deposit; credited = consolidated; fee }));
         };
         case (#err _) {};
       };

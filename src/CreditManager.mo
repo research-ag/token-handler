@@ -5,8 +5,6 @@ module {
   public type LogEvent = {
     #credited : Nat;
     #debited : Nat;
-    #burned : Nat;
-    #issued : Nat;
   };
 
   public type StableData = {
@@ -50,7 +48,6 @@ module {
 
     public func changePool(amount : Nat) {
       pool += amount;
-      log(Principal.fromBlob(""), #issued(amount));
     };
 
     public func burnPool(amount : Nat) : Bool {

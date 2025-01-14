@@ -32,7 +32,7 @@ module {
       withdrawn : Nat;
       surcharge : Nat;
     };
-    #locked : Nat;
+    #locked : Int;
   };
 
   public class WithdrawalManager(
@@ -120,6 +120,8 @@ module {
             case (?pp) assert data.get(pp).changeCredit(creditAmount);
             case null creditManager.changePool(creditAmount);
           };
+
+          log(principal, #locked(-creditAmount));
 
           #err(newError);
         };
