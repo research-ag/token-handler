@@ -12,6 +12,10 @@ import ICRC84 "mo:icrc84";
 /// automatically updates the tracked value if it changes.
 /// The functions in this module do not retry any ledger calls if they fail.
 module {
+  public type StableData = {
+    fee : Nat;
+  };
+
   type BalanceResult = ICRC1Agent.BalanceResult;
 
   type TransferResult = ICRC1Agent.TransferResult;
@@ -19,7 +23,8 @@ module {
   type DrawResult = ICRC1Agent.TransferFromResult;
 
   public class Ledger(api : ICRC1.API, ownPrincipal : Principal, initial_fee : Nat) {
-    public var callback : (Nat, Nat) -> () = func(_, _) {};
+    public var assertInvariant = func () : Bool = true;
+    public var onFeeChanged : (oldFee : Nat, newFee : Nat) -> () = func _ {};
 
     let agent = ICRC1Agent.LedgerAgent(api);
     agent.setFee(initial_fee);
@@ -27,22 +32,28 @@ module {
     public func fee() : Nat = agent.fee();
 
     public func setFee(newFee : Nat) {
+      ignore assertInvariant();
       let oldFee = agent.fee();
       if (newFee != oldFee) {
         agent.setFee(newFee);
-        callback(oldFee, newFee);
+        onFeeChanged(oldFee, newFee);
       };
+      ignore assertInvariant();
     };
 
     var feeLock = false;
+    
     public func loadFee() : async* ?Nat {
+      ignore assertInvariant();
       if (feeLock) return null;
       feeLock := true;
       try {
-        switch (await* agent.fetchFee()) {
+        let ret = switch (await* agent.fetchFee()) {
           case (#ok(fee)) { setFee(fee); ?fee };
           case _ null;
         };
+        ignore assertInvariant();
+        ret;
       } finally feeLock := false;
     };
 
@@ -57,6 +68,7 @@ module {
 
     /// Fetches actual deposit for a principal from the ICRC1 ledger.
     public func loadDeposit(p : Principal) : async* BalanceResult {
+      ignore assertInvariant();
       await* agent.balance_of({
         owner = ownPrincipal;
         subaccount = ?ICRC84.toSubaccount(p);
@@ -65,6 +77,7 @@ module {
 
     // Amount is the amount to transfer out, amount - fee is received
     func transfer(from_subaccount : ?ICRC1.Subaccount, to : ICRC1.Account, amount : Nat) : async* TransferResult {
+      ignore assertInvariant();
       let fee = agent.fee();
       assert amount >= fee;
       let res = await* agent.transfer(from_subaccount, to, amount - fee);
@@ -74,6 +87,7 @@ module {
 
     /// Consolidate funds into the main account
     public func consolidate(p : Principal, amount : Nat) : async* TransferResult {
+      ignore assertInvariant();
       await* transfer(
         ?ICRC84.toSubaccount(p),
         { owner = ownPrincipal; subaccount = null },
@@ -83,6 +97,7 @@ module {
 
     /// Send <amount> out from the main account, <amount> - fee_ will be received
     public func send(to : ICRC1.Account, amount : Nat) : async* TransferResult {
+      ignore assertInvariant();
       await* transfer(null, to, amount);
     };
 
@@ -90,6 +105,7 @@ module {
     /// <amount> is the amount including fees subtracted from the allowance
     /// <amount - fee will be received in the main account
     public func draw(p : Principal, from : ICRC1.Account, amount : Nat) : async* DrawResult {
+      ignore assertInvariant();
       let fee = agent.fee();
       assert amount >= fee;
       let to = { owner = ownPrincipal; subaccount = null };
@@ -98,5 +114,10 @@ module {
       res;
     };
 
+    public func share() : StableData = {
+      fee = agent.fee();
+    };
+
+    public func unshare(data : StableData) = agent.setFee(data.fee);
   };
 };

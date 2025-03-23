@@ -8,7 +8,7 @@ import Principal "mo:base/Principal";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import Nat "mo:base/Nat";
-import Result "mo:base/Result";
+import Debug "mo:base/Debug";
 
 import ICRC84 "mo:icrc84";
 import ICRC1 "icrc1-api";
@@ -16,21 +16,21 @@ import ICRC84Helper "icrc84-helper";
 import DepositManager "DepositManager";
 import AllowanceManager "AllowanceManager";
 import WithdrawalManager "WithdrawalManager";
-import CreditRegistry "CreditRegistry";
+import CreditManager "CreditManager";
+import Data "Data";
+import FeeManager "FeeManager";
 
 module {
-  public type StableData = (
-    DepositManager.StableData, // account manager
-    CreditRegistry.StableData, // credit registry
-  );
-
-  public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditRegistry.LogEvent or {
-    #error : Text;
+  public type StableData = {
+    data : Data.StableData<Principal>;
+    depositManager : DepositManager.StableData;
+    creditManager : CreditManager.StableData;
+    feeManager : FeeManager.StableData;
+    ledger : ICRC84Helper.StableData;
   };
 
-  public type AccountInfo = {
-    deposit : Nat;
-    credit : Int;
+  public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditManager.LogEvent or FeeManager.LogEvent or {
+    #error : Text;
   };
 
   public type TokenHandlerOptions = {
@@ -47,6 +47,7 @@ module {
       underway : Nat;
       queued : Nat;
       consolidated : Nat;
+      usableDeposit : (deposit : Int, correct : Bool);
     };
     flow : {
       consolidated : Nat;
@@ -58,13 +59,13 @@ module {
     };
     users : {
       queued : Nat;
+      locked : Nat;
+      total : Nat;
     };
     depositManager : DepositManager.State;
+    withdrawalManager : WithdrawalManager.State;
+    feeManager : FeeManager.State;
   };
-
-  /// Returns default stable data for `TokenHandler`.
-  public func defaultStableData() : StableData = ((((#leaf, 0, 0, 1), 0), 0), ([], 0, 0));
-  //public func defaultStableData() : StableData = (([], 0, 0));
 
   /// Converts `Principal` to `ICRC1.Subaccount`.
   public func toSubaccount(p : Principal) : ICRC1.Subaccount = ICRC84.toSubaccount(p);
@@ -91,10 +92,16 @@ module {
     public func notificationsOnPause() : Bool = depositManager.state().paused;
 
     /// Pause new notifications.
-    public func pauseNotifications() = depositManager.pause(true);
+    public func pauseNotifications() {
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      depositManager.pause(true);
+    };
 
     /// Unpause new notifications.
-    public func unpauseNotifications() = depositManager.pause(false);
+    public func unpauseNotifications() {
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      depositManager.pause(false);
+    };
 
     /// If some unexpected error happened, this flag turns true and handler stops doing anything until recreated.
     var isFrozen_ : Bool = false;
@@ -108,92 +115,111 @@ module {
       log(ownPrincipal, #error(errorText));
     };
 
-    /// Tracks credited funds (usable balance) associated with each principal.
-    let creditRegistry = CreditRegistry.CreditRegistry(log);
+    let ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
 
-    let Ledger = ICRC84Helper.Ledger(ledgerApi, ownPrincipal, initialFee);
+    let data = Data.Data<Principal>(Principal.compare);
+
+    let oldCallback = ledger.onFeeChanged;
+    ledger.onFeeChanged := func (old, new) {
+      data.thresholdChanged(new);
+      oldCallback(old, new);
+    };
+    
+    let feeManager = FeeManager.FeeManager(ledger, data, log);
+
+    /// Tracks credited funds (usable balance) associated with each principal.
+    let creditManager = CreditManager.CreditManager(data, log);
 
     let depositManager = DepositManager.DepositManager(
-      Ledger,
+      ledger,
       triggerOnNotifications,
-      creditRegistry.issue,
+      data,
+      feeManager,
       log,
       freezeTokenHandler
     );
 
-    Ledger.callback := func(oldFee : Nat, newFee : Nat) {
-      depositManager.registerFeeChange(oldFee, newFee);
-    };
-
     /// Returns the ledger fee.
-    public func ledgerFee() : Nat = depositManager.state().fee.ledger;
+    public func ledgerFee() : Nat = feeManager.ledgerFee();
 
     /// Returns the current surcharge amount.
-    public func surcharge() : Nat = depositManager.state().fee.surcharge;
+    public func surcharge() : Nat = feeManager.surcharge();
 
     /// Sets new surcharge amount.
-    public func setSurcharge(s : Nat) = depositManager.setSurcharge(s);
+    public func setSurcharge(s : Nat) = feeManager.setSurcharge(s);
 
     /// Calculates the final fee of the specific type.
-    public func fee(_ : { #deposit; #allowance; #withdrawal }) : Nat = depositManager.state().fee.deposit;
+    public func fee(_ : { #deposit; #allowance; #withdrawal }) : Nat = feeManager.fee();
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
-    public func fetchFee() : async* ?Nat {
-      await* Ledger.loadFee();
+    public func fetchFee() : async* ?Nat { 
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = await* ledger.loadFee();
+      ignore assertInvariant();
+      ret;
     };
 
     /// Returns a user's last know (= tracked) deposit
     /// Null means the principal is locked, hence no value is available.
-    public func trackedDeposit(p : Principal) : ?Nat = depositManager.getDeposit(p);
+    public func trackedDeposit(p : Principal) : ?Nat = switch (data.getOpt(p)) {
+      case null null;
+      case (?entry) ?entry.deposit();
+    };
 
     let allowanceManager = AllowanceManager.AllowanceManager(
-      Ledger,
-      surcharge, // surcharge
-      creditRegistry.issue,
-      log,
-      freezeTokenHandler
+      ledger,
+      data,
+      feeManager,
+      log
     );
 
     let withdrawalManager = WithdrawalManager.WithdrawalManager(
-      Ledger,
-      surcharge, // surcharge
-      creditRegistry.issue,
-      log,
-      freezeTokenHandler
+      ledger,
+      data,
+      creditManager,
+      feeManager,
+      log
     );
 
     /// Returns the current `TokenHandler` state.
-    public func state() : State = ( 
-      depositManager.state() |> {
-      balance = {
-        deposited = _.funds.deposited;
-        underway = _.funds.underway;
-        queued = _.funds.queued;
-        consolidated = _.totalConsolidated - withdrawalManager.totalWithdrawn();
+    public func state() : State {
+      let d = depositManager.state();
+      let w = withdrawalManager.state();
+      {
+        balance = {
+          deposited = d.funds.deposited;
+          underway = d.funds.underway;
+          queued = d.funds.queued;
+          consolidated = d.totalConsolidated - w.totalWithdrawn;
+          usableDeposit = data.usableDeposit();
+        };
+        flow = {
+          consolidated = d.totalConsolidated;
+          withdrawn = w.totalWithdrawn;
+        };
+        credit = {
+          total = data.creditSum() + data.handlerPoolBalance();
+          pool = data.handlerPoolBalance();
+        };
+        users = {
+          queued = data.depositsCount();
+          locked = data.locks();
+          total = data.size();
+        };
+        depositManager = d;
+        withdrawalManager = w;
+        feeManager = feeManager.state();
       };
-      flow = {
-        consolidated = _.totalConsolidated;
-        withdrawn = withdrawalManager.totalWithdrawn();
-      };
-      credit = {
-        total = creditRegistry.totalBalance();
-        pool = creditRegistry.poolBalance();
-      };
-      users = {
-        queued = _.nDeposits;
-        locked = _.nLocks;
-      };
-      depositManager = depositManager.state();
-      // withdrawalManager = withdrawalManager.state();
-      // allowanceManager = allowanceManager.state();
-    });
+    };
 
     /// Gets the current credit amount associated with a specific principal.
-    public func userCredit(p : Principal) : Int = creditRegistry.userBalance(p);
+    public func userCredit(p : Principal) : Nat = data.get(p).credit();
 
     /// Gets the current credit amount in the pool.
-    public func poolCredit() : Int = creditRegistry.poolBalance();
+    public func handlerCredit() : Int = data.handlerPoolBalance();
+    
+    public func poolCredit() : Nat = creditManager.poolBalance();
 
     /// Adds amount to P’s credit.
     /// With checking the availability of sufficient funds.
@@ -209,7 +235,12 @@ module {
     ///   // Handle fail
     /// };
     /// ```
-    public func creditUser(p : Principal, amount : Nat) : Bool = creditRegistry.creditUser(p, amount);
+    public func creditUser(p : Principal, amount : Nat) : Bool {
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = creditManager.creditUser(p, amount);
+      ignore assertInvariant();
+      ret;
+    };
 
     /// Deducts amount from P’s credit.
     /// With checking the availability of sufficient funds in the pool.
@@ -225,13 +256,18 @@ module {
     ///   // Handle fail
     /// };
     /// ```
-    public func debitUser(p : Principal, amount : Nat) : Bool = creditRegistry.debitUser(p, amount);
+    public func debitUser(p : Principal, amount : Nat) : Bool {
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = creditManager.debitUser(p, amount);
+      ignore assertInvariant();
+      ret;
+    };
 
     /// For debug and testing purposes only.
     /// Issue credit directly to a principal or burn from a principal.
     /// A negative amount means burn.
     /// Without checking the availability of sufficient funds.
-    public func issue_(account : CreditRegistry.Account, amount : Int) = creditRegistry.issue(account, amount);
+    // public func issue_(account : CreditManager.Account, amount : Int) = creditManager.issue(account, amount);
 
     /// Notifies of a deposit and schedules consolidation process.
     /// Returns the newly detected deposit and credit funds if successful, otherwise `null`.
@@ -244,6 +280,7 @@ module {
     public func notify(p : Principal) : async* ?(Nat, Nat) {
       if isFrozen_ return null;
       let ?result = await* depositManager.notify(p) else return null;
+      ignore assertInvariant();
       ?result;
     };
 
@@ -275,7 +312,10 @@ module {
     /// };
     /// ```
     public func depositFromAllowance(p : Principal, source : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AllowanceManager.DepositFromAllowanceResponse {
-      await* allowanceManager.depositFromAllowance(p, source, amount, expectedFee);
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = await* allowanceManager.depositFromAllowance(p, source, amount, expectedFee);
+      ignore assertInvariant();
+      ret;
     };
 
     /// Triggers the processing deposits.
@@ -289,6 +329,7 @@ module {
     public func trigger(n : Nat) : async* () {
       if isFrozen_ return;
       await* depositManager.trigger(n);
+      ignore assertInvariant();
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
@@ -315,21 +356,10 @@ module {
     ///   };
     /// ```
     public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
-      // try to burn from pool
-      creditRegistry.burn(#pool, amount) 
-      |> (
-        if (not _) {
-          let err = #InsufficientCredit;
-          log(ownPrincipal, #withdrawalError(err));
-          return #err(err);
-        }
-      );
-      let result = await* withdrawalManager.withdraw(null, to, amount, expectedFee);
-      if (Result.isErr(result)) {
-        // re-issue credit if unsuccessful
-        creditRegistry.issue(#pool, amount);
-      };
-      result;
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = await* withdrawalManager.withdraw(null, to, amount, expectedFee);
+      ignore assertInvariant();
+      ret;
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
@@ -360,37 +390,47 @@ module {
     ///   };
     /// ```
     public func withdrawFromCredit(p : Principal, to : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
-      // try to burn from user
-      creditRegistry.burn(#user p, creditAmount)
-      |> (
-        if (not _) { 
-          let err = #InsufficientCredit;
-          log(ownPrincipal, #withdrawalError(err));
-          return #err(err);
-        }
-      );
-      let result = await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
-      if (Result.isErr(result)) {
-        // re-issue credit if unsuccessful
-        creditRegistry.issue(#user p, creditAmount);
-      };
-      result;
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
+      ignore assertInvariant();
+      ret;
     };
 
-    /// For testing purposes.
-    //public func assertIntegrity() { accountManager.assertIntegrity() };
-    public func assertIntegrity() {};
+    public func assertInvariant() : Bool {
+      let { totalConsolidated; funds = { deposited } } = depositManager.state();
+      let { totalWithdrawn; lockedFunds } = withdrawalManager.state();
+      let { totalCredited } = allowanceManager.state();
+      let assets = deposited + totalConsolidated + totalCredited - lockedFunds - totalWithdrawn : Nat;
+
+      let creditSum = data.creditSum();
+      let handlerPool = data.handlerPoolBalance();
+      let pool = creditManager.poolBalance();
+      let { outstandingFees } = feeManager.state();
+      let liabilities = creditSum + handlerPool + pool + outstandingFees : Int;
+
+      let ok = assets == liabilities;
+      if (not ok) freezeTokenHandler("Invariant violation: assets != liabilities");
+      ok;
+    };
+
+    ledger.assertInvariant := assertInvariant;
 
     /// Serializes the token handler data.
-    public func share() : StableData = (
-      depositManager.share(),
-      creditRegistry.share(),
-    );
+    public func share() : StableData = {
+      data = data.share();
+      creditManager = creditManager.share();
+      depositManager = depositManager.share();
+      feeManager = feeManager.share();
+      ledger = ledger.share();
+    };
 
     /// Deserializes the token handler data.
     public func unshare(values : StableData) {
-      depositManager.unshare(values.0);
-      creditRegistry.unshare(values.1);
+      data.unshare(values.data);
+      creditManager.unshare(values.creditManager);
+      depositManager.unshare(values.depositManager);
+      feeManager.unshare(values.feeManager);
+      ledger.unshare(values.ledger);
     };
   };
 };

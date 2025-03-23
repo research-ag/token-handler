@@ -217,10 +217,9 @@ actor class Example() = self {
       });
       case (#err err) {
         switch (err) {
-          case (#TooLowQuantity) #Err(#AmountBelowMinimum({}));
           case (#BadFee({ expected_fee })) #Err(#BadFee({ expected_fee }));
-          case (#InsufficientFunds({ balance })) #Err(#TransferError({ message = "Insufficient funds" }));
-          case (#InsufficientAllowance({ allowance })) #Err(#TransferError({ message = "Insufficient allowance" }));
+          case (#InsufficientFunds(_)) #Err(#TransferError({ message = "Insufficient funds" }));
+          case (#InsufficientAllowance(_)) #Err(#TransferError({ message = "Insufficient allowance" }));
           case (#CallIcrc1LedgerError) #Err(#CallLedgerError({ message = "Call error" }));
           case _ #Err(#CallLedgerError({ message = "Try later" }));
         };
@@ -290,11 +289,11 @@ actor class Example() = self {
       if (Principal.equal(ledger, assetInfo.ledgerPrincipal)) return #Err(#AlreadyRegistered(i));
     };
     let id = Vec.size(assets);
-    {
+
+    Vec.add<AssetInfo>(assets,     {
       ledgerPrincipal = ledger;
       handler = createTokenHandler(ledger);
-    }
-    |> Vec.add<AssetInfo>(assets, _);
+    });
     #Ok(id);
   };
 
