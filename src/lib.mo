@@ -8,6 +8,7 @@ import Principal "mo:base/Principal";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import Nat "mo:base/Nat";
+import Debug "mo:base/Debug";
 
 import ICRC84 "mo:icrc84";
 import ICRC1 "icrc1-api";
@@ -91,10 +92,16 @@ module {
     public func notificationsOnPause() : Bool = depositManager.state().paused;
 
     /// Pause new notifications.
-    public func pauseNotifications() = depositManager.pause(true);
+    public func pauseNotifications() {
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      depositManager.pause(true);
+    };
 
     /// Unpause new notifications.
-    public func unpauseNotifications() = depositManager.pause(false);
+    public func unpauseNotifications() {
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      depositManager.pause(false);
+    };
 
     /// If some unexpected error happened, this flag turns true and handler stops doing anything until recreated.
     var isFrozen_ : Bool = false;
@@ -146,7 +153,12 @@ module {
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
-    public func fetchFee() : async* ?Nat = async* await* ledger.loadFee();
+    public func fetchFee() : async* ?Nat { 
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = await* ledger.loadFee();
+      ignore assertInvariant();
+      ret;
+    };
 
     /// Returns a user's last know (= tracked) deposit
     /// Null means the principal is locked, hence no value is available.
@@ -223,7 +235,12 @@ module {
     ///   // Handle fail
     /// };
     /// ```
-    public func creditUser(p : Principal, amount : Nat) : Bool = creditManager.creditUser(p, amount);
+    public func creditUser(p : Principal, amount : Nat) : Bool {
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = creditManager.creditUser(p, amount);
+      ignore assertInvariant();
+      ret;
+    };
 
     /// Deducts amount from P’s credit.
     /// With checking the availability of sufficient funds in the pool.
@@ -239,7 +256,12 @@ module {
     ///   // Handle fail
     /// };
     /// ```
-    public func debitUser(p : Principal, amount : Nat) : Bool = creditManager.debitUser(p, amount);
+    public func debitUser(p : Principal, amount : Nat) : Bool {
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = creditManager.debitUser(p, amount);
+      ignore assertInvariant();
+      ret;
+    };
 
     /// For debug and testing purposes only.
     /// Issue credit directly to a principal or burn from a principal.
@@ -258,6 +280,7 @@ module {
     public func notify(p : Principal) : async* ?(Nat, Nat) {
       if isFrozen_ return null;
       let ?result = await* depositManager.notify(p) else return null;
+      ignore assertInvariant();
       ?result;
     };
 
@@ -289,7 +312,10 @@ module {
     /// };
     /// ```
     public func depositFromAllowance(p : Principal, source : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AllowanceManager.DepositFromAllowanceResponse {
-      await* allowanceManager.depositFromAllowance(p, source, amount, expectedFee);
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = await* allowanceManager.depositFromAllowance(p, source, amount, expectedFee);
+      ignore assertInvariant();
+      ret;
     };
 
     /// Triggers the processing deposits.
@@ -303,6 +329,7 @@ module {
     public func trigger(n : Nat) : async* () {
       if isFrozen_ return;
       await* depositManager.trigger(n);
+      ignore assertInvariant();
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
@@ -329,7 +356,10 @@ module {
     ///   };
     /// ```
     public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
-      await* withdrawalManager.withdraw(null, to, amount, expectedFee);
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = await* withdrawalManager.withdraw(null, to, amount, expectedFee);
+      ignore assertInvariant();
+      ret;
     };
 
     /// Initiates a withdrawal by transferring tokens to another account.
@@ -360,10 +390,13 @@ module {
     ///   };
     /// ```
     public func withdrawFromCredit(p : Principal, to : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
-      await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
+      if isFrozen_ Debug.trap("The token handler is frozen");
+      let ret = await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
+      ignore assertInvariant();
+      ret;
     };
 
-    public func assertInvariant() {
+    public func assertInvariant() : Bool {
       let { totalConsolidated; funds = { deposited } } = depositManager.state();
       let { totalWithdrawn; lockedFunds } = withdrawalManager.state();
       let { totalCredited } = allowanceManager.state();
@@ -375,10 +408,12 @@ module {
       let { outstandingFees } = feeManager.state();
       let liabilities = creditSum + handlerPool + pool + outstandingFees : Int;
 
-      if (assets != liabilities) {
-        freezeTokenHandler("Invariant violation: assets != liabilities");
-      };
+      let ok = assets == liabilities;
+      if (not ok) freezeTokenHandler("Invariant violation: assets != liabilities");
+      ok;
     };
+
+    ledger.assertInvariant := assertInvariant;
 
     /// Serializes the token handler data.
     public func share() : StableData = {

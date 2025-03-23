@@ -1,7 +1,7 @@
 [dependencies]
 base = "0.13.4"
 vector = "0.4.1"
-icrc84 = "https://github.com/research-ag/icrc-84#main@6475b4987a9eddbb362ee16698106c2a3007ba1c"
+icrc84 = "https://github.com/research-ag/icrc-84#main@750573596a0f31780bf0caaab1cd247832a0b0f5"
 
 [toolchain]
 moc = "0.13.4"

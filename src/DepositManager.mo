@@ -144,6 +144,7 @@ module {
       let ret = await* do_notify(p, entry);
 
       assert entry.unlock();
+      
       return ret;
     };
 

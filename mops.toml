@@ -8,7 +8,7 @@ license = "Apache-2.0"
 
 [dependencies]
 base = "0.13.5"
-icrc84 = "https://github.com/research-ag/icrc-84#main@34a67ed2b16b3dd7cb2731e45708a32d49fe8c70"
+icrc84 = "https://github.com/research-ag/icrc-84#main@750573596a0f31780bf0caaab1cd247832a0b0f5"
 
 [dev-dependencies]
 test = "2.0.0"
