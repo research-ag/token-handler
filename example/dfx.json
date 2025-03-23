@@ -1,0 +1,15 @@
+{
+  "canisters": {
+    "icrc84_example": {
+      "main": "./main.mo",
+      "type": "motoko"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": "mops sources"
+    }
+  },
+  "version": 1
+}

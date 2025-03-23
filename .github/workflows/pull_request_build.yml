@@ -1,12 +1,9 @@
 name: App build
+env:
+  dfx_version: 0.23.0
 on:
   pull_request:
     types: [synchronize, opened, reopened, ready_for_review, unlabeled]
-
-inputs:
-  mops-version:
-    description: "Mops CLI version to install"
-    default: "latest"
 
 jobs:
   build:
@@ -16,19 +13,44 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Node
-        uses: actions/setup-node@v4
+      - name: Install dfx
+        uses: dfinity/setup-dfx@main
+        with:
+          dfx-version: ${{ env.dfx_version }}
+
+      - name: Confirm dfx version
+        run: dfx --version
 
       - name: Install mops
-        uses: ZenVoich/setup-mops@v1.2.0
+        uses: ZenVoich/setup-mops@v1
 
       - name: Make sure moc is installed
         run: mops toolchain bin moc || mops toolchain use moc latest
 
-      - name: Show mops version
+      - name: Show mops & moc versions
         run: |
           mops --version
           $(mops toolchain bin moc) --version
 
       - name: Run tests
         run: mops test
+
+      - name: Build example
+        working-directory: ./example
+        run: dfx build --check
+ 
+      - name: Make bin directory
+        run: mkdir -p /home/runner/bin
+
+      - name: Get didc
+        run: |
+          release=$(curl --silent "https://api.github.com/repos/dfinity/candid/releases/latest" | awk -F\" '/tag_name/ { print $4 }')  	
+          curl -fsSL https://github.com/dfinity/candid/releases/download/$release/didc-linux64 > /home/runner/bin/didc
+          chmod +x /home/runner/bin/didc
+          echo "/home/runner/bin" >> $GITHUB_PATH
+
+      - name: Check did file of example
+        working-directory: ./example
+        run: |
+          didc check .dfx/local/canisters/icrc84_example/icrc84_example.did $(ls -d .mops/_github/icrc84*)/icrc-84.did
+
