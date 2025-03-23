@@ -1,6 +1,6 @@
 import ICRC1 "icrc1-api";
 import ICRC1Agent "icrc1-agent";
-import ICRC84 "mo:icrc84";
+import ICRC84 "mo:icrc-84";
 
 /// This module wraps around the icrc1-agent and further simplifies the arguments
 /// for all calls required for ICRC-84 support.

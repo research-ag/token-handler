@@ -1,20 +1,19 @@
 [package]
-name = ""
+name = "token-handler"
 version = "0.0.1"
-description = ""
+description = "Complete management of user withdrawals and deposits"
 repository = "https://github.com/research-ag/token-handler"
-keywords = [ ]
+keywords = [ "defi", "icrc-1", "icrc-2", "deposits", "subaccount" ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.13.5"
-icrc84 = "https://github.com/research-ag/icrc-84#main@750573596a0f31780bf0caaab1cd247832a0b0f5"
+base = "0.14.4"
+icrc-84 = "0.0.1"
 
 [dev-dependencies]
 test = "2.0.0"
 vector = "0.4.1"
-await-async = "https://github.com/research-ag/await-async#45092cb97f0b66a513b476e7b586998ac561149c@45092cb97f0b66a513b476e7b586998ac561149c"
+async-test = "https://github.com/research-ag/async-test#45092cb97f0b66a513b476e7b586998ac561149c@45092cb97f0b66a513b476e7b586998ac561149c"
 
 [toolchain]
-moc = "0.13.5"
-wasmtime = "28.0.0"
+moc = "0.13.0"

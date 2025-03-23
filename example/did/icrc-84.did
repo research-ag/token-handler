@@ -1,0 +1,90 @@
+type Token = principal;
+type Amount = nat;
+
+type TokenInfo = record {
+  allowance_fee : Amount;
+  deposit_fee : Amount;
+  withdrawal_fee : Amount;
+};
+
+type Subaccount = blob;
+
+type NotifyArg = record {
+  token : Token;
+};
+
+type NotifyResult = record {
+  deposit_inc : Amount;
+  credit_inc : Amount;
+  credit : int;
+};
+
+type NotifyResponse = variant {
+  Ok : NotifyResult;
+  Err : variant {
+    CallLedgerError : record { message : text };
+    NotAvailable : record { message : text };
+  };
+};
+
+type WithdrawArgs = record {
+  to : Account;
+  amount : Amount;
+  token : Token;
+  expected_fee : opt nat;
+};
+
+type WithdrawResponse = variant {
+  Ok : record {
+    txid : nat;
+    amount : Amount;
+  };
+  Err : variant {
+    BadFee : record { expected_fee : nat };
+    CallLedgerError : record { message : text };
+    InsufficientCredit : record {};
+    AmountBelowMinimum : record {};
+  };
+};
+
+type DepositArgs = record {
+  token : Token;
+  amount : Amount;
+  from : Account;
+  expected_fee : opt nat;
+};
+
+type Account = record {
+  owner : principal;
+  subaccount : opt Subaccount;
+};
+
+type DepositResult = record {
+  txid : nat;
+  credit_inc : Amount;
+  credit : int;
+};
+
+type DepositResponse = variant {
+  Ok : DepositResult;
+  Err : variant {
+    AmountBelowMinimum : record {};
+    BadFee : record { expected_fee : nat };
+    CallLedgerError : record { message : text };
+    TransferError : record { message : text }; // insufficient allowance or insufficient funds
+  };
+};
+
+service : () -> {
+  // helper function
+  principalToSubaccount : (principal) -> (opt blob) query;
+
+  // public queries
+  icrc84_supported_tokens : () -> (vec Token) query;
+  icrc84_token_info : (Token) -> (TokenInfo) query;
+
+  // updates
+  icrc84_notify : (NotifyArg) -> (NotifyResponse);
+  icrc84_deposit : (DepositArgs) -> (DepositResponse);
+  icrc84_withdraw : (WithdrawArgs) -> (WithdrawResponse);
+};

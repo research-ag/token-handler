@@ -1,8 +1,8 @@
 /// TokenHandler
 ///
-/// Copyright: 2023-2024 MR Research AG
+/// Copyright: 2023-2025 MR Research AG
 /// Main author: Timo Hanke (timohanke)
-/// Contributors: Denys Kushnarov (reginleif888), Andy Gura (AndyGura)
+/// Contributors: Andrii Stepanov (AStepanov25), Denys Kushnarov (reginleif888), Andy Gura (AndyGura)
 
 import Principal "mo:base/Principal";
 import Int "mo:base/Int";
@@ -10,7 +10,7 @@ import Text "mo:base/Text";
 import Nat "mo:base/Nat";
 import Debug "mo:base/Debug";
 
-import ICRC84 "mo:icrc84";
+import ICRC84 "mo:icrc-84";
 import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
 import DepositManager "DepositManager";
