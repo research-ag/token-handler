@@ -1,6 +1,5 @@
 # TokenHandler
 
-
 ## Overview
 
 TokenHandler is a comprehensive solution designed to facilitate the deposit and withdrawal management on an ICRC-1 ledger. The package allows financial service canisters to track and manage user funds efficiently and securely. An example for such a service is a DEX.
@@ -166,11 +165,11 @@ flowchart TD
 
 ## Copyright
 
-MR Research AG, 2023-2024
+MR Research AG, 2023-2025
 
 ## Authors
 
-Timo Hanke (timohanke), Denys Kushnarov (reginleif888), Andy Gura (AndyGura)
+Timo Hanke (timohanke), Andrii Stepanov (AStepanov25), Denys Kushnarov (reginleif888), Andy Gura (AndyGura)
 
 ## License
 

@@ -1,14 +1,14 @@
 [package]
-name = ""
+name = "token-handler"
 version = "0.0.1"
-description = ""
+description = "Complete management of user withdrawals and deposits"
 repository = "https://github.com/research-ag/token-handler"
-keywords = [ ]
+keywords = [ "defi", "icrc-1", "icrc-2", "deposits", "subaccount" ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.13.5"
-icrc84 = "https://github.com/research-ag/icrc-84#main@750573596a0f31780bf0caaab1cd247832a0b0f5"
+base = "0.14.4"
+icrc-84 = "0.0.1"
 
 [dev-dependencies]
 test = "2.0.0"
