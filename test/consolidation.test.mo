@@ -159,7 +159,7 @@ do {
 
   // Wait for consolidation
   // Wait for transfer() response to be ready
-  await* mock_ledger.transfer_.wait(i, #ready);
+  await* mock_ledger.transfer_.wait(i, #responded);
 
   assert state() == (0, 3, 0); // consolidation successful
   assert journal.hasEvents([
@@ -178,7 +178,7 @@ do {
   // trigger call
   let fut1 = async { await* handler.fetchFee() };
   // wait for call to arrive
-  await* ledger.fee_.wait(i, #running);
+  await* ledger.fee_.wait(i, #called);
   // trigger second call
   assert (await* handler.fetchFee()) == null;
   // release response
@@ -243,7 +243,7 @@ do {
   do {
     let i = ledger.transfer_.stage_unlocked(?(#Ok 0));
     await* handler.trigger(1);
-    assert ledger.transfer_.state(i) == #ready;
+    assert ledger.transfer_.state(i) == #responded;
     assert state() == (6, 5, 1); // user2 funds consolidated
     assert journal.hasEvents([
       #consolidated({ credited = 5; deducted = 10; fee = 5 }),
@@ -264,7 +264,7 @@ do {
     let i = ledger.transfer_.stage_unlocked(?(#Ok 0));
     let j = ledger.transfer_.stage_unlocked(?(#Ok 0));
     await* handler.trigger(10);
-    assert (ledger.transfer_.state(i), ledger.transfer_.state(j)) == (#ready, #ready);
+    assert (ledger.transfer_.state(i), ledger.transfer_.state(j)) == (#responded, #responded);
     assert state() == (0, 11, 0); // all deposits consolidated
     assert journal.hasEvents([
       #consolidated({ credited = 5; deducted = 10; fee = 5 }),
@@ -304,7 +304,7 @@ do {
     let j = ledger.transfer_.stage_unlocked(null);
     let k = ledger.transfer_.stage_unlocked(?(#Ok 0));
     await* handler.trigger(10);
-    assert ((ledger.transfer_.state(i), ledger.transfer_.state(j), ledger.transfer_.state(k))) == (#ready, #ready, #staged);
+    assert ((ledger.transfer_.state(i), ledger.transfer_.state(j), ledger.transfer_.state(k))) == (#responded, #responded, #staged);
     assert state() == (14, 16, 2); // only user2 deposit consolidated
     assert journal.hasEvents([
       #consolidated({ credited = 5; deducted = 10; fee = 5 }),

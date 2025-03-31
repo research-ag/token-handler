@@ -3,10 +3,10 @@ import AsyncTester "mo:async-test";
 
 module {
   public class MockLedger(debug_ : Bool, key : Text) {
-    public let fee_ = AsyncTester.SimpleStageTester<Nat>(?(key # " fee"), null, debug_);
-    public let balance_ = AsyncTester.SimpleStageTester<Nat>(?(key # " balance"), null, debug_);
-    public let transfer_ = AsyncTester.SimpleStageTester<ICRC1.TransferResult>(?(key # " transfer"), null, debug_);
-    public let transfer_from_ = AsyncTester.SimpleStageTester<ICRC1.TransferFromResult>(?(key # " transfer_from"), null, debug_);
+    public let fee_ = AsyncTester.SimpleStageTester<Nat>(debug_, key # " fee", null);
+    public let balance_ = AsyncTester.SimpleStageTester<Nat>(debug_, key # " balance", null);
+    public let transfer_ = AsyncTester.SimpleStageTester<ICRC1.TransferResult>(debug_, key # " transfer", null);
+    public let transfer_from_ = AsyncTester.SimpleStageTester<ICRC1.TransferFromResult>(debug_, key # " transfer_from", null);
     
     public shared func fee() : async Nat {
       fee_.call_result(await* fee_.call());
