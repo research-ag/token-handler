@@ -131,7 +131,7 @@ do {
 
   let i = mock_ledger.transfer_.stage_unlocked(?(#Ok 0));
   await* handler.trigger(1);
-  assert mock_ledger.transfer_.state(i) == #ready;
+  assert mock_ledger.transfer_.state(i) == #responded;
   assert journal.hasEvents([
     #consolidated({ credited = 16; deducted = 16; fee = 0 }),
   ]);
