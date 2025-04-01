@@ -8,12 +8,12 @@ license = "Apache-2.0"
 
 [dependencies]
 base = "0.14.4"
-icrc-84 = "0.0.1"
+icrc-84 = "0.0.3"
 
 [dev-dependencies]
-test = "2.0.0"
+test = "2.1.0"
 vector = "0.4.1"
-async-test = "https://github.com/research-ag/async-test#45092cb97f0b66a513b476e7b586998ac561149c@45092cb97f0b66a513b476e7b586998ac561149c"
+async-test = "0.0.1"
 
 [toolchain]
 moc = "0.13.0"
