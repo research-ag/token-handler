@@ -1,17 +1,17 @@
 [package]
 name = "token-handler"
-version = "0.0.1"
+version = "0.0.2"
 description = "Complete management of user withdrawals and deposits"
 repository = "https://github.com/research-ag/token-handler"
 keywords = [ "defi", "icrc-1", "icrc-2", "deposits", "subaccount" ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.14.4"
+base = "0.14.5"
 icrc-84 = "0.0.3"
 
 [dev-dependencies]
-test = "2.1.0"
+test = "2.1.1"
 vector = "0.4.1"
 async-test = "0.0.1"
 

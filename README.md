@@ -1,3 +1,6 @@
+[![mops](https://oknww-riaaa-aaaam-qaf6a-cai.raw.ic0.app/badge/mops/token-handler)](https://mops.one/token-handler)
+[![documentation](https://oknww-riaaa-aaaam-qaf6a-cai.raw.ic0.app/badge/documentation/token-handler)](https://mops.one/token-handler/docs)
+
 # TokenHandler
 
 ## Overview
