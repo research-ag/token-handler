@@ -16,4 +16,4 @@ vector = "0.4.1"
 async-test = "0.0.1"
 
 [toolchain]
-moc = "0.13.0"
+moc = "0.14.5"
