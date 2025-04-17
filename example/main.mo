@@ -3,15 +3,21 @@ import Error "mo:base/Error";
 import Int "mo:base/Int";
 import Prim "mo:prim";
 import Principal "mo:base/Principal";
-import Text "mo:base/Text";
 import Timer "mo:base/Timer";
 import Vec "mo:vector";
 import Time "mo:base/Time";
 import Blob "mo:base/Blob";
 
+import ICRC84 "mo:icrc-84";
+
 import TokenHandler "../src";
 
 actor class Example() = self {
+
+  // ensure compliance to ICRC84 standart.
+  // actor won't compile in case of type mismatch here
+  let _ : ICRC84.ICRC84 = self;
+
   stable var journalData : Journal = Vec.new();
 
   stable var assetsData : Vec.Vector<StableAssetInfo> = Vec.new();
@@ -26,70 +32,6 @@ actor class Example() = self {
   type StableAssetInfo = {
     ledgerPrincipal : Principal;
     handler : TokenHandler.StableData;
-  };
-
-  type TokenInfo = {
-    deposit_fee : Nat;
-    withdrawal_fee : Nat;
-    allowance_fee : Nat;
-  };
-
-  type NotifyResult = {
-    #Ok : {
-      deposit_inc : Nat;
-      credit_inc : Nat;
-      credit : Int;
-    };
-    #Err : {
-      #CallLedgerError : { message : Text };
-      #NotAvailable : { message : Text };
-    };
-  };
-
-  type DepositArgs = {
-    token : Principal;
-    amount : Nat;
-    from : Account;
-    expected_fee : ?Nat;
-  };
-
-  type Account = {
-    owner : Principal;
-    subaccount : ?Blob;
-  };
-
-  type DepositResponse = {
-    #Ok : {
-      txid : Nat;
-      credit_inc : Nat;
-      credit : Int;
-    };
-    #Err : {
-      #AmountBelowMinimum : {};
-      #BadFee : { expected_fee : Nat };
-      #CallLedgerError : { message : Text };
-      #TransferError : { message : Text };
-    };
-  };
-
-  type WithdrawArgs = {
-    to : Account;
-    amount : Nat;
-    token : Principal;
-    expected_fee : ?Nat;
-  };
-
-  type WithdrawResult = {
-    #Ok : {
-      txid : Nat;
-      amount : Nat;
-    };
-    #Err : {
-      #CallLedgerError : { message : Text };
-      #BadFee : { expected_fee : Nat };
-      #InsufficientCredit : {};
-      #AmountBelowMinimum : {};
-    };
   };
 
   var initialized : Bool = false;
@@ -129,8 +71,6 @@ actor class Example() = self {
     initialized := true;
   };
 
-  public shared query func principalToSubaccount(p : Principal) : async ?Blob = async ?TokenHandler.toSubaccount(p);
-
   public shared query func icrc84_supported_tokens() : async [Principal] {
     assertInitialized();
     Array.tabulate<Principal>(
@@ -139,7 +79,7 @@ actor class Example() = self {
     );
   };
 
-  public shared query func icrc84_token_info(token : Principal) : async TokenInfo {
+  public shared query func icrc84_token_info(token : Principal) : async ICRC84.TokenInfo {
     assertInitialized();
     for ((assetInfo, i) in Vec.items(assets)) {
       if (Principal.equal(assetInfo.ledgerPrincipal, token)) {
@@ -153,37 +93,27 @@ actor class Example() = self {
     throw Error.reject("Unknown token");
   };
 
-  public shared query ({ caller }) func icrc84_credit(token : Principal) : async Int {
+  public shared query ({ caller }) func icrc84_query(tokens : [Principal]) : async ([(
+    Principal,
+    {
+      credit : Int;
+      tracked_deposit : ?Nat;
+    },
+  )]) {
     assertInitialized();
-    let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
-    assetInfo.handler.userCredit(caller);
-  };
-
-  public shared query ({ caller }) func icrc84_all_credits() : async [(Principal, Int)] {
-    assertInitialized();
-    let res : Vec.Vector<(Principal, Int)> = Vec.new();
-    for (assetInfo in Vec.vals(assets)) {
+    let ret : Vec.Vector<(Principal, { credit : Int; tracked_deposit : ?Nat })> = Vec.new();
+    for (token in tokens.vals()) {
+      let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
       let credit = assetInfo.handler.userCredit(caller);
-      if (credit != 0) {
-        Vec.add(res, (assetInfo.ledgerPrincipal, credit));
+      if (credit > 0) {
+        let tracked_deposit = assetInfo.handler.trackedDeposit(caller);
+        Vec.add(ret, (token, { credit; tracked_deposit }));
       };
     };
-    Vec.toArray(res);
+    Vec.toArray(ret);
   };
 
-  public shared query ({ caller }) func icrc84_trackedDeposit(token : Principal) : async {
-    #Ok : Nat;
-    #Err : { #NotAvailable : { message : Text } };
-  } {
-    assertInitialized();
-    let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
-    switch (assetInfo.handler.trackedDeposit(caller)) {
-      case (?d) #Ok(d);
-      case null #Err(#NotAvailable({ message = "Unknown caller" }));
-    };
-  };
-
-  public shared ({ caller }) func icrc84_notify(args : { token : Principal }) : async NotifyResult {
+  public shared ({ caller }) func icrc84_notify(args : ICRC84.NotifyArgs) : async ICRC84.NotifyResponse {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let result = try {
@@ -205,7 +135,7 @@ actor class Example() = self {
     };
   };
 
-  public shared ({ caller }) func icrc84_deposit(args : DepositArgs) : async DepositResponse {
+  public shared ({ caller }) func icrc84_deposit(args : ICRC84.DepositArgs) : async ICRC84.DepositResponse {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let res = await* assetInfo.handler.depositFromAllowance(caller, args.from, args.amount, args.expected_fee);
@@ -227,7 +157,7 @@ actor class Example() = self {
     };
   };
 
-  public shared ({ caller }) func icrc84_withdraw(args : WithdrawArgs) : async WithdrawResult {
+  public shared ({ caller }) func icrc84_withdraw(args : ICRC84.WithdrawArgs) : async ICRC84.WithdrawResponse {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
 
@@ -290,10 +220,13 @@ actor class Example() = self {
     };
     let id = Vec.size(assets);
 
-    Vec.add<AssetInfo>(assets,     {
-      ledgerPrincipal = ledger;
-      handler = createTokenHandler(ledger);
-    });
+    Vec.add<AssetInfo>(
+      assets,
+      {
+        ledgerPrincipal = ledger;
+        handler = createTokenHandler(ledger);
+      },
+    );
     #Ok(id);
   };
 

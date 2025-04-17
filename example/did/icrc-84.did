@@ -76,12 +76,20 @@ type DepositResponse = variant {
 };
 
 service : () -> {
-  // helper function
-  principalToSubaccount : (principal) -> (opt blob) query;
-
   // public queries
   icrc84_supported_tokens : () -> (vec Token) query;
   icrc84_token_info : (Token) -> (TokenInfo) query;
+
+  // private queries
+  icrc84_query : (vec Token) -> (
+  vec record {
+    Token;
+    record {
+      credit : int;
+      tracked_deposit : opt Amount;
+    };
+  }
+  ) query;
 
   // updates
   icrc84_notify : (NotifyArg) -> (NotifyResponse);
