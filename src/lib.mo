@@ -21,6 +21,20 @@ import Data "Data";
 import FeeManager "FeeManager";
 
 module {
+  public type StableDataV2 = {
+    data : Data.StableData<Principal>;
+    depositManager : DepositManager.StableData;
+    creditManager : CreditManager.StableData;
+    feeManager : FeeManager.StableData;
+    ledger : ICRC84Helper.StableData;
+    withdrawalManager : WithdrawalManager.StableData;
+  };
+  public func migrateStableDataV2(data : StableData) : StableDataV2 = {
+    data with withdrawalManager = {
+      totalWithdrawn = 0;
+      lockedFunds = 0;
+    }
+  };
   public type StableData = {
     data : Data.StableData<Principal>;
     depositManager : DepositManager.StableData;
@@ -120,11 +134,11 @@ module {
     let data = Data.Data<Principal>(Principal.compare);
 
     let oldCallback = ledger.onFeeChanged;
-    ledger.onFeeChanged := func (old, new) {
+    ledger.onFeeChanged := func(old, new) {
       data.thresholdChanged(new);
       oldCallback(old, new);
     };
-    
+
     let feeManager = FeeManager.FeeManager(ledger, data, log);
 
     /// Tracks credited funds (usable balance) associated with each principal.
@@ -136,7 +150,7 @@ module {
       data,
       feeManager,
       log,
-      freezeTokenHandler
+      freezeTokenHandler,
     );
 
     /// Returns the ledger fee.
@@ -153,7 +167,7 @@ module {
 
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
-    public func fetchFee() : async* ?Nat { 
+    public func fetchFee() : async* ?Nat {
       if isFrozen_ Debug.trap("The token handler is frozen");
       let ret = await* ledger.loadFee();
       ignore assertInvariant();
@@ -171,7 +185,7 @@ module {
       ledger,
       data,
       feeManager,
-      log
+      log,
     );
 
     let withdrawalManager = WithdrawalManager.WithdrawalManager(
@@ -179,7 +193,7 @@ module {
       data,
       creditManager,
       feeManager,
-      log
+      log,
     );
 
     /// Returns the current `TokenHandler` state.
@@ -218,7 +232,7 @@ module {
 
     /// Gets the current credit amount in the pool.
     public func handlerCredit() : Int = data.handlerPoolBalance();
-    
+
     public func poolCredit() : Nat = creditManager.poolBalance();
 
     /// Adds amount to P’s credit.
@@ -416,21 +430,23 @@ module {
     ledger.assertInvariant := assertInvariant;
 
     /// Serializes the token handler data.
-    public func share() : StableData = {
+    public func share() : StableDataV2 = {
       data = data.share();
       creditManager = creditManager.share();
       depositManager = depositManager.share();
       feeManager = feeManager.share();
       ledger = ledger.share();
+      withdrawalManager = withdrawalManager.share();
     };
 
     /// Deserializes the token handler data.
-    public func unshare(values : StableData) {
+    public func unshare(values : StableDataV2) {
       data.unshare(values.data);
       creditManager.unshare(values.creditManager);
       depositManager.unshare(values.depositManager);
       feeManager.unshare(values.feeManager);
       ledger.unshare(values.ledger);
+      withdrawalManager.unshare(values.withdrawalManager);
     };
   };
 };
