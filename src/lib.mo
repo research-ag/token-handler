@@ -21,26 +21,14 @@ import Data "Data";
 import FeeManager "FeeManager";
 
 module {
-  public type StableDataV2 = {
-    data : Data.StableData<Principal>;
-    depositManager : DepositManager.StableData;
-    creditManager : CreditManager.StableData;
-    feeManager : FeeManager.StableData;
-    ledger : ICRC84Helper.StableData;
-    withdrawalManager : WithdrawalManager.StableData;
-  };
-  public func migrateStableDataV2(data : StableData) : StableDataV2 = {
-    data with withdrawalManager = {
-      totalWithdrawn = 0;
-      lockedFunds = 0;
-    }
-  };
   public type StableData = {
     data : Data.StableData<Principal>;
     depositManager : DepositManager.StableData;
     creditManager : CreditManager.StableData;
     feeManager : FeeManager.StableData;
     ledger : ICRC84Helper.StableData;
+    withdrawalManager : WithdrawalManager.StableData;
+    allowanceManager : AllowanceManager.StableData;
   };
 
   public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditManager.LogEvent or FeeManager.LogEvent or {
@@ -430,23 +418,25 @@ module {
     ledger.assertInvariant := assertInvariant;
 
     /// Serializes the token handler data.
-    public func share() : StableDataV2 = {
+    public func share() : StableData = {
       data = data.share();
       creditManager = creditManager.share();
       depositManager = depositManager.share();
       feeManager = feeManager.share();
       ledger = ledger.share();
       withdrawalManager = withdrawalManager.share();
+      allowanceManager = allowanceManager.share();
     };
 
     /// Deserializes the token handler data.
-    public func unshare(values : StableDataV2) {
+    public func unshare(values : StableData) {
       data.unshare(values.data);
       creditManager.unshare(values.creditManager);
       depositManager.unshare(values.depositManager);
       feeManager.unshare(values.feeManager);
       ledger.unshare(values.ledger);
       withdrawalManager.unshare(values.withdrawalManager);
+      allowanceManager.unshare(values.allowanceManager);
     };
   };
 };

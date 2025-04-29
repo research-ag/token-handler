@@ -31,7 +31,7 @@ actor class Example() = self {
 
   type StableAssetInfo = {
     ledgerPrincipal : Principal;
-    handler : TokenHandler.StableDataV2;
+    handler : TokenHandler.StableData;
   };
 
   var initialized : Bool = false;
