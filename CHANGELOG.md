@@ -1,5 +1,9 @@
 # Token-handler changelog
 
+## 0.0.4
+
+* Fix missing data in upgrade persistence (bugfix)
+
 ## 0.0.3
 
 * Update the example to updated icrc-84 package
