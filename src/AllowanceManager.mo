@@ -20,6 +20,10 @@ module {
     };
   };
 
+  public type StableData = {
+    totalCredited : Nat;
+  };
+
   public type State = {
     totalCredited : Nat;
   };
@@ -43,7 +47,7 @@ module {
     ) : async* DepositFromAllowanceResponse {
       let surcharge_ = feeManager.surcharge();
       let fee = feeManager.fee();
-      
+
       switch (expectedFee) {
         case null {};
         case (?f) if (f != fee) return #err(#BadFee { expected_fee = fee });
@@ -74,6 +78,14 @@ module {
 
     public func state() : State = {
       totalCredited = totalCredited;
+    };
+
+    public func share() : StableData = {
+      totalCredited;
+    };
+
+    public func unshare(data : StableData) {
+      totalCredited := data.totalCredited;
     };
   };
 };
