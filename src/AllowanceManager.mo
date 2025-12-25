@@ -1,6 +1,6 @@
 import ICRC1 "icrc1-api";
-import R "mo:base/Result";
-import Principal "mo:base/Principal";
+import R "mo:core/Result";
+import Principal "mo:core/Principal";
 import ICRC84Helper "icrc84-helper";
 import Data "Data";
 import FeeManager "FeeManager";

@@ -1,8 +1,7 @@
-import Principal "mo:base/Principal";
-import R "mo:base/Result";
-import Text "mo:base/Text";
-import Nat "mo:base/Nat";
-import Iter "mo:base/Iter";
+import Principal "mo:core/Principal";
+import R "mo:core/Result";
+import Text "mo:core/Text";
+import Nat "mo:core/Nat";
 
 import ICRC1 "icrc1-api"; // only needed for error types
 import ICRC84Helper "icrc84-helper";
@@ -183,7 +182,7 @@ module {
     /// Triggers the processing deposits.
     /// n - desired number of potential consolidations.
     public func trigger(n : Nat) : async* () {
-      for (i in Iter.range(1, n)) {
+      for (_ in Nat.range(0, n)) {
         let ?entry = data.getMaxEligibleDeposit(feeManager.ledgerFee()) else return;
 
         let result = await* consolidate(entry);

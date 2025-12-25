@@ -1,5 +1,5 @@
-import Principal "mo:base/Principal";
-import R "mo:base/Result";
+import Principal "mo:core/Principal";
+import R "mo:core/Result";
 import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
 import FeeManager "FeeManager";

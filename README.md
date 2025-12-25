@@ -168,7 +168,7 @@ flowchart TD
 
 ## Copyright
 
-MR Research AG, 2023-2025
+MR Research AG, 2023 - 2025
 
 ## Authors
 

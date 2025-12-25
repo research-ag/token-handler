@@ -7,7 +7,7 @@ keywords = [ "defi", "icrc-1", "icrc-2", "deposits", "subaccount" ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.14.9"
+core = "2.0.0"
 icrc-84 = "0.1.0"
 
 [dev-dependencies]
@@ -16,4 +16,4 @@ vector = "0.4.1"
 async-test = "0.0.1"
 
 [toolchain]
-moc = "0.14.0"
+moc = "1.0.0"

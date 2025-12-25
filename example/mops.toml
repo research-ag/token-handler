@@ -1,7 +1,6 @@
 [dependencies]
-base = "0.14.8"
-vector = "0.4.1"
+core = "2.0.0"
 icrc-84 = "0.1.0"
 
 [toolchain]
-moc = "0.14.8"
+moc = "1.0.0"

@@ -1,14 +1,16 @@
 /// TokenHandler
 ///
-/// Copyright: 2023-2025 MR Research AG
+/// Copyright: 2023 - 2025 MR Research AG
+///
 /// Main author: Timo Hanke (timohanke)
+///
 /// Contributors: Andrii Stepanov (AStepanov25), Denys Kushnarov (reginleif888), Andy Gura (AndyGura)
 
-import Principal "mo:base/Principal";
-import Int "mo:base/Int";
-import Text "mo:base/Text";
-import Nat "mo:base/Nat";
-import Debug "mo:base/Debug";
+import Principal "mo:core/Principal";
+import Int "mo:core/Int";
+import Text "mo:core/Text";
+import Nat "mo:core/Nat";
+import Runtime "mo:core/Runtime";
 
 import ICRC84 "mo:icrc-84";
 import ICRC1 "icrc1-api";
@@ -95,13 +97,13 @@ module {
 
     /// Pause new notifications.
     public func pauseNotifications() {
-      if isFrozen_ Debug.trap("The token handler is frozen");
+      if isFrozen_ Runtime.trap("The token handler is frozen");
       depositManager.pause(true);
     };
 
     /// Unpause new notifications.
     public func unpauseNotifications() {
-      if isFrozen_ Debug.trap("The token handler is frozen");
+      if isFrozen_ Runtime.trap("The token handler is frozen");
       depositManager.pause(false);
     };
 
@@ -156,7 +158,7 @@ module {
     /// Fetches and updates the fee from the ICRC1 ledger.
     /// Returns the new fee, or `null` if fetching is already in progress.
     public func fetchFee() : async* ?Nat {
-      if isFrozen_ Debug.trap("The token handler is frozen");
+      if isFrozen_ Runtime.trap("The token handler is frozen");
       let ret = await* ledger.loadFee();
       ignore assertInvariant();
       ret;
@@ -238,7 +240,7 @@ module {
     /// };
     /// ```
     public func creditUser(p : Principal, amount : Nat) : Bool {
-      if isFrozen_ Debug.trap("The token handler is frozen");
+      if isFrozen_ Runtime.trap("The token handler is frozen");
       let ret = creditManager.creditUser(p, amount);
       ignore assertInvariant();
       ret;
@@ -259,7 +261,7 @@ module {
     /// };
     /// ```
     public func debitUser(p : Principal, amount : Nat) : Bool {
-      if isFrozen_ Debug.trap("The token handler is frozen");
+      if isFrozen_ Runtime.trap("The token handler is frozen");
       let ret = creditManager.debitUser(p, amount);
       ignore assertInvariant();
       ret;
@@ -314,7 +316,7 @@ module {
     /// };
     /// ```
     public func depositFromAllowance(p : Principal, source : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* AllowanceManager.DepositFromAllowanceResponse {
-      if isFrozen_ Debug.trap("The token handler is frozen");
+      if isFrozen_ Runtime.trap("The token handler is frozen");
       let ret = await* allowanceManager.depositFromAllowance(p, source, amount, expectedFee);
       ignore assertInvariant();
       ret;
@@ -358,7 +360,7 @@ module {
     ///   };
     /// ```
     public func withdrawFromPool(to : ICRC1.Account, amount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
-      if isFrozen_ Debug.trap("The token handler is frozen");
+      if isFrozen_ Runtime.trap("The token handler is frozen");
       let ret = await* withdrawalManager.withdraw(null, to, amount, expectedFee);
       ignore assertInvariant();
       ret;
@@ -392,7 +394,7 @@ module {
     ///   };
     /// ```
     public func withdrawFromCredit(p : Principal, to : ICRC1.Account, creditAmount : Nat, expectedFee : ?Nat) : async* WithdrawalManager.WithdrawResponse {
-      if isFrozen_ Debug.trap("The token handler is frozen");
+      if isFrozen_ Runtime.trap("The token handler is frozen");
       let ret = await* withdrawalManager.withdraw(?p, to, creditAmount, expectedFee);
       ignore assertInvariant();
       ret;

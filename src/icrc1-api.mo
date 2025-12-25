@@ -1,4 +1,4 @@
-import Principal "mo:base/Principal";
+import Principal "mo:core/Principal";
 
 /// This module first provides all types required to interact with an ICRC1 ledger.
 /// In particular, all argument types and response types.

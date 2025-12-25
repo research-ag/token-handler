@@ -1,7 +1,7 @@
-import RbTree "mo:base/RBTree";
-import Order "mo:base/Order";
-import Int "mo:base/Int";
-import Nat "mo:base/Nat";
+import Map "mo:core/Map";
+import Order "mo:core/Order";
+import Int "mo:core/Int";
+import Nat "mo:core/Nat";
 
 module {
   type Value = {
@@ -11,8 +11,8 @@ module {
   };
 
   public type StableData<K> = {
-    tree : RbTree.Tree<K, Value>;
-    depositsTree : RbTree.Tree<(deposit : Nat, key : K), Value>;
+    tree : Map.Map<K, Value>;
+    depositsTree : Map.Map<(deposit : Nat, key : K), Value>;
     handlerPool : Int;
     lookupCount : Nat;
     size : Nat;
@@ -27,15 +27,17 @@ module {
   };
 
   class State<K>(compare : (K, K) -> Order.Order) {
-    public let tree = RbTree.RBTree<K, Value>(compare);
+    public var tree = Map.empty<K, Value>();
 
-    public let depositsTree = RbTree.RBTree<(deposit : Nat, key : K), Value>(
-      func((d1, k1), (d2, k2)) {
-        let c = Nat.compare(d1, d2);
-        if (c != #equal) return c;
-        compare(k1, k2);
-      }
-    );
+    public let treeCompare = compare;
+
+    public var depositsTree = Map.empty<(deposit : Nat, key : K), Value>();
+
+    public let depositsTreeCompare : ((Nat, K), (Nat, K)) -> Order.Order = func((d1, k1), (d2, k2)) {
+      let c = Nat.compare(d1, d2);
+      if (c != #equal) return c;
+      compare(k1, k2);
+    };
 
     public var handlerPool : Int = 0;
 
@@ -57,8 +59,8 @@ module {
     };
 
     public func share() : StableData<K> = {
-      tree = tree.share();
-      depositsTree = depositsTree.share();
+      tree = tree;
+      depositsTree = depositsTree;
       handlerPool;
       lookupCount;
       size;
@@ -73,8 +75,8 @@ module {
     };
 
     public func unshare(data : StableData<K>) {
-      tree.unshare(data.tree);
-      depositsTree.unshare(data.depositsTree);
+      tree := data.tree;
+      depositsTree := data.depositsTree;
       handlerPool := data.handlerPool;
       lookupCount := data.lookupCount;
       size := data.size;
@@ -96,12 +98,12 @@ module {
         state.lookupCount += 1;
         state.size -= 1;
         inside := false;
-        state.tree.delete(key_);
+        state.tree.remove(state.treeCompare, key_);
       } else if (not inside and not empty) {
         state.lookupCount += 1;
         state.size += 1;
         inside := true;
-        state.tree.put(key_, value);
+        state.tree.add(state.treeCompare, key_, value);
       };
     };
 
@@ -140,7 +142,7 @@ module {
 
     public func setDeposit(deposit : Nat) {
       if (value.deposit != 0) {
-        state.depositsTree.delete((value.deposit, key_));
+        state.depositsTree.remove(state.depositsTreeCompare, (value.deposit, key_));
         state.deposits_count -= 1;
       };
       state.deposit_sum -= value.deposit;
@@ -150,7 +152,7 @@ module {
       state.deposit_sum += value.deposit;
       if (value.deposit != 0) {
         state.deposits_count += 1;
-        state.depositsTree.put((value.deposit, key_), value);
+        state.depositsTree.add(state.depositsTreeCompare, (value.deposit, key_), value);
       };
 
       state.unusable_deposit.correct := false;
@@ -200,7 +202,7 @@ module {
     public func depositSum() : Nat = state.deposit_sum;
 
     func maxDeposit() : Nat {
-      let ?((deposit, _), _) = state.depositsTree.entriesRev().next() else return 0;
+      let ?((deposit, _), _) = state.depositsTree.reverseEntries().next() else return 0;
       deposit;
     };
 
@@ -213,7 +215,7 @@ module {
 
     public func getMaxEligibleDeposit(threshold : Nat) : ?Entry<K> {
       if (updateUnusableDeposit(threshold)) return null;
-      for (((deposit, key), value) in state.depositsTree.entriesRev()) {
+      for (((deposit, key), value) in state.depositsTree.reverseEntries()) {
         if (deposit <= threshold) return null;
         if (not value.lock) return ?Entry(true, key, value, state);
       };
