@@ -1,6 +1,5 @@
 import Array "mo:core/Array";
 import Debug "mo:core/Debug";
-import Iter "mo:core/Iter";
 import Time "mo:core/Time";
 import Int "mo:core/Int";
 import Principal "mo:core/Principal";
@@ -160,8 +159,7 @@ module {
       Debug.print(
         debug_show (
           journal.toArray()
-          |> Array.range(_, startFrom, _.size())
-          |> Iter.toArray(_)
+          |> _.sliceToArray(startFrom, _.size())
         )
       );
     };
