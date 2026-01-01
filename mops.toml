@@ -8,7 +8,7 @@ license = "Apache-2.0"
 
 [dependencies]
 core = "2.0.0"
-icrc-84 = "0.1.0"
+icrc-84 = "0.1.1"
 
 [dev-dependencies]
 test = "2.1.1"
