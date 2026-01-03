@@ -11,7 +11,6 @@ core = "2.0.0"
 icrc-84 = "0.1.1"
 
 [dev-dependencies]
-test = "2.1.1"
 async-test = "0.0.2"
 
 [toolchain]
