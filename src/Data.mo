@@ -1,4 +1,6 @@
 import Int "mo:core/Int";
+import { type Iter } "mo:core/Types";
+import List "mo:core/pure/List";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Order "mo:core/Order";
@@ -233,4 +235,75 @@ module {
 
     public func unshare(data : StableData<K>) = state.unshare(data);
   };
+
+  type Tree<K, V> = {
+    #node : ({ #R; #B }, Tree<K, V>, (K, ?V), Tree<K, V>);
+    #leaf;
+  };
+  public type StableDataV1<K> = {
+    tree : Tree<K, Value>;
+    depositsTree : Tree<(deposit : Nat, key : K), Value>;
+    handlerPool : Int;
+    lookupCount : Nat;
+    size : Nat;
+    locks : Nat;
+    credit_sum : Nat;
+    deposits_count : Nat;
+    deposit_sum : Nat;
+    unusable_deposit : {
+      correct : Bool;
+      sum : Nat;
+    };
+  };
+
+  public func migrateStableDataV1<K>(data : StableDataV1<K>, cmp : (implicit : (K, K) -> Order.Order)) : StableData<K> {
+    func migrateTree<K, V>(tree : Tree<K, V>, cmp : (implicit : (K, K) -> Order.Order)) : Map.Map<K, V> {
+      // copied from mo:base/RBTree source code
+      type IterRep<X, Y> = List.List<{ #tr : Tree<X, Y>; #xy : (X, ?Y) }>;
+      func iter<X, Y>(tree : Tree<X, Y>) : Iter<(X, Y)> {
+        object {
+          var trees : IterRep<X, Y> = ?(#tr(tree), null);
+          public func next() : ?(X, Y) {
+            switch (trees) {
+              case (null) { null };
+              case (?(#tr(#leaf), ts)) {
+                trees := ts;
+                next();
+              };
+              case (?(#xy(xy), ts)) {
+                trees := ts;
+                switch (xy.1) {
+                  case null { next() };
+                  case (?y) { ?(xy.0, y) };
+                };
+              };
+              case (?(#tr(#node(_, l, xy, r)), ts)) {
+                trees := ?(#tr(l), ?(#xy(xy), ?(#tr(r), ts)));
+                next();
+              };
+            };
+          };
+        };
+      };
+      let map = Map.empty<K, V>();
+      for ((k, v) in iter(tree)) {
+        map.add(cmp, k, v);
+      };
+      map;
+    };
+
+    {
+      data with
+      tree = migrateTree(data.tree, cmp);
+      depositsTree = migrateTree(
+        data.depositsTree,
+        func((d1, k1), (d2, k2)) {
+          let c = Nat.compare(d1, d2);
+          if (c != #equal) return c;
+          cmp(k1, k2);
+        },
+      );
+    };
+  };
+
 };

@@ -145,6 +145,52 @@ There are 2 types of withdrawals at the moment:
 
 Full API documentation can be found [here](https://mops.one/token-handler/docs/lib).
 
+## Migration guide
+
+### Upgrading from <=0.0.4 to >0.0.4
+
+Starting with versions > 0.0.4, the internal representation of `TokenHandler.StableData` has changed. If you persist the token handler state in stable memory using `TokenHandler.StableData`, you must migrate the old data.
+
+- Old type name: `TokenHandler.StableDataV1`
+- New type name: `TokenHandler.StableData`
+- Migration function: `TokenHandler.migrateStableDataV1 : (TokenHandler.StableDataV1) -> TokenHandler.StableData`
+
+Minimal example (just the migration step):
+
+```motoko
+import TokenHandler "mo:token-handler";
+
+let stableData : TokenHandler.StableData =
+  TokenHandler.migrateStableDataV1(oldStableData);
+```
+
+Typical upgrade pattern with stable variables:
+
+```motoko
+import TokenHandler "mo:token-handler";
+
+(
+  with migration = func(
+    old : {
+      thData : TokenHandler.StableDataV1
+    }
+  ) : {
+    thData : TokenHandler.StableData
+  } = {
+      thData = TokenHandler.migrateStableDataV1(old.thData);
+  }
+)
+persistent actor class MyClass() {
+    var thData : TokenHandler.StableData;
+    ....
+};
+```
+
+Notes:
+- Only projects that store `TokenHandler.StableData` in stable memory are affected.
+- If you never persisted `TokenHandler.StableData`, you can ignore this migration.
+- Versions that introduce the new type are > 0.0.4.
+
 ## Implementation
 
 We have the following modules:

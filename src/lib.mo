@@ -442,4 +442,20 @@ module {
       allowanceManager.unshare(values.allowanceManager);
     };
   };
+
+  public type StableDataV1 = {
+    data : Data.StableDataV1<Principal>;
+    depositManager : DepositManager.StableData;
+    creditManager : CreditManager.StableData;
+    feeManager : FeeManager.StableData;
+    ledger : ICRC84Helper.StableData;
+    withdrawalManager : WithdrawalManager.StableData;
+    allowanceManager : AllowanceManager.StableData;
+  };
+  public func migrateStableDataV1(data : StableDataV1) : StableData {
+    {
+      data with
+      data = Data.migrateStableDataV1(data.data, Principal.compare);
+    };
+  };
 };
