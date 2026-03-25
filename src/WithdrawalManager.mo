@@ -1,10 +1,11 @@
 import Principal "mo:core/Principal";
-import R "mo:core/Result";
-import ICRC1 "icrc1-api";
-import ICRC84Helper "icrc84-helper";
-import FeeManager "FeeManager";
+import { type Result } "mo:core/Types";
+
 import CreditManager "CreditManager";
 import Data "Data";
+import FeeManager "FeeManager";
+import ICRC1 "icrc1-api";
+import ICRC84Helper "icrc84-helper";
 
 module {
   public type StableData = {
@@ -23,7 +24,7 @@ module {
     #InsufficientCredit;
   };
 
-  public type WithdrawResponse = R.Result<(transactionIndex : Nat, withdrawnAmount : Nat), WithdrawError>;
+  public type WithdrawResponse = Result<(transactionIndex : Nat, withdrawnAmount : Nat), WithdrawError>;
 
   public type LogEvent = {
     #withdraw : {

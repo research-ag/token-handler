@@ -1,10 +1,10 @@
 import Array "mo:core/Array";
 import Debug "mo:core/Debug";
-import Time "mo:core/Time";
 import Int "mo:core/Int";
-import Principal "mo:core/Principal";
 import List "mo:core/List";
 import Nat "mo:core/Nat";
+import Principal "mo:core/Principal";
+import Time "mo:core/Time";
 
 import TokenHandler "../../src";
 

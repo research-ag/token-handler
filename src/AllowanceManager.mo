@@ -1,7 +1,9 @@
-import ICRC1 "icrc1-api";
-import R "mo:core/Result";
 import Principal "mo:core/Principal";
+import R "mo:core/Result";
+
+import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
+
 import Data "Data";
 import FeeManager "FeeManager";
 
@@ -55,7 +57,7 @@ module {
 
       let res = await* icrc84.draw(p, source, creditAmount + fee);
 
-      if (R.isOk(res)) {
+      if (res.isOk()) {
         totalCredited += creditAmount + surcharge_;
         assert data.get(p).changeCredit(creditAmount);
         data.changeHandlerPool(surcharge_);

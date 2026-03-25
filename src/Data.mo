@@ -1,7 +1,7 @@
-import Map "mo:core/Map";
-import Order "mo:core/Order";
 import Int "mo:core/Int";
+import Map "mo:core/Map";
 import Nat "mo:core/Nat";
+import Order "mo:core/Order";
 
 module {
   type Value = {

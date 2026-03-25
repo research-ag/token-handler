@@ -6,21 +6,22 @@
 ///
 /// Contributors: Andrii Stepanov (AStepanov25), Denys Kushnarov (reginleif888), Andy Gura (AndyGura)
 
-import Principal "mo:core/Principal";
 import Int "mo:core/Int";
-import Text "mo:core/Text";
 import Nat "mo:core/Nat";
+import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
+import Text "mo:core/Text";
 
 import ICRC84 "mo:icrc-84";
-import ICRC1 "icrc1-api";
-import ICRC84Helper "icrc84-helper";
-import DepositManager "DepositManager";
+
 import AllowanceManager "AllowanceManager";
-import WithdrawalManager "WithdrawalManager";
 import CreditManager "CreditManager";
 import Data "Data";
+import DepositManager "DepositManager";
 import FeeManager "FeeManager";
+import ICRC1 "icrc1-api";
+import ICRC84Helper "icrc84-helper";
+import WithdrawalManager "WithdrawalManager";
 
 module {
   public type StableData = {

@@ -1,12 +1,11 @@
-import Principal "mo:core/Principal";
-import R "mo:core/Result";
-import Text "mo:core/Text";
 import Nat "mo:core/Nat";
+import Principal "mo:core/Principal";
+import { type Result } "mo:core/Types";
 
-import ICRC1 "icrc1-api"; // only needed for error types
-import ICRC84Helper "icrc84-helper";
 import Data "Data";
 import FeeManager "FeeManager";
+import ICRC1 "icrc1-api"; // only needed for error types
+import ICRC84Helper "icrc84-helper";
 
 module {
   public type StableData = {
@@ -46,7 +45,7 @@ module {
     };
   };
 
-  public type TransferResponse = R.Result<Nat, ConsolidationError>;
+  public type TransferResponse = Result<Nat, ConsolidationError>;
 
   /// Manages deposits from users, handles consolidation operations.
   /// icrc84 must be configured with the correct previous fee after an upgrade
@@ -143,7 +142,7 @@ module {
       let ret = await* do_notify(p, entry);
 
       assert entry.unlock();
-      
+
       return ret;
     };
 

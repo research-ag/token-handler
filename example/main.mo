@@ -1,8 +1,8 @@
 import Array "mo:core/Array";
 import Error "mo:core/Error";
 import Int "mo:core/Int";
-import Prim "mo:prim";
 import Principal "mo:core/Principal";
+import Runtime "mo:core/Runtime";
 import Timer "mo:core/Timer";
 import Time "mo:core/Time";
 import Blob "mo:core/Blob";
@@ -38,7 +38,7 @@ persistent actor class Example() = self {
   transient var journal : Journal = List.empty();
 
   private func assertInitialized() = if (not initialized) {
-    Prim.trap("Not initialized");
+    Runtime.trap("Not initialized");
   };
 
   private func createTokenHandler(ledgerPrincipal : Principal) : TokenHandler.TokenHandler {
