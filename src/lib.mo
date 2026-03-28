@@ -11,6 +11,7 @@ import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
+import Prim "mo:prim";
 
 import ICRC84 "mo:icrc-84";
 
@@ -82,8 +83,7 @@ module {
 
   /// Build a `LedgerAPI` object based on the ledger principal.
   public func buildLedgerApi(ledgerPrincipal : Principal) : LedgerAPI {
-    ledgerPrincipal
-    |> ICRC1.service(_)
+    Prim.actorOfPrincipal<ICRC1.Service>(ledgerPrincipal)
     |> ICRC1.apiFromService(_);
   };
 
