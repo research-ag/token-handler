@@ -1,28 +1,27 @@
-import Array "mo:base/Array";
-import Error "mo:base/Error";
-import Int "mo:base/Int";
-import Prim "mo:prim";
-import Principal "mo:base/Principal";
-import Timer "mo:base/Timer";
-import Vec "mo:vector";
-import Time "mo:base/Time";
-import Blob "mo:base/Blob";
+import Array "mo:core/Array";
+import Error "mo:core/Error";
+import Int "mo:core/Int";
+import Principal "mo:core/Principal";
+import Runtime "mo:core/Runtime";
+import Timer "mo:core/Timer";
+import Time "mo:core/Time";
+import Blob "mo:core/Blob";
+import List "mo:core/List";
 
 import ICRC84 "mo:icrc-84";
 
 import TokenHandler "../src";
 
-actor class Example() = self {
-
+persistent actor class Example() = self {
   // ensure compliance to ICRC84 standart.
   // actor won't compile in case of type mismatch here
-  let _ : ICRC84.ICRC84 = self;
+  transient let _ : ICRC84.ICRC84 = self;
 
-  stable var journalData : Journal = Vec.new();
+  var journalData : Journal = List.empty();
 
-  stable var assetsData : Vec.Vector<StableAssetInfo> = Vec.new();
+  var assetsData : List.List<StableAssetInfo> = List.empty();
 
-  type Journal = Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)>;
+  type Journal = List.List<(Time.Time, Principal, TokenHandler.LogEvent)>;
 
   type AssetInfo = {
     ledgerPrincipal : Principal;
@@ -34,12 +33,12 @@ actor class Example() = self {
     handler : TokenHandler.StableData;
   };
 
-  var initialized : Bool = false;
-  var assets : Vec.Vector<AssetInfo> = Vec.new();
-  var journal : Journal = Vec.new();
+  transient var initialized : Bool = false;
+  transient var assets : List.List<AssetInfo> = List.empty();
+  transient var journal : Journal = List.empty();
 
   private func assertInitialized() = if (not initialized) {
-    Prim.trap("Not initialized");
+    Runtime.trap("Not initialized");
   };
 
   private func createTokenHandler(ledgerPrincipal : Principal) : TokenHandler.TokenHandler {
@@ -49,7 +48,7 @@ actor class Example() = self {
       initialFee = 0;
       triggerOnNotifications = true;
       log = func(p : Principal, event : TokenHandler.LogEvent) {
-        Vec.add(journal, (Time.now(), p, event));
+        journal.add((Time.now(), p, event));
       };
     });
   };
@@ -57,7 +56,7 @@ actor class Example() = self {
   public shared func init() : async () {
     assert not initialized;
     journal := journalData;
-    assets := Vec.map<StableAssetInfo, AssetInfo>(
+    assets := List.map<StableAssetInfo, AssetInfo>(
       assetsData,
       func(x) {
         let r = {
@@ -74,14 +73,14 @@ actor class Example() = self {
   public shared query func icrc84_supported_tokens() : async [Principal] {
     assertInitialized();
     Array.tabulate<Principal>(
-      Vec.size(assets),
-      func(i) = Vec.get(assets, i).ledgerPrincipal,
+      List.size(assets),
+      func(i) = List.at(assets, i).ledgerPrincipal,
     );
   };
 
   public shared query func icrc84_token_info(token : Principal) : async ICRC84.TokenInfo {
     assertInitialized();
-    for ((assetInfo, i) in Vec.items(assets)) {
+    for ((i, assetInfo) in List.enumerate(assets)) {
       if (Principal.equal(assetInfo.ledgerPrincipal, token)) {
         return {
           deposit_fee = assetInfo.handler.fee(#deposit);
@@ -101,16 +100,16 @@ actor class Example() = self {
     },
   )]) {
     assertInitialized();
-    let ret : Vec.Vector<(Principal, { credit : Int; tracked_deposit : ?Nat })> = Vec.new();
+    let ret : List.List<(Principal, { credit : Int; tracked_deposit : ?Nat })> = List.empty();
     for (token in tokens.vals()) {
       let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
       let credit = assetInfo.handler.userCredit(caller);
       if (credit > 0) {
         let tracked_deposit = assetInfo.handler.trackedDeposit(caller);
-        Vec.add(ret, (token, { credit; tracked_deposit }));
+        List.add(ret, (token, { credit; tracked_deposit }));
       };
     };
-    Vec.toArray(ret);
+    List.toArray(ret);
   };
 
   public shared ({ caller }) func icrc84_notify(args : ICRC84.NotifyArgs) : async ICRC84.NotifyResponse {
@@ -188,14 +187,14 @@ actor class Example() = self {
   ignore Timer.recurringTimer<system>(
     #seconds 60,
     func() : async () {
-      for (asset in Vec.vals(assets)) {
+      for (asset in assets.values()) {
         await* asset.handler.trigger(10);
       };
     },
   );
 
   private func getAssetInfo(icrc1Ledger : Principal) : ?AssetInfo {
-    for (assetInfo in Vec.vals(assets)) {
+    for (assetInfo in assets.values()) {
       if (Principal.equal(assetInfo.ledgerPrincipal, icrc1Ledger)) {
         return ?assetInfo;
       };
@@ -215,12 +214,12 @@ actor class Example() = self {
     } catch (err) {
       throw err;
     };
-    for ((assetInfo, i) in Vec.items(assets)) {
+    for ((i, assetInfo) in List.enumerate(assets)) {
       if (Principal.equal(ledger, assetInfo.ledgerPrincipal)) return #Err(#AlreadyRegistered(i));
     };
-    let id = Vec.size(assets);
+    let id = assets.size();
 
-    Vec.add<AssetInfo>(
+    List.add<AssetInfo>(
       assets,
       {
         ledgerPrincipal = ledger;
@@ -232,7 +231,7 @@ actor class Example() = self {
 
   system func preupgrade() {
     journalData := journal;
-    assetsData := Vec.map<AssetInfo, StableAssetInfo>(
+    assetsData := List.map<AssetInfo, StableAssetInfo>(
       assets,
       func(x) = {
         ledgerPrincipal = x.ledgerPrincipal;

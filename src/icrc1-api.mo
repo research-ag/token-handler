@@ -1,4 +1,4 @@
-import Principal "mo:base/Principal";
+import Principal "mo:core/Principal";
 
 /// This module first provides all types required to interact with an ICRC1 ledger.
 /// In particular, all argument types and response types.
@@ -88,8 +88,6 @@ module ICRC1 {
     transfer : shared TransferArgs -> async TransferResult;
     transfer_from : shared TransferFromArgs -> async TransferFromResult;
   };
-
-  public func service(p : Principal) : Service = actor (Principal.toText(p));
 
   public func apiFromService(x : Service) : API = {
     fee = x.icrc1_fee;

@@ -1,5 +1,6 @@
-import ICRC1 "../../src/icrc1-api";
 import AsyncTester "mo:async-test";
+
+import ICRC1 "../../src/icrc1-api";
 
 module {
   public class MockLedger(debug_ : Bool, key : Text) {

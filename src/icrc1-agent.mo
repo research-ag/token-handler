@@ -1,5 +1,6 @@
+import R "mo:core/Result";
+
 import ICRC1 "icrc1-api";
-import R "mo:base/Result";
 
 /// This module is built on top of icrc1-api.
 /// It wraps the ICRC1 ledger API calls in try-catch blocks

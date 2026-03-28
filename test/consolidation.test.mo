@@ -1,6 +1,7 @@
-import Principal "mo:base/Principal";
-import Util "util/common";
+import Principal "mo:core/Principal";
+
 import MockLedger "util/mock_ledger";
+import Util "util/common";
 
 let DEBUG = false;
 let user1 = Principal.fromBlob("1");

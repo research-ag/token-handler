@@ -1,6 +1,7 @@
-import Principal "mo:base/Principal";
-import Int "mo:base/Int";
-import Nat "mo:base/Nat";
+import Int "mo:core/Int";
+import Nat "mo:core/Nat";
+import Principal "mo:core/Principal";
+
 import Data "Data";
 
 module {

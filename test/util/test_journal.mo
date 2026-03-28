@@ -1,10 +1,10 @@
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Iter "mo:base/Iter";
-import Time "mo:base/Time";
-import Int "mo:base/Int";
-import Principal "mo:base/Principal";
-import Vec "mo:vector";
+import Array "mo:core/Array";
+import Debug "mo:core/Debug";
+import Int "mo:core/Int";
+import List "mo:core/List";
+import Nat "mo:core/Nat";
+import Principal "mo:core/Principal";
+import Time "mo:core/Time";
 
 import TokenHandler "../../src";
 
@@ -118,10 +118,10 @@ module {
     };
   };
 
-  type JournalVector = Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)>;
+  type JournalVector = List.List<(Time.Time, Principal, TokenHandler.LogEvent)>;
 
   public class TestJournal() {
-    let journal : Vec.Vector<(Time.Time, Principal, TokenHandler.LogEvent)> = Vec.new();
+    let journal : JournalVector = List.empty();
     let invariantChecker : InveariantChecker = InveariantChecker();
 
     var counter_ = 0;
@@ -137,30 +137,29 @@ module {
     public func log(p : Principal, e : TokenHandler.LogEvent) {
       let event = (Time.now(), p, e);
       if (verbose) Debug.print("logging: " # debug_show event);
-      Vec.add(journal, event);
+      journal.add(event);
     };
 
     public func hasEvents(events : [TokenHandler.LogEvent]) : Bool {
       let prevCounter = counter_; // previous size
-      counter_ := Vec.size(journal);
-      if (Vec.size(journal) != prevCounter + events.size()) return false;
+      counter_ := journal.size();
+      if (counter_ != prevCounter + events.size()) return false;
       if (events.size() == 0) return true;
-      for (i in Iter.range(prevCounter, prevCounter + events.size() - 1)) {
-        let (_, p, event) = Vec.get(journal, i);
+      for (i in Nat.range(prevCounter, prevCounter + events.size())) {
+        let (_, p, event) = journal.at(i);
         if (event != events[i - prevCounter]) return false;
         if (not invariantChecker.checkInvariant(p, event)) return false;
       };
       true;
     };
 
-    public func size() : Nat = Vec.size(journal);
+    public func size() : Nat = journal.size();
 
     public func debugShow(startFrom : Nat) : () {
       Debug.print(
         debug_show (
-          Vec.toArray(journal)
-          |> Array.slice(_, startFrom, _.size())
-          |> Iter.toArray(_)
+          journal.toArray()
+          |> _.sliceToArray(startFrom, _.size())
         )
       );
     };
