@@ -89,8 +89,6 @@ module ICRC1 {
     transfer_from : shared TransferFromArgs -> async TransferFromResult;
   };
 
-  public func service(p : Principal) : Service = actor (p.toText());
-
   public func apiFromService(x : Service) : API = {
     fee = x.icrc1_fee;
     balance_of = x.icrc1_balance_of;
