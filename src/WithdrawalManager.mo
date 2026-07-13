@@ -2,7 +2,7 @@ import Principal "mo:core/Principal";
 import { type Result } "mo:core/Types";
 
 import CreditManager "CreditManager";
-import Data "Data";
+import { Data; Entry } "Data";
 import FeeManager "FeeManager";
 import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
@@ -36,107 +36,108 @@ module {
     #locked : Int;
   };
 
-  public class WithdrawalManager(
+  public type WithdrawalManager = {
+    var totalWithdrawn : Nat;
+    var lockedFunds : Nat;
+  };
+
+  public func new() : WithdrawalManager {
+    {
+      var totalWithdrawn = 0;
+      var lockedFunds = 0;
+    };
+  };
+
+  public func state(self : WithdrawalManager) : State = {
+    totalWithdrawn = self.totalWithdrawn;
+    lockedFunds = self.lockedFunds;
+  };
+
+  /// Initiates a withdrawal by transferring tokens to another account.
+  /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
+  /// creditAmount = amount of credit being deducted
+  /// amount of tokens that the `to` account receives = creditAmount - userExpectedFee
+  public func withdraw(
+    self : WithdrawalManager,
     icrc84 : ICRC84Helper.Ledger,
     data : Data.Data<Principal>,
     creditManager : CreditManager.CreditManager,
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
-  ) {
-    var totalWithdrawn = 0;
-    var lockedFunds = 0;
-
+    p : ?Principal,
+    to : ICRC1.Account,
+    creditAmount : Nat,
+    userExpectedFee : ?Nat,
+  ) : async* WithdrawResponse {
     let noPrincipal = Principal.fromBlob("");
+    let realFee = switch (p) {
+      case null feeManager.ledgerFee(icrc84); // withdrawal from pool
+      case _ feeManager.fee(icrc84); // withdrawal from credit
+    };
+    switch (userExpectedFee) {
+      case null {};
+      case (?f) if (f != realFee) return #err(#BadFee { expected_fee = realFee });
+    };
+    if (creditAmount <= realFee) return #err(#TooLowQuantity);
 
-    public func state() : State = {
-      totalWithdrawn;
-      lockedFunds;
+    let (ok, principal) = switch (p) {
+      case null (creditManager.burnPool(creditAmount), noPrincipal);
+      case (?pp) (creditManager.burn(data, pp, creditAmount), pp);
+    };
+    if (ok) {
+      self.lockedFunds += creditAmount;
+      log(principal, #locked(creditAmount));
+    } else {
+      return #err(#InsufficientCredit);
     };
 
-    /// Initiates a withdrawal by transferring tokens to another account.
-    /// Returns ICRC1 transaction index and amount of transferred tokens (fee excluded).
-    /// creditAmount = amount of credit being deducted
-    /// amount of tokens that the `to` account receives = creditAmount - userExpectedFee
-    public func withdraw(p : ?Principal, to : ICRC1.Account, creditAmount : Nat, userExpectedFee : ?Nat) : async* WithdrawResponse {
-      let realFee = switch (p) {
-        case null feeManager.ledgerFee(); // withdrawal from pool
-        case _ feeManager.fee(); // withdrawal from credit
-      };
-      switch (userExpectedFee) {
-        case null {};
-        case (?f) if (f != realFee) return #err(#BadFee { expected_fee = realFee });
-      };
-      if (creditAmount <= realFee) return #err(#TooLowQuantity);
+    let surcharge = feeManager.surcharge;
 
-      let (ok, principal) = switch (p) {
-        case null (creditManager.burnPool(creditAmount), noPrincipal);
-        case (?pp) (creditManager.burn(pp, creditAmount), pp);
-      };
-      if (ok) {
-        lockedFunds += creditAmount;
-        log(principal, #locked(creditAmount));
-      } else {
-        return #err(#InsufficientCredit);
-      };
+    let amountToSend = switch (p) {
+      case (?_) creditAmount - surcharge : Nat;
+      case null creditAmount;
+    };
 
-      let surcharge = feeManager.surcharge();
+    let res = await* ICRC84Helper.send(icrc84, to, amountToSend);
 
-      let amountToSend = switch (p) {
-        case (?_) creditAmount - surcharge : Nat;
-        case null creditAmount;
-      };
+    switch (res) {
+      case (#ok txid) {
+        switch (p) {
+          case (?pp) {
+            data.changeHandlerPool(surcharge);
 
-      let res = await* icrc84.send(to, amountToSend);
-
-      switch (res) {
-        case (#ok txid) {
-          switch (p) {
-            case (?pp) {
-              data.changeHandlerPool(surcharge);
-
-              log(pp, #withdraw { to; amount = creditAmount; withdrawn = amountToSend; surcharge });
-            };
-            case null {
-              log(noPrincipal, #withdraw { to; amount = creditAmount; withdrawn = creditAmount; surcharge = 0 });
-            };
+            log(pp, #withdraw { to; amount = creditAmount; withdrawn = amountToSend; surcharge });
           };
-
-          lockedFunds -= creditAmount;
-          totalWithdrawn += amountToSend;
-
-          #ok(txid, creditAmount - realFee : Nat);
+          case null {
+            log(noPrincipal, #withdraw { to; amount = creditAmount; withdrawn = creditAmount; surcharge = 0 });
+          };
         };
-        case (#err(error)) {
-          let realFee = switch (p) {
-            case null feeManager.ledgerFee();
-            case _ feeManager.fee();
-          };
-          let newError = switch (error) {
-            case (#BadFee _) #BadFee { expected_fee = realFee };
-            case _ error;
-          };
 
-          lockedFunds -= creditAmount;
-          switch (p) {
-            case (?pp) assert data.get(pp).changeCredit(creditAmount);
-            case null creditManager.changePool(creditAmount);
-          };
+        self.lockedFunds -= creditAmount;
+        self.totalWithdrawn += amountToSend;
 
-          log(principal, #locked(-creditAmount));
-
-          #err(newError);
-        };
+        #ok(txid, creditAmount - realFee : Nat);
       };
-    };
+      case (#err(error)) {
+        let realFee = switch (p) {
+          case null feeManager.ledgerFee(icrc84);
+          case _ feeManager.fee(icrc84);
+        };
+        let newError = switch (error) {
+          case (#BadFee _) #BadFee { expected_fee = realFee };
+          case _ error;
+        };
 
-    public func share() : StableData = {
-      totalWithdrawn;
-      lockedFunds;
-    };
+        self.lockedFunds -= creditAmount;
+        switch (p) {
+          case (?pp) assert data.entry(pp).changeCredit(creditAmount);
+          case null creditManager.changePool(creditAmount);
+        };
 
-    public func unshare(data : StableData) {
-      totalWithdrawn := data.totalWithdrawn;
-      lockedFunds := data.lockedFunds;
+        log(principal, #locked(-creditAmount));
+
+        #err(newError);
+      };
     };
   };
 };

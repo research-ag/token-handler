@@ -36,69 +36,81 @@ module {
 
   public type FeeResult = R.Result<Nat, { #CallIcrc1LedgerError }>;
 
-  public class LedgerAgent(api : ICRC1.API) {
-    var fee_ = 0;
+  public type LedgerAgent = {
+    api : ICRC1.API;
+    var fee_ : Nat;
+  };
 
-    public func fee() : Nat = fee_;
-
-    public func setFee(x : Nat) = fee_ := x;
-
-    public func fetchFee() : async* FeeResult {
-      try {
-        #ok(await api.fee());
-      } catch (_) {
-        #err(#CallIcrc1LedgerError);
-      };
+  public func new(api : ICRC1.API) : LedgerAgent {
+    {
+      api;
+      var fee_ = 0;
     };
+  };
 
-    public func balance_of(a : ICRC1.Account) : async* BalanceResult {
-      try {
-        #ok(await api.balance_of(a));
-      } catch (_) {
-        #err(#CallIcrc1LedgerError);
-      };
+  public func fee(self : LedgerAgent) : Nat = self.fee_;
+
+  public func setFee(self : LedgerAgent, x : Nat) {
+    self.fee_ := x;
+  };
+
+  public func fetchFee(self : LedgerAgent) : async* FeeResult {
+    try {
+      #ok(await self.api.fee());
+    } catch (_) {
+      #err(#CallIcrc1LedgerError);
     };
+  };
 
-    public func transfer(
-      from_subaccount : ?ICRC1.Subaccount,
-      to : ICRC1.Account,
-      amount : Nat,
-    ) : async* TransferResult {
-      let args = {
-        from_subaccount;
-        to;
-        amount;
-        fee = ?fee_;
-        memo = null;
-        created_at_time = null;
-      };
-      try {
-        R.fromUpper(await api.transfer(args));
-      } catch (_) {
-        #err(#CallIcrc1LedgerError);
-      };
+  public func balance_of(self : LedgerAgent, a : ICRC1.Account) : async* BalanceResult {
+    try {
+      #ok(await self.api.balance_of(a));
+    } catch (_) {
+      #err(#CallIcrc1LedgerError);
     };
+  };
 
-    public func transfer_from(
-      from : ICRC1.Account,
-      to : ICRC1.Account,
-      amount : Nat,
-      spender : ?ICRC1.Subaccount,
-    ) : async* TransferFromResult {
-      let args = {
-        spender_subaccount = spender;
-        from;
-        to;
-        amount;
-        fee = ?fee_;
-        memo = null;
-        created_at_time = null;
-      };
-      try {
-        R.fromUpper(await api.transfer_from(args));
-      } catch (_) {
-        #err(#CallIcrc1LedgerError);
-      };
+  public func transfer(
+    self : LedgerAgent,
+    from_subaccount : ?ICRC1.Subaccount,
+    to : ICRC1.Account,
+    amount : Nat,
+  ) : async* TransferResult {
+    let args = {
+      from_subaccount;
+      to;
+      amount;
+      fee = ?self.fee_;
+      memo = null;
+      created_at_time = null;
+    };
+    try {
+      R.fromUpper(await self.api.transfer(args));
+    } catch (_) {
+      #err(#CallIcrc1LedgerError);
+    };
+  };
+
+  public func transfer_from(
+    self : LedgerAgent,
+    from : ICRC1.Account,
+    to : ICRC1.Account,
+    amount : Nat,
+    spender : ?ICRC1.Subaccount,
+  ) : async* TransferFromResult {
+    let args = {
+      spender_subaccount = spender;
+      from;
+      to;
+      amount;
+      fee = ?self.fee_;
+      memo = null;
+      created_at_time = null;
+    };
+    try {
+      R.fromUpper(await self.api.transfer_from(args));
+    } catch (_) {
+      #err(#CallIcrc1LedgerError);
     };
   };
 };

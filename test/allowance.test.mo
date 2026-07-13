@@ -1,5 +1,6 @@
 import Principal "mo:core/Principal";
 
+import TokenHandler "../src";
 import MockLedger "util/mock_ledger";
 import Util "util/common";
 
@@ -15,7 +16,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?3);
-  ignore await* handler.fetchFee();
+  ignore await* TokenHandler.fetchFee(handler);
   assert handler.ledgerFee() == 3;
   assert journal.hasEvents([
     #feeUpdated({ new = 3; old = 0; delta = 0 }),
@@ -30,13 +31,13 @@ do {
 
   // deposit via allowance < amount + fee
   ignore mock_ledger.transfer_from_.stage_unlocked(? #Err(#InsufficientAllowance({ allowance = 8 })));
-  assert (await* handler.depositFromAllowance(user1, user1_account, 4, null)) == #err(#InsufficientAllowance({ allowance = 8 }));
+  assert (await* TokenHandler.depositFromAllowance(handler, user1, user1_account, 4, null)) == #err(#InsufficientAllowance({ allowance = 8 }));
   assert state() == (0, 0, 0);
   assert journal.hasEvents([]);
 
   // deposit via allowance >= amount + fee
   ignore mock_ledger.transfer_from_.stage_unlocked(? #Ok 42);
-  assert (await* handler.depositFromAllowance(user1, user1_account, 3, null)) == #ok(3, 42);
+  assert (await* TokenHandler.depositFromAllowance(handler, user1, user1_account, 3, null)) == #ok(3, 42);
   assert handler.userCredit(user1) == 3;
   assert handler.state().credit == { pool = 2; total = 5 };
   assert journal.hasEvents([
@@ -46,7 +47,7 @@ do {
   // deposit from allowance >= amount
   // caller principal != account owner
   ignore mock_ledger.transfer_from_.stage_unlocked(? #Ok 42);
-  assert (await* handler.depositFromAllowance(user1, user2_account, 7, null)) == #ok(7, 42);
+  assert (await* TokenHandler.depositFromAllowance(handler, user1, user2_account, 7, null)) == #ok(7, 42);
   assert handler.userCredit(user1) == 10;
   assert handler.state().credit == { pool = 4; total = 14 };
   assert journal.hasEvents([
@@ -57,7 +58,7 @@ do {
   // expected_fee != ledger_fee
   // not staging a response to assert that no call is happening
   // allowance fee = 5
-  assert (await* handler.depositFromAllowance(user1, user1_account, 2, ?100)) == #err(#BadFee({ expected_fee = 5 }));
+  assert (await* TokenHandler.depositFromAllowance(handler, user1, user1_account, 2, ?100)) == #err(#BadFee({ expected_fee = 5 }));
   assert handler.userCredit(user1) == 10; // not changed
   assert handler.state().credit == { pool = 4; total = 14 }; // not changed
   assert journal.hasEvents([]);

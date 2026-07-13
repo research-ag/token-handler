@@ -11,7 +11,7 @@ module {
   ) {
     let journal = TestJournal.TestJournal();
 
-    let handler = TokenHandler.TokenHandler({
+    let handler = TokenHandler.new({
       ledgerApi = ledger;
       ownPrincipal = Principal.fromBlob("");
       initialFee = 0;

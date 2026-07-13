@@ -1,5 +1,6 @@
 import Principal "mo:core/Principal";
 
+import TokenHandler "../src";
 import MockLedger "util/mock_ledger";
 import Util "util/common";
 
@@ -12,7 +13,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?2);
-  ignore await* handler.fetchFee();
+  ignore await* TokenHandler.fetchFee(handler);
   assert handler.ledgerFee() == 2;
   assert journal.hasEvents([
     #feeUpdated({ new = 2; old = 0; delta = 0 }),
@@ -32,8 +33,8 @@ do {
   // scenario 1: increase fee
   let i = mock_ledger.balance_.stage(?5);
   ignore mock_ledger.fee_.stage_unlocked(?4);
-  let f1 = async { await* handler.notify(user1) };
-  ignore await* handler.fetchFee();
+  let f1 = async { await* TokenHandler.notify(handler, user1) };
+  ignore await* TokenHandler.fetchFee(handler);
   assert journal.hasEvents([
     #feeUpdated({ new = 4; old = 2; delta = 0 }),
   ]);
@@ -46,8 +47,8 @@ do {
   // scenario 2: decrease fee
   let i2 = mock_ledger.balance_.stage(?5);
   ignore mock_ledger.fee_.stage_unlocked(?2);
-  let f2 = async { await* handler.notify(user1) };
-  ignore await* handler.fetchFee();
+  let f2 = async { await* TokenHandler.notify(handler, user1) };
+  ignore await* TokenHandler.fetchFee(handler);
   assert journal.hasEvents([
     #feeUpdated({ new = 2; old = 4; delta = 0 }),
   ]);
@@ -63,7 +64,7 @@ do {
 
   // scenario 1: new_fee < prev_fee < deposit
   ignore mock_ledger.fee_.stage_unlocked(?1);
-  ignore await* handler.fetchFee();
+  ignore await* TokenHandler.fetchFee(handler);
   assert journal.hasEvents([
     #feeUpdated({ new = 1; old = 2; delta = -1 }),
   ]);
@@ -71,7 +72,7 @@ do {
 
   // scenario 2: prev_fee < new_fee < deposit
   ignore mock_ledger.fee_.stage_unlocked(?2);
-  ignore await* handler.fetchFee();
+  ignore await* TokenHandler.fetchFee(handler);
   assert journal.hasEvents([
     #feeUpdated({ new = 2; old = 1; delta = 1 }),
   ]);
@@ -79,7 +80,7 @@ do {
 
   // scenario 3: prev_fee < deposit <= new_fee
   ignore mock_ledger.fee_.stage_unlocked(?5);
-  ignore await* handler.fetchFee();
+  ignore await* TokenHandler.fetchFee(handler);
   assert journal.hasEvents([
     #feeUpdated({ new = 5; old = 2; delta = 3 }),
   ]);
@@ -94,7 +95,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?5);
-  ignore await* handler.fetchFee();
+  ignore await* TokenHandler.fetchFee(handler);
   assert handler.ledgerFee() == 5;
   assert journal.hasEvents([
     #feeUpdated({ new = 5; old = 0; delta = 0 }),
@@ -102,8 +103,8 @@ do {
 
   // fetching fee should not overlap
   let i = mock_ledger.fee_.stage(?6);
-  let f1 = async { await* handler.fetchFee() };
-  let f2 = async { await* handler.fetchFee() };
+  let f1 = async { await* TokenHandler.fetchFee(handler) };
+  let f2 = async { await* TokenHandler.fetchFee(handler) };
   assert (await f2) == null;
   mock_ledger.fee_.release(i);
   assert (await f1) == ?6;
@@ -124,13 +125,13 @@ do {
   ]);
 
   ignore mock_ledger.balance_.stage_unlocked(?16);
-  assert (await* handler.notify(user1)) == ?(16, 1);
+  assert (await* TokenHandler.notify(handler, user1)) == ?(16, 1);
   assert journal.hasEvents([
     #newDeposit({ creditInc = 1; depositInc = 16; ledgerFee = 0; surcharge = 15 }),
   ]);
 
   let i = mock_ledger.transfer_.stage_unlocked(?(#Ok 0));
-  await* handler.trigger(1);
+  await* TokenHandler.trigger(handler, 1);
   assert mock_ledger.transfer_.state(i) == #responded;
   assert journal.hasEvents([
     #consolidated({ credited = 16; deducted = 16; fee = 0 }),
@@ -176,7 +177,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?2);
-  ignore await* handler.fetchFee();
+  ignore await* TokenHandler.fetchFee(handler);
   assert handler.ledgerFee() == 2;
   assert journal.hasEvents([
     #feeUpdated({ new = 2; old = 0; delta = 0 }),

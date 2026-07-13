@@ -42,7 +42,7 @@ persistent actor class Example() = self {
   };
 
   private func createTokenHandler(ledgerPrincipal : Principal) : TokenHandler.TokenHandler {
-    TokenHandler.TokenHandler({
+    TokenHandler.new({
       ledgerApi = TokenHandler.buildLedgerApi(ledgerPrincipal);
       ownPrincipal = Principal.fromActor(self);
       initialFee = 0;
@@ -63,7 +63,7 @@ persistent actor class Example() = self {
           ledgerPrincipal = x.ledgerPrincipal;
           handler = createTokenHandler(x.ledgerPrincipal);
         };
-        r.handler.unshare(x.handler);
+        TokenHandler.unshare(r.handler, x.handler);
         r;
       },
     );
@@ -116,7 +116,7 @@ persistent actor class Example() = self {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let result = try {
-      await* assetInfo.handler.notify(caller);
+      await* TokenHandler.notify(assetInfo.handler, caller);
     } catch (err) {
       return #Err(#CallLedgerError({ message = Error.message(err) }));
     };
@@ -137,7 +137,7 @@ persistent actor class Example() = self {
   public shared ({ caller }) func icrc84_deposit(args : ICRC84.DepositArgs) : async ICRC84.DepositResponse {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
-    let res = await* assetInfo.handler.depositFromAllowance(caller, args.from, args.amount, args.expected_fee);
+    let res = await* TokenHandler.depositFromAllowance(assetInfo.handler, caller, args.from, args.amount, args.expected_fee);
     switch (res) {
       case (#ok(credit_inc, txid)) #Ok({
         txid;
@@ -168,7 +168,7 @@ persistent actor class Example() = self {
       case null {};
     };
 
-    let res = await* assetInfo.handler.withdrawFromCredit(caller, args.to, args.amount, args.expected_fee);
+    let res = await* TokenHandler.withdrawFromCredit(assetInfo.handler, caller, args.to, args.amount, args.expected_fee);
     switch (res) {
       case (#ok(txid, amount)) #Ok({ txid; amount });
       case (#err err) {
@@ -188,7 +188,7 @@ persistent actor class Example() = self {
     #seconds 60,
     func() : async () {
       for (asset in assets.values()) {
-        await* asset.handler.trigger(10);
+        await* TokenHandler.trigger(asset.handler, 10);
       };
     },
   );
@@ -235,7 +235,7 @@ persistent actor class Example() = self {
       assets,
       func(x) = {
         ledgerPrincipal = x.ledgerPrincipal;
-        handler = x.handler.share();
+        handler = TokenHandler.share(x.handler);
       },
     );
   };

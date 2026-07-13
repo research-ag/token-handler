@@ -1,6 +1,6 @@
 import Principal "mo:core/Principal";
 
-import Data "Data";
+import { Data; Entry } "Data";
 
 module {
   public type LogEvent = {
@@ -12,53 +12,67 @@ module {
     pool : Nat;
   };
 
-  /// Tracks credited funds (usable balance) associated with each principal.
-  public class CreditManager(data : Data.Data<Principal>, log : (Principal, LogEvent) -> ()) {
-    var pool = 0;
+  public type CreditManager = {
+    var pool : Nat;
+  };
 
-    public func poolBalance() : Nat = pool;
-
-    // The creditUser/debitUser functions transfer credit from the
-    // user to/from the pool.
-    public func creditUser(p : Principal, amount : Nat) : Bool {
-      if (amount > pool) return false;
-      pool -= amount;
-
-      let entry = data.get(p);
-      assert entry.changeCredit(amount);
-      log(p, #credited(amount));
-      true;
+  public func new() : CreditManager {
+    {
+      var pool = 0;
     };
+  };
 
-    public func debitUser(p : Principal, amount : Nat) : Bool {
-      let entry = data.get(p);
-      if (not entry.changeCredit(-amount)) return false;
+  public func poolBalance(self : CreditManager) : Nat = self.pool;
 
-      pool += amount;
-      log(p, #debited(amount));
-      true;
-    };
+  // The creditUser/debitUser functions transfer credit from the
+  // user to/from the pool.
+  public func creditUser(
+    self : CreditManager,
+    data : Data.Data<Principal>,
+    log : (Principal, LogEvent) -> (),
+    p : Principal,
+    amount : Nat,
+  ) : Bool {
+    if (amount > self.pool) return false;
+    self.pool -= amount;
 
-    // Burn credit from a user or the pool
-    // This is called on withdrawals
-    // A check is performed, balances can not go negative
-    public func burn(p : Principal, amount : Nat) : Bool {
-      if (not data.get(p).changeCredit(-amount)) return false;
-      true;
-    };
+    let entry = data.entry(p);
+    assert entry.changeCredit(amount);
+    log(p, #credited(amount));
+    true;
+  };
 
-    public func changePool(amount : Nat) {
-      pool += amount;
-    };
+  public func debitUser(
+    self : CreditManager,
+    data : Data.Data<Principal>,
+    log : (Principal, LogEvent) -> (),
+    p : Principal,
+    amount : Nat,
+  ) : Bool {
+    let entry = data.entry(p);
+    if (not entry.changeCredit(-amount)) return false;
 
-    public func burnPool(amount : Nat) : Bool {
-      if (amount > pool) return false;
-      pool -= amount;
-      true;
-    };
+    self.pool += amount;
+    log(p, #debited(amount));
+    true;
+  };
 
-    public func share() : StableData = { pool = pool };
+  // Burn credit from a user or the pool
+  // This is called on withdrawals
+  // A check is performed, balances can not go negative
+  public func burn(self : CreditManager, data : Data.Data<Principal>, p : Principal, amount : Nat) : Bool {
+    ignore self;
+    if (not data.entry(p).changeCredit(-amount)) return false;
+    true;
+  };
 
-    public func unshare(data : StableData) = pool := data.pool;
+  public func changePool(self : CreditManager, amount : Nat) {
+    self.pool += amount;
+  };
+
+  public func burnPool(self : CreditManager, amount : Nat) : Bool {
+    if (amount > self.pool) return false;
+    self.pool -= amount;
+    true;
   };
 };
