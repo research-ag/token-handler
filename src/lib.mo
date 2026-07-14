@@ -31,6 +31,7 @@ module {
   /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
   /// providing a comprehensive solution for handling ICRC-1 token transactions.
   public type TokenHandler = {
+    api : ICRC1.API;
     var isFrozen_ : Bool;
     ledger : ICRC84Helper.Ledger;
     data : Data.Data<Principal>;
@@ -49,7 +50,7 @@ module {
     depositManager : DepositManager.DepositManager;
     creditManager : CreditManager.CreditManager;
     feeManager : FeeManager.FeeManager;
-    ledger : ICRC84Helper.StableData;
+    ledger : ICRC84Helper.Ledger;
     withdrawalManager : WithdrawalManager.WithdrawalManager;
     allowanceManager : AllowanceManager.AllowanceManager;
   };
@@ -107,7 +108,7 @@ module {
   };
 
   public func new(options : TokenHandlerOptions) : TokenHandler {
-    let ledger = ICRC84Helper.Ledger(options.ledgerApi, options.ownPrincipal, options.initialFee);
+    let ledger = ICRC84Helper.Ledger(options.ownPrincipal, options.initialFee);
     let data = Data.empty<Principal>();
     let feeManager = FeeManager.new();
     let creditManager = CreditManager.new();
@@ -116,6 +117,7 @@ module {
     let withdrawalManager = WithdrawalManager.new();
 
     let self : TokenHandler = {
+      api = options.ledgerApi;
       var isFrozen_ = false;
       ledger;
       data;
@@ -172,7 +174,7 @@ module {
   /// Returns the new fee, or `null` if fetching is already in progress.
   public func fetchFee(self : TokenHandler) : async* ?Nat {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = await* ICRC84Helper.loadFee(self.ledger, func() = assertInvariant(self), func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee));
+    let ret = await* ICRC84Helper.loadFee(self.ledger, self.api, func() = assertInvariant(self), func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee));
     ignore assertInvariant(self);
     ret;
   };
@@ -254,6 +256,7 @@ module {
       func(err) { freezeTokenHandler(self, err) },
       self.triggerOnNotifications,
       p,
+      self.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     ) else return null;
@@ -280,6 +283,7 @@ module {
       source,
       amount,
       expectedFee,
+      self.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
@@ -298,6 +302,7 @@ module {
       self.feeManager,
       self.log,
       n,
+      self.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
@@ -325,6 +330,7 @@ module {
       to,
       amount,
       expectedFee,
+      self.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
@@ -354,6 +360,7 @@ module {
       to,
       creditAmount,
       expectedFee,
+      self.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
@@ -389,7 +396,7 @@ module {
     creditManager = self.creditManager;
     depositManager = self.depositManager;
     feeManager = self.feeManager;
-    ledger = self.ledger.share();
+    ledger = self.ledger;
     withdrawalManager = self.withdrawalManager;
     allowanceManager = self.allowanceManager;
   };
@@ -414,7 +421,11 @@ module {
     self.depositManager.underwayFunds := values.depositManager.underwayFunds;
     self.feeManager.surcharge := values.feeManager.surcharge;
     self.feeManager.outstandingFees := values.feeManager.outstandingFees;
-    self.ledger.unshare(values.ledger);
+
+    self.ledger.fee := values.ledger.fee;
+    self.ledger.feeLock := values.ledger.feeLock;
+    self.ledger.ownPrincipal := values.ledger.ownPrincipal;
+
     self.withdrawalManager.totalWithdrawn := values.withdrawalManager.totalWithdrawn;
     self.withdrawalManager.lockedFunds := values.withdrawalManager.lockedFunds;
     self.allowanceManager.totalCredited := values.allowanceManager.totalCredited;

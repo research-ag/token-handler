@@ -64,6 +64,7 @@ module {
     to : ICRC1.Account,
     creditAmount : Nat,
     userExpectedFee : ?Nat,
+    api : ICRC1.API,
     assertInvariant : () -> Bool,
     onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
   ) : async* WithdrawResponse {
@@ -96,7 +97,7 @@ module {
       case null creditAmount;
     };
 
-    let res = await* ICRC84Helper.send(icrc84, to, amountToSend, assertInvariant, onFeeChanged);
+    let res = await* ICRC84Helper.send(icrc84, to, amountToSend, api, assertInvariant, onFeeChanged);
 
     switch (res) {
       case (#ok txid) {

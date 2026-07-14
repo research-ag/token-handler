@@ -36,34 +36,24 @@ module {
 
   public type FeeResult = R.Result<Nat, { #CallIcrc1LedgerError }>;
 
-  public type LedgerAgent = {
-    api : ICRC1.API;
-  };
-
-  public func new(api : ICRC1.API) : LedgerAgent {
-    {
-      api;
-    };
-  };
-
-  public func fetchFee(self : LedgerAgent) : async* FeeResult {
+  public func fetchFee(api : ICRC1.API) : async* FeeResult {
     try {
-      #ok(await self.api.fee());
+      #ok(await api.fee());
     } catch (_) {
       #err(#CallIcrc1LedgerError);
     };
   };
 
-  public func balance_of(self : LedgerAgent, a : ICRC1.Account) : async* BalanceResult {
+  public func balance_of(api : ICRC1.API, a : ICRC1.Account) : async* BalanceResult {
     try {
-      #ok(await self.api.balance_of(a));
+      #ok(await api.balance_of(a));
     } catch (_) {
       #err(#CallIcrc1LedgerError);
     };
   };
 
   public func transfer(
-    self : LedgerAgent,
+    api : ICRC1.API,
     from_subaccount : ?ICRC1.Subaccount,
     to : ICRC1.Account,
     amount : Nat,
@@ -78,14 +68,14 @@ module {
       created_at_time = null;
     };
     try {
-      R.fromUpper(await self.api.transfer(args));
+      R.fromUpper(await api.transfer(args));
     } catch (_) {
       #err(#CallIcrc1LedgerError);
     };
   };
 
   public func transfer_from(
-    self : LedgerAgent,
+    api : ICRC1.API,
     from : ICRC1.Account,
     to : ICRC1.Account,
     amount : Nat,
@@ -102,7 +92,7 @@ module {
       created_at_time = null;
     };
     try {
-      R.fromUpper(await self.api.transfer_from(args));
+      R.fromUpper(await api.transfer_from(args));
     } catch (_) {
       #err(#CallIcrc1LedgerError);
     };
