@@ -26,26 +26,27 @@ module {
   public type Ledger = {
     agent : ICRC1Agent.LedgerAgent;
     ownPrincipal : Principal;
+    var fee : Nat;
     var feeLock : Bool;
   };
 
   public func Ledger(api : ICRC1.API, ownPrincipal : Principal, initial_fee : Nat) : Ledger {
     let agent = ICRC1Agent.new(api);
-    ICRC1Agent.setFee(agent, initial_fee);
     {
       agent;
       ownPrincipal;
+      var fee = initial_fee;
       var feeLock = false;
     };
   };
 
-  public func fee(self : Ledger) : Nat = self.agent.fee();
+  public func fee(self : Ledger) : Nat = self.fee;
 
   public func setFee(self : Ledger, newFee : Nat, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) {
     ignore assertInvariant();
-    let oldFee = self.agent.fee();
+    let oldFee = self.fee;
     if (newFee != oldFee) {
-      self.agent.setFee(newFee);
+      self.fee := newFee;
       onFeeChanged(oldFee, newFee);
     };
     ignore assertInvariant();
@@ -57,7 +58,10 @@ module {
     self.feeLock := true;
     try {
       let ret = switch (await* ICRC1Agent.fetchFee(self.agent)) {
-        case (#ok(fee)) { setFee(self, fee, assertInvariant, onFeeChanged); ?fee };
+        case (#ok(fee)) {
+          setFee(self, fee, assertInvariant, onFeeChanged);
+          ?fee;
+        };
         case _ null;
       };
       ignore assertInvariant();
@@ -77,18 +81,20 @@ module {
   /// Fetches actual deposit for a principal from the ICRC1 ledger.
   public func loadDeposit(self : Ledger, p : Principal, assertInvariant : () -> Bool) : async* BalanceResult {
     ignore assertInvariant();
-    await* ICRC1Agent.balance_of(self.agent, {
-      owner = self.ownPrincipal;
-      subaccount = ?ICRC84.toSubaccount(p);
-    });
+    await* ICRC1Agent.balance_of(
+      self.agent,
+      {
+        owner = self.ownPrincipal;
+        subaccount = ?ICRC84.toSubaccount(p);
+      },
+    );
   };
 
   // Amount is the amount to transfer out, amount - fee is received
   func transfer(self : Ledger, from_subaccount : ?ICRC1.Subaccount, to : ICRC1.Account, amount : Nat, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) : async* TransferResult {
     ignore assertInvariant();
-    let fee = self.agent.fee();
-    assert amount >= fee;
-    let res = await* ICRC1Agent.transfer(self.agent, from_subaccount, to, amount - fee);
+    assert amount >= self.fee;
+    let res = await* ICRC1Agent.transfer(self.agent, from_subaccount, to, amount - self.fee, self.fee);
     checkFee(self, res, assertInvariant, onFeeChanged);
     res;
   };
@@ -117,17 +123,16 @@ module {
   /// <amount - fee will be received in the main account
   public func draw(self : Ledger, p : Principal, from : ICRC1.Account, amount : Nat, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) : async* DrawResult {
     ignore assertInvariant();
-    let fee = self.agent.fee();
-    assert amount >= fee;
+    assert amount >= self.fee;
     let to = { owner = self.ownPrincipal; subaccount = null };
-    let res = await* ICRC1Agent.transfer_from(self.agent, from, to, amount - fee, ?ICRC84.toSubaccount(p));
+    let res = await* ICRC1Agent.transfer_from(self.agent, from, to, amount - self.fee, ?ICRC84.toSubaccount(p), self.fee);
     checkFee(self, res, assertInvariant, onFeeChanged);
     res;
   };
 
   public func share(self : Ledger) : StableData = {
-    fee = self.agent.fee();
+    fee = self.fee;
   };
 
-  public func unshare(self : Ledger, data : StableData) = self.agent.setFee(data.fee);
+  public func unshare(self : Ledger, data : StableData) = self.fee := data.fee;
 };

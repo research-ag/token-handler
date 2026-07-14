@@ -38,20 +38,12 @@ module {
 
   public type LedgerAgent = {
     api : ICRC1.API;
-    var fee_ : Nat;
   };
 
   public func new(api : ICRC1.API) : LedgerAgent {
     {
       api;
-      var fee_ = 0;
     };
-  };
-
-  public func fee(self : LedgerAgent) : Nat = self.fee_;
-
-  public func setFee(self : LedgerAgent, x : Nat) {
-    self.fee_ := x;
   };
 
   public func fetchFee(self : LedgerAgent) : async* FeeResult {
@@ -75,12 +67,13 @@ module {
     from_subaccount : ?ICRC1.Subaccount,
     to : ICRC1.Account,
     amount : Nat,
+    fee : Nat,
   ) : async* TransferResult {
     let args = {
       from_subaccount;
       to;
       amount;
-      fee = ?self.fee_;
+      fee = ?fee;
       memo = null;
       created_at_time = null;
     };
@@ -97,13 +90,14 @@ module {
     to : ICRC1.Account,
     amount : Nat,
     spender : ?ICRC1.Subaccount,
+    fee : Nat,
   ) : async* TransferFromResult {
     let args = {
       spender_subaccount = spender;
       from;
       to;
       amount;
-      fee = ?self.fee_;
+      fee = ?fee;
       memo = null;
       created_at_time = null;
     };
