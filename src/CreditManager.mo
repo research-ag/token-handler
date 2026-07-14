@@ -8,10 +8,6 @@ module {
     #debited : Nat;
   };
 
-  public type StableData = {
-    pool : Nat;
-  };
-
   public type CreditManager = {
     var pool : Nat;
   };

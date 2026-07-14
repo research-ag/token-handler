@@ -8,12 +8,6 @@ import ICRC1 "icrc1-api"; // only needed for error types
 import ICRC84Helper "icrc84-helper";
 
 module {
-  public type StableData = {
-    totalConsolidated : Nat;
-    paused : Bool;
-    totalCredited : Nat;
-    underwayFunds : Nat;
-  };
 
   public type State = {
     paused : Bool;

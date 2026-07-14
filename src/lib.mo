@@ -24,14 +24,33 @@ import ICRC84Helper "icrc84-helper";
 import WithdrawalManager "WithdrawalManager";
 
 module {
+
+  /// Module `TokenHandler` provides mechanisms to facilitate the deposit and withdrawal management on an ICRC-1 ledger.
+  ///
+  /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
+  /// providing a comprehensive solution for handling ICRC-1 token transactions.
+  public type TokenHandler = {
+    var isFrozen_ : Bool;
+    ledger : ICRC84Helper.Ledger;
+    data : Data.Data<Principal>;
+    feeManager : FeeManager.FeeManager;
+    creditManager : CreditManager.CreditManager;
+    depositManager : DepositManager.DepositManager;
+    allowanceManager : AllowanceManager.AllowanceManager;
+    withdrawalManager : WithdrawalManager.WithdrawalManager;
+    triggerOnNotifications : Bool;
+    ownPrincipal : Principal;
+    log : (Principal, LogEvent) -> ();
+  };
+
   public type StableData = {
     data : Data.Data<Principal>;
-    depositManager : DepositManager.StableData;
-    creditManager : CreditManager.StableData;
-    feeManager : FeeManager.StableData;
+    depositManager : DepositManager.DepositManager;
+    creditManager : CreditManager.CreditManager;
+    feeManager : FeeManager.FeeManager;
     ledger : ICRC84Helper.StableData;
-    withdrawalManager : WithdrawalManager.StableData;
-    allowanceManager : AllowanceManager.StableData;
+    withdrawalManager : WithdrawalManager.WithdrawalManager;
+    allowanceManager : AllowanceManager.AllowanceManager;
   };
 
   public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditManager.LogEvent or FeeManager.LogEvent or {
@@ -85,24 +104,6 @@ module {
     ledgerPrincipal
     |> ICRC1.service(_)
     |> ICRC1.apiFromService(_);
-  };
-
-  /// Module `TokenHandler` provides mechanisms to facilitate the deposit and withdrawal management on an ICRC-1 ledger.
-  ///
-  /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
-  /// providing a comprehensive solution for handling ICRC-1 token transactions.
-  public type TokenHandler = {
-    var isFrozen_ : Bool;
-    ledger : ICRC84Helper.Ledger;
-    data : Data.Data<Principal>;
-    feeManager : FeeManager.FeeManager;
-    creditManager : CreditManager.CreditManager;
-    depositManager : DepositManager.DepositManager;
-    allowanceManager : AllowanceManager.AllowanceManager;
-    withdrawalManager : WithdrawalManager.WithdrawalManager;
-    triggerOnNotifications : Bool;
-    ownPrincipal : Principal;
-    log : (Principal, LogEvent) -> ();
   };
 
   public func new(options : TokenHandlerOptions) : TokenHandler {
@@ -380,25 +381,12 @@ module {
   /// Serializes the token handler data.
   public func share(self : TokenHandler) : StableData = {
     data = self.data;
-    creditManager = { pool = self.creditManager.pool };
-    depositManager = {
-      totalConsolidated = self.depositManager.totalConsolidated;
-      paused = self.depositManager.paused;
-      totalCredited = self.depositManager.totalCredited;
-      underwayFunds = self.depositManager.underwayFunds;
-    };
-    feeManager = {
-      surcharge = self.feeManager.surcharge;
-      outstandingFees = self.feeManager.outstandingFees;
-    };
+    creditManager = self.creditManager;
+    depositManager = self.depositManager;
+    feeManager = self.feeManager;
     ledger = self.ledger.share();
-    withdrawalManager = {
-      totalWithdrawn = self.withdrawalManager.totalWithdrawn;
-      lockedFunds = self.withdrawalManager.lockedFunds;
-    };
-    allowanceManager = {
-      totalCredited = self.allowanceManager.totalCredited;
-    };
+    withdrawalManager = self.withdrawalManager;
+    allowanceManager = self.allowanceManager;
   };
 
   /// Deserializes the token handler data.

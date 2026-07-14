@@ -22,10 +22,6 @@ module {
     };
   };
 
-  public type StableData = {
-    totalCredited : Nat;
-  };
-
   public type State = {
     totalCredited : Nat;
   };

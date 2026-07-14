@@ -11,11 +11,6 @@ module {
     #surchargeUpdated : { old : Nat; new : Nat };
   };
 
-  public type StableData = {
-    surcharge : Nat;
-    outstandingFees : Nat;
-  };
-
   public type State = {
     ledger : Nat;
     deposit : Nat;

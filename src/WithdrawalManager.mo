@@ -8,10 +8,6 @@ import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
 
 module {
-  public type StableData = {
-    totalWithdrawn : Nat;
-    lockedFunds : Nat;
-  };
 
   public type State = {
     totalWithdrawn : Nat;
