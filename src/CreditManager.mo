@@ -1,16 +1,12 @@
 import Principal "mo:core/Principal";
 
 import { Data; Entry } "Data";
+import Types "types";
 
 module {
-  public type LogEvent = {
-    #credited : Nat;
-    #debited : Nat;
-  };
+  public type LogEvent = Types.CreditManagerLogEvent;
 
-  public type CreditManager = {
-    var pool : Nat;
-  };
+  public type CreditManager = Types.CreditManager;
 
   public func new() : CreditManager {
     {
@@ -25,31 +21,31 @@ module {
   public func creditUser(
     self : CreditManager,
     data : Data.Data<Principal>,
-    log : (Principal, LogEvent) -> (),
     p : Principal,
     amount : Nat,
+    ctx : Types.TokenHandlerContext,
   ) : Bool {
     if (amount > self.pool) return false;
     self.pool -= amount;
 
     let entry = data.entry(p);
     assert entry.changeCredit(amount);
-    log(p, #credited(amount));
+    ctx.log(p, #credited(amount));
     true;
   };
 
   public func debitUser(
     self : CreditManager,
     data : Data.Data<Principal>,
-    log : (Principal, LogEvent) -> (),
     p : Principal,
     amount : Nat,
+    ctx : Types.TokenHandlerContext,
   ) : Bool {
     let entry = data.entry(p);
     if (not entry.changeCredit(-amount)) return false;
 
     self.pool += amount;
-    log(p, #debited(amount));
+    ctx.log(p, #debited(amount));
     true;
   };
 

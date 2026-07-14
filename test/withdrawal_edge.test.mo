@@ -16,7 +16,7 @@ do {
 
   ignore mock_ledger.fee_.stage_unlocked(?1);
   ignore await* TokenHandler.fetchFee(handler, ctx);
-  handler.setSurcharge(2);
+  handler.setSurcharge(2, ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 1; old = 0; delta = 0 }),
     #surchargeUpdated({ new = 2; old = 0 }),
@@ -50,7 +50,7 @@ do {
   assert journal.hasEvents([]);
 
   // Move all the credit into the pool to test pool withdrawals.
-  assert handler.debitUser(user1, 17) == true;
+  assert handler.debitUser(user1, 17, ctx) == true;
   assert handler.poolCredit() == 17;
   assert journal.hasEvents([#debited(17)]);
 
@@ -79,5 +79,5 @@ do {
     #withdraw({ amount = 10; withdrawn = 10; surcharge = 0; to = account }),
   ]);
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };

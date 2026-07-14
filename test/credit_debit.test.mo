@@ -32,38 +32,38 @@ do {
   ]);
 
   // debitUser: credit < amount -> no change.
-  assert handler.debitUser(user1, 101) == false;
+  assert handler.debitUser(user1, 101, ctx) == false;
   assert handler.userCredit(user1) == 100;
   assert handler.poolCredit() == 0;
   assert journal.hasEvents([]);
 
   // debitUser: amount < credit -> moves credit to the pool.
-  assert handler.debitUser(user1, 50) == true;
+  assert handler.debitUser(user1, 50, ctx) == true;
   assert handler.userCredit(user1) == 50;
   assert handler.poolCredit() == 50;
   assert journal.hasEvents([#debited(50)]);
 
   // debitUser: amount == credit (boundary) -> succeeds, credit becomes 0.
-  assert handler.debitUser(user1, 50) == true;
+  assert handler.debitUser(user1, 50, ctx) == true;
   assert handler.userCredit(user1) == 0;
   assert handler.poolCredit() == 100;
   assert journal.hasEvents([#debited(50)]);
 
   // creditUser: amount > pool -> no change.
-  assert handler.creditUser(user1, 101) == false;
+  assert handler.creditUser(user1, 101, ctx) == false;
   assert handler.userCredit(user1) == 0;
   assert handler.poolCredit() == 100;
   assert journal.hasEvents([]);
 
   // creditUser: amount == pool (boundary) -> succeeds, pool becomes 0.
-  assert handler.creditUser(user2, 100) == true;
+  assert handler.creditUser(user2, 100, ctx) == true;
   assert handler.userCredit(user2) == 100;
   assert handler.poolCredit() == 0;
   assert journal.hasEvents([#credited(100)]);
 
   // creditUser with empty pool -> no change.
-  assert handler.creditUser(user1, 1) == false;
+  assert handler.creditUser(user1, 1, ctx) == false;
   assert journal.hasEvents([]);
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };

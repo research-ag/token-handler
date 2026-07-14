@@ -23,9 +23,8 @@ module {
 
   public type Ledger = Types.Ledger;
 
-  public func Ledger(ownPrincipal : Principal, initial_fee : Nat) : Ledger {
+  public func Ledger(initial_fee : Nat) : Ledger {
     {
-      var ownPrincipal = ownPrincipal;
       var fee = initial_fee;
       var feeLock = false;
     };
@@ -70,12 +69,12 @@ module {
   };
 
   /// Fetches actual deposit for a principal from the ICRC1 ledger.
-  public func loadDeposit(self : Ledger, p : Principal, ctx : Types.TokenHandlerContext) : async* BalanceResult {
+  public func loadDeposit(_self : Ledger, p : Principal, ctx : Types.TokenHandlerContext) : async* BalanceResult {
     ignore ctx.assertInvariant();
     await* ICRC1Agent.balance_of(
       ctx.api,
       {
-        owner = self.ownPrincipal;
+        owner = ctx.ownPrincipal;
         subaccount = ?ICRC84.toSubaccount(p);
       },
     );
@@ -96,7 +95,7 @@ module {
     await* transfer(
       self,
       ?ICRC84.toSubaccount(p),
-      { owner = self.ownPrincipal; subaccount = null },
+      { owner = ctx.ownPrincipal; subaccount = null },
       amount,
       ctx,
     );
@@ -114,7 +113,7 @@ module {
   public func draw(self : Ledger, p : Principal, from : ICRC1.Account, amount : Nat, ctx : Types.TokenHandlerContext) : async* DrawResult {
     ignore ctx.assertInvariant();
     assert amount >= self.fee;
-    let to = { owner = self.ownPrincipal; subaccount = null };
+    let to = { owner = ctx.ownPrincipal; subaccount = null };
     let res = await* ICRC1Agent.transfer_from(ctx.api, from, to, amount - self.fee, ?ICRC84.toSubaccount(p), self.fee);
     checkFee(self, res, ctx);
     res;

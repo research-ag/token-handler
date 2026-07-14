@@ -61,7 +61,6 @@ module {
     icrc84 : ICRC84Helper.Ledger,
     data : Data.Data<Principal>,
     feeManager : FeeManager.FeeManager,
-    log : (Principal, LogEvent) -> (),
     trap : (text : Text) -> (),
     triggerOnNotifications : Bool,
     p : Principal,
@@ -90,7 +89,7 @@ module {
       let ledgerFee = feeManager.ledgerFee(icrc84);
       feeManager.addFee(icrc84);
       data.changeHandlerPool(surcharge);
-      log(
+      ctx.log(
         p,
         #newDeposit {
           depositInc;
@@ -100,13 +99,13 @@ module {
         },
       );
     } else {
-      log(p, #depositInc(depositInc));
+      ctx.log(p, #depositInc(depositInc));
     };
 
     if (triggerOnNotifications) {
       // schedule a canister self-call to initiate the consolidation
       // we need try-catch so that we don't trap if scheduling fails synchronously
-      try ignore async await* trigger(self, icrc84, data, feeManager, log, 1, ctx) catch (_) {};
+      try ignore async await* trigger(self, icrc84, data, feeManager, 1, ctx) catch (_) {};
     };
     return ?(depositInc, creditInc);
   };
@@ -123,7 +122,6 @@ module {
     icrc84 : ICRC84Helper.Ledger,
     data : Data.Data<Principal>,
     feeManager : FeeManager.FeeManager,
-    log : (Principal, LogEvent) -> (),
     trap : (text : Text) -> (),
     triggerOnNotifications : Bool,
     p : Principal,
@@ -133,7 +131,7 @@ module {
     let entry = data.entry(p);
     if (not entry.lock()) return null;
 
-    let ret = await* do_notify(self, icrc84, data, feeManager, log, trap, triggerOnNotifications, p, entry, ctx);
+    let ret = await* do_notify(self, icrc84, data, feeManager, trap, triggerOnNotifications, p, entry, ctx);
 
     assert entry.unlock();
 
@@ -145,7 +143,6 @@ module {
     self : DepositManager,
     icrc84 : ICRC84Helper.Ledger,
     feeManager : FeeManager.FeeManager,
-    log : (Principal, LogEvent) -> (),
     entry : Entry.Entry<Principal>,
     ctx : Types.TokenHandlerContext,
   ) : async* TransferResponse {
@@ -167,7 +164,7 @@ module {
         self.totalConsolidated += consolidated;
         entry.setDeposit(0);
         feeManager.subtractFee(fee);
-        log(entry.key(), #consolidated({ deducted = deposit; credited = consolidated; fee }));
+        ctx.log(entry.key(), #consolidated({ deducted = deposit; credited = consolidated; fee }));
       };
       case (#err _) {};
     };
@@ -186,14 +183,13 @@ module {
     icrc84 : ICRC84Helper.Ledger,
     data : Data.Data<Principal>,
     feeManager : FeeManager.FeeManager,
-    log : (Principal, LogEvent) -> (),
     n : Nat,
     ctx : Types.TokenHandlerContext,
   ) : async* () {
     for (_ in Nat.range(0, n)) {
       let ?entry = data.getMaxEligibleDeposit(feeManager.ledgerFee(icrc84)) else return;
 
-      let result = await* consolidate(self, icrc84, feeManager, log, entry, ctx);
+      let result = await* consolidate(self, icrc84, feeManager, entry, ctx);
 
       switch (result) {
         case (#err(#CallIcrc1LedgerError)) return;

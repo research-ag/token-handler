@@ -21,7 +21,7 @@ do {
   ]);
 
   // update surcharge
-  handler.setSurcharge(2);
+  handler.setSurcharge(2, ctx);
   assert handler.surcharge() == 2;
   assert journal.hasEvents([
     #surchargeUpdated({ new = 2; old = 0 }),
@@ -97,7 +97,7 @@ do {
 
   // debit user
   // (for checking withdrawal from pool)
-  assert handler.debitUser(user1, 10);
+  assert handler.debitUser(user1, 10, ctx);
   assert journal.hasEvents([#debited(10)]);
   assert handler.userCredit(user1) == 0;
   assert handler.poolCredit() == 10;
@@ -126,5 +126,5 @@ do {
   assert state() == (0, 10, 0); // state unchanged
   assert journal.hasEvents([]);
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };

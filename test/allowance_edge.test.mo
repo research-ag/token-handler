@@ -16,7 +16,7 @@ do {
 
   ignore mock_ledger.fee_.stage_unlocked(?2);
   ignore await* TokenHandler.fetchFee(handler, ctx);
-  handler.setSurcharge(1);
+  handler.setSurcharge(1, ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 2; old = 0; delta = 0 }),
     #surchargeUpdated({ new = 1; old = 0 }),
@@ -48,5 +48,5 @@ do {
   assert handler.userCredit(user1) == 10; // unchanged
   assert journal.hasEvents([]);
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };

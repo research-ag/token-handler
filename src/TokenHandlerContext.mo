@@ -7,18 +7,19 @@ module {
 
   public type TokenHandlerContextOptions = {
     ledgerApi : ICRC1.API;
-    // ownPrincipal : Principal;
-    // initialFee : Nat;
-    // triggerOnNotifications : Bool;
-    // log : (Principal, LogEvent) -> ();
+    log : (Principal, Types.LogEvent) -> ();
   };
 
   public func new(handler : TokenHandler.TokenHandler, options : TokenHandlerContextOptions) : Types.TokenHandlerContext {
-    {
+    let ctx = {
+      ownPrincipal = handler.ownPrincipal;
       api = options.ledgerApi;
-      assertInvariant = func() : Bool = TokenHandler.assertInvariant(handler);
-      onFeeChanged = func(oldFee : Nat, newFee : Nat) = TokenHandler.onFeeChanged(handler, oldFee : Nat, newFee : Nat);
+      assertInvariant = func() : Bool = TokenHandler.assertInvariant(handler, ctx);
+      onFeeChanged = func(oldFee : Nat, newFee : Nat) = TokenHandler.onFeeChanged(handler, oldFee : Nat, newFee : Nat, ctx);
+      log = options.log;
+      var isFrozen_ = false;
     };
+    return ctx;
   };
 
 };

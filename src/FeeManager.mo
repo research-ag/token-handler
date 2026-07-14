@@ -33,8 +33,8 @@ module {
     ICRC84Helper.fee(ledger);
   };
 
-  public func setSurcharge(self : FeeManager, s : Nat, log : (Principal, LogEvent) -> ()) {
-    log(Principal.fromBlob(""), #surchargeUpdated({ old = self.surcharge; new = s }));
+  public func setSurcharge(self : FeeManager, s : Nat, ctx : Types.TokenHandlerContext) {
+    ctx.log(Principal.fromBlob(""), #surchargeUpdated({ old = self.surcharge; new = s }));
     self.surcharge := s;
   };
 
@@ -53,12 +53,12 @@ module {
     outstandingFees = self.outstandingFees;
   };
 
-  public func onFeeChanged(self : FeeManager, data : Data.Data<Principal>, old : Nat, new : Nat, log : (Principal, LogEvent) -> ()) {
+  public func onFeeChanged(self : FeeManager, data : Data.Data<Principal>, old : Nat, new : Nat, ctx : Types.TokenHandlerContext) {
     let delta = (new : Int - old) * data.depositsCount();
     data.changeHandlerPool(-delta);
     let sum = (self.outstandingFees : Int) + delta;
     assert sum >= 0;
     self.outstandingFees := Int.abs(sum);
-    log(Principal.fromBlob(""), #feeUpdated({ old; new; delta }));
+    ctx.log(Principal.fromBlob(""), #feeUpdated({ old; new; delta }));
   };
 };

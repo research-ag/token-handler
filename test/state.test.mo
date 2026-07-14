@@ -17,7 +17,7 @@ do {
 
   ignore mock_ledger.fee_.stage_unlocked(?3);
   ignore await* TokenHandler.fetchFee(handler, ctx);
-  handler.setSurcharge(2);
+  handler.setSurcharge(2, ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 3; old = 0; delta = 0 }),
     #surchargeUpdated({ new = 2; old = 0 }),
@@ -63,7 +63,7 @@ do {
   assert s2.users.locked == 0;
   assert s2.users.total == 1;
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };
 
 // Block B: withdrawal from consolidated credit updates flow/withdrawn fields.
@@ -105,5 +105,5 @@ do {
   assert s.users.locked == 0;
   assert s.users.total == 1;
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };

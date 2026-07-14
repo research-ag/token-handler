@@ -49,7 +49,6 @@ module {
     data : Data.Data<Principal>,
     creditManager : CreditManager.CreditManager,
     feeManager : FeeManager.FeeManager,
-    log : (Principal, LogEvent) -> (),
     p : ?Principal,
     to : ICRC1.Account,
     creditAmount : Nat,
@@ -73,7 +72,7 @@ module {
     };
     if (ok) {
       self.lockedFunds += creditAmount;
-      log(principal, #locked(creditAmount));
+      ctx.log(principal, #locked(creditAmount));
     } else {
       return #err(#InsufficientCredit);
     };
@@ -93,10 +92,10 @@ module {
           case (?pp) {
             data.changeHandlerPool(surcharge);
 
-            log(pp, #withdraw { to; amount = creditAmount; withdrawn = amountToSend; surcharge });
+            ctx.log(pp, #withdraw { to; amount = creditAmount; withdrawn = amountToSend; surcharge });
           };
           case null {
-            log(noPrincipal, #withdraw { to; amount = creditAmount; withdrawn = creditAmount; surcharge = 0 });
+            ctx.log(noPrincipal, #withdraw { to; amount = creditAmount; withdrawn = creditAmount; surcharge = 0 });
           };
         };
 
@@ -121,7 +120,7 @@ module {
           case null creditManager.changePool(creditAmount);
         };
 
-        log(principal, #locked(-creditAmount));
+        ctx.log(principal, #locked(-creditAmount));
 
         #err(newError);
       };

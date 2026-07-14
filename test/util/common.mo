@@ -18,13 +18,13 @@ module {
       ownPrincipal = Principal.fromBlob("");
       initialFee = 0;
       triggerOnNotifications;
-      log = journal.log;
     });
 
     let ctx = TokenHandlerContext.new(
       handler,
       {
         ledgerApi = ledger;
+        log = journal.log;
       },
     );
 

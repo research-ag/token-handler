@@ -20,7 +20,7 @@ do {
   ]);
 
   // update surcharge
-  handler.setSurcharge(2);
+  handler.setSurcharge(2, ctx);
   assert handler.surcharge() == 2;
   assert journal.hasEvents([
     #surchargeUpdated({ new = 2; old = 0 }),
@@ -86,7 +86,7 @@ do {
   ]);
   assert handler.userCredit(user1) == 1; // credit not corrected
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };
 
 do {
@@ -111,14 +111,14 @@ do {
   assert journal.hasEvents([
     #feeUpdated({ new = 6; old = 5; delta = 0 }),
   ]);
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };
 
 do {
   let mock_ledger = MockLedger.MockLedger(DEBUG, "");
   let (handler, ctx, journal, _) = Util.createHandler(mock_ledger, false);
 
-  handler.setSurcharge(15);
+  handler.setSurcharge(15, ctx);
   assert handler.surcharge() == 15;
   assert journal.hasEvents([
     #surchargeUpdated({ new = 15; old = 0 })
@@ -142,33 +142,33 @@ do {
 
   // credit user
   // case: pool credit < amount
-  assert handler.creditUser(user1, 30) == false;
+  assert handler.creditUser(user1, 30, ctx) == false;
   assert journal.hasEvents([]);
   assert handler.poolCredit() == 0;
   assert handler.userCredit(user1) == 1;
 
   // debit user
   // case: credit < amount
-  assert handler.debitUser(user1, 30) == false;
+  assert handler.debitUser(user1, 30, ctx) == false;
   assert journal.hasEvents([]);
   assert handler.poolCredit() == 0;
   assert handler.userCredit(user1) == 1;
 
   // debit user
   // case: credit >= amount
-  assert handler.debitUser(user1, 1) == true;
+  assert handler.debitUser(user1, 1, ctx) == true;
   assert journal.hasEvents([#debited(1)]);
   assert handler.poolCredit() == 1;
   assert handler.userCredit(user1) == 0;
 
   // credit user
   // case: pool credit <= amount
-  assert (handler.creditUser(user1, 1)) == true;
+  assert (handler.creditUser(user1, 1, ctx)) == true;
   assert journal.hasEvents([#credited(1)]);
   assert handler.poolCredit() == 0;
   assert handler.userCredit(user1) == 1;
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };
 
 do {
@@ -184,7 +184,7 @@ do {
   ]);
 
   // update surcharge
-  handler.setSurcharge(3);
+  handler.setSurcharge(3, ctx);
   assert handler.surcharge() == 3;
   assert journal.hasEvents([
     #surchargeUpdated({ new = 3; old = 0 }),
@@ -195,7 +195,7 @@ do {
   assert handler.fee(#withdrawal) == 5;
 
   // update surcharge
-  handler.setSurcharge(5);
+  handler.setSurcharge(5, ctx);
   assert handler.surcharge() == 5;
   assert journal.hasEvents([
     #surchargeUpdated({ new = 5; old = 3 }),

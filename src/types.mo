@@ -1,31 +1,30 @@
-import CreditManager "CreditManager";
 import { Data } "Data";
 import ICRC1 "icrc1-api";
 
 module {
 
   public type TokenHandler = {
-    var isFrozen_ : Bool;
-    ledger : Ledger;
-    data : Data.Data<Principal>;
-    feeManager : FeeManager;
-    creditManager : CreditManager.CreditManager;
-    depositManager : DepositManager;
-    allowanceManager : AllowanceManager;
-    withdrawalManager : WithdrawalManager;
-    triggerOnNotifications : Bool;
     ownPrincipal : Principal;
-    log : (Principal, LogEvent) -> ();
+    data : Data.Data<Principal>;
+    depositManager : DepositManager;
+    creditManager : CreditManager;
+    feeManager : FeeManager;
+    ledger : Ledger;
+    withdrawalManager : WithdrawalManager;
+    allowanceManager : AllowanceManager;
+    var triggerOnNotifications : Bool;
   };
 
   public type TokenHandlerContext = {
+    ownPrincipal : Principal;
     api : ICRC1.API;
     assertInvariant : () -> Bool;
     onFeeChanged : (oldFee : Nat, newFee : Nat) -> ();
+    log : (Principal, LogEvent) -> ();
+    var isFrozen_ : Bool;
   };
 
   public type Ledger = {
-    var ownPrincipal : Principal; // FIXME should not be mutable
     var fee : Nat;
     var feeLock : Bool;
   };
@@ -89,7 +88,16 @@ module {
     #locked : Int;
   };
 
-  public type LogEvent = DepositManagerLogEvent or AllowanceManagerLogEvent or WithdrawalManagerLogEvent or CreditManager.LogEvent or FeeManagerLogEvent or {
+  public type CreditManager = {
+    var pool : Nat;
+  };
+
+  public type CreditManagerLogEvent = {
+    #credited : Nat;
+    #debited : Nat;
+  };
+
+  public type LogEvent = DepositManagerLogEvent or AllowanceManagerLogEvent or WithdrawalManagerLogEvent or CreditManagerLogEvent or FeeManagerLogEvent or {
     #error : Text;
   };
 };

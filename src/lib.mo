@@ -33,23 +33,12 @@ module {
   /// providing a comprehensive solution for handling ICRC-1 token transactions.
   public type TokenHandler = Types.TokenHandler;
 
-  public type StableData = {
-    data : Data.Data<Principal>;
-    depositManager : DepositManager.DepositManager;
-    creditManager : CreditManager.CreditManager;
-    feeManager : FeeManager.FeeManager;
-    ledger : ICRC84Helper.Ledger;
-    withdrawalManager : WithdrawalManager.WithdrawalManager;
-    allowanceManager : AllowanceManager.AllowanceManager;
-  };
-
   public type LogEvent = Types.LogEvent;
 
   public type TokenHandlerOptions = {
     ownPrincipal : Principal;
     initialFee : Nat;
     triggerOnNotifications : Bool;
-    log : (Principal, LogEvent) -> ();
   };
 
   public type State = {
@@ -93,7 +82,7 @@ module {
   };
 
   public func new(options : TokenHandlerOptions) : TokenHandler {
-    let ledger = ICRC84Helper.Ledger(options.ownPrincipal, options.initialFee);
+    let ledger = ICRC84Helper.Ledger(options.initialFee);
     let data = Data.empty<Principal>();
     let feeManager = FeeManager.new();
     let creditManager = CreditManager.new();
@@ -102,7 +91,6 @@ module {
     let withdrawalManager = WithdrawalManager.new();
 
     let self : TokenHandler = {
-      var isFrozen_ = false;
       ledger;
       data;
       feeManager;
@@ -110,9 +98,8 @@ module {
       depositManager;
       allowanceManager;
       withdrawalManager;
-      triggerOnNotifications = options.triggerOnNotifications;
+      var triggerOnNotifications = options.triggerOnNotifications;
       ownPrincipal = options.ownPrincipal;
-      log = options.log;
     };
 
     self;
@@ -122,24 +109,24 @@ module {
   public func notificationsOnPause(self : TokenHandler) : Bool = self.depositManager.state(self.data).paused;
 
   /// Pause new notifications.
-  public func pauseNotifications(self : TokenHandler) {
-    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
+  public func pauseNotifications(self : TokenHandler, ctx : Types.TokenHandlerContext) {
+    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
     self.depositManager.pause(true);
   };
 
   /// Unpause new notifications.
-  public func unpauseNotifications(self : TokenHandler) {
-    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
+  public func unpauseNotifications(self : TokenHandler, ctx : Types.TokenHandlerContext) {
+    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
     self.depositManager.pause(false);
   };
 
   /// Checks if the TokenHandler is frozen.
-  public func isFrozen(self : TokenHandler) : Bool = self.isFrozen_;
+  public func isFrozen(self : TokenHandler, ctx : Types.TokenHandlerContext) : Bool = ctx.isFrozen_;
 
   /// Freezes the handler in case of unexpected errors and logs the error message to the journal.
-  func freezeTokenHandler(self : TokenHandler, errorText : Text) : () {
-    self.isFrozen_ := true;
-    self.log(self.ownPrincipal, #error(errorText));
+  func freezeTokenHandler(self : TokenHandler, errorText : Text, ctx : Types.TokenHandlerContext) : () {
+    ctx.isFrozen_ := true;
+    ctx.log(self.ownPrincipal, #error(errorText));
   };
 
   /// Returns the ledger fee.
@@ -149,7 +136,7 @@ module {
   public func surcharge(self : TokenHandler) : Nat = self.feeManager.surcharge;
 
   /// Sets new surcharge amount.
-  public func setSurcharge(self : TokenHandler, s : Nat) = self.feeManager.setSurcharge(s, self.log);
+  public func setSurcharge(self : TokenHandler, s : Nat, ctx : Types.TokenHandlerContext) = self.feeManager.setSurcharge(s, ctx);
 
   /// Calculates the final fee of the specific type.
   public func fee(self : TokenHandler, _ : { #deposit; #allowance; #withdrawal }) : Nat = self.feeManager.fee(self.ledger);
@@ -157,9 +144,9 @@ module {
   /// Fetches and updates the fee from the ICRC1 ledger.
   /// Returns the new fee, or `null` if fetching is already in progress.
   public func fetchFee(self : TokenHandler, ctx : Types.TokenHandlerContext) : async* ?Nat {
-    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* ICRC84Helper.loadFee(self.ledger, ctx);
-    ignore assertInvariant(self);
+    ignore ctx.assertInvariant();
     ret;
   };
 
@@ -211,38 +198,37 @@ module {
 
   /// Adds amount to P’s credit.
   /// With checking the availability of sufficient funds.
-  public func creditUser(self : TokenHandler, p : Principal, amount : Nat) : Bool {
-    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = self.creditManager.creditUser(self.data, self.log, p, amount);
-    ignore assertInvariant(self);
+  public func creditUser(self : TokenHandler, p : Principal, amount : Nat, ctx : Types.TokenHandlerContext) : Bool {
+    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+    let ret = self.creditManager.creditUser(self.data, p, amount, ctx);
+    ignore ctx.assertInvariant();
     ret;
   };
 
   /// Deducts amount from P’s credit.
   /// With checking the availability of sufficient funds in the pool.
-  public func debitUser(self : TokenHandler, p : Principal, amount : Nat) : Bool {
-    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = self.creditManager.debitUser(self.data, self.log, p, amount);
-    ignore assertInvariant(self);
+  public func debitUser(self : TokenHandler, p : Principal, amount : Nat, ctx : Types.TokenHandlerContext) : Bool {
+    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+    let ret = self.creditManager.debitUser(self.data, p, amount, ctx);
+    ignore ctx.assertInvariant();
     ret;
   };
 
   /// Notifies of a deposit and schedules consolidation process.
   /// Returns the newly detected deposit and credit funds if successful, otherwise `null`.
   public func notify(self : TokenHandler, p : Principal, ctx : Types.TokenHandlerContext) : async* ?(Nat, Nat) {
-    if (self.isFrozen_) return null;
+    if (ctx.isFrozen_) return null;
     let ?result = await* DepositManager.notify(
       self.depositManager,
       self.ledger,
       self.data,
       self.feeManager,
-      self.log,
-      func(err) { freezeTokenHandler(self, err) },
+      func(err) { freezeTokenHandler(self, err, ctx) },
       self.triggerOnNotifications,
       p,
       ctx,
     ) else return null;
-    ignore assertInvariant(self);
+    ignore ctx.assertInvariant();
     ?result;
   };
 
@@ -255,37 +241,35 @@ module {
     expectedFee : ?Nat,
     ctx : Types.TokenHandlerContext,
   ) : async* AllowanceManager.DepositFromAllowanceResponse {
-    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* AllowanceManager.depositFromAllowance(
       self.allowanceManager,
       self.ledger,
       self.data,
       self.feeManager,
-      self.log,
       p,
       source,
       amount,
       expectedFee,
       ctx,
     );
-    ignore assertInvariant(self);
+    ignore ctx.assertInvariant();
     ret;
   };
 
   /// Triggers the processing deposits.
   /// n - desired number of potential consolidations.
   public func trigger(self : TokenHandler, n : Nat, ctx : Types.TokenHandlerContext) : async* () {
-    if (self.isFrozen_) return;
+    if (ctx.isFrozen_) return;
     await* DepositManager.trigger(
       self.depositManager,
       self.ledger,
       self.data,
       self.feeManager,
-      self.log,
       n,
       ctx,
     );
-    ignore assertInvariant(self);
+    ignore ctx.assertInvariant();
   };
 
   /// Initiates a withdrawal by transferring tokens to another account.
@@ -298,21 +282,20 @@ module {
     expectedFee : ?Nat,
     ctx : Types.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
-    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* WithdrawalManager.withdraw(
       self.withdrawalManager,
       self.ledger,
       self.data,
       self.creditManager,
       self.feeManager,
-      self.log,
       null,
       to,
       amount,
       expectedFee,
       ctx,
     );
-    ignore assertInvariant(self);
+    ignore ctx.assertInvariant();
     ret;
   };
 
@@ -327,25 +310,24 @@ module {
     expectedFee : ?Nat,
     ctx : Types.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
-    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* WithdrawalManager.withdraw(
       self.withdrawalManager,
       self.ledger,
       self.data,
       self.creditManager,
       self.feeManager,
-      self.log,
       ?p,
       to,
       creditAmount,
       expectedFee,
       ctx,
     );
-    ignore assertInvariant(self);
+    ignore assertInvariant(self, ctx);
     ret;
   };
 
-  public func assertInvariant(self : TokenHandler) : Bool {
+  public func assertInvariant(self : TokenHandler, ctx : Types.TokenHandlerContext) : Bool {
     let { totalConsolidated; funds = { deposited } } = self.depositManager.state(self.data);
     let { totalWithdrawn; lockedFunds } = self.withdrawalManager.state();
     let { totalCredited } = self.allowanceManager.state();
@@ -358,53 +340,12 @@ module {
     let liabilities = creditSum + handlerPool + pool + outstandingFees : Int;
 
     let ok = assets == liabilities;
-    if (not ok) freezeTokenHandler(self, "Invariant violation: assets != liabilities");
+    if (not ok) freezeTokenHandler(self, "Invariant violation: assets != liabilities", ctx);
     ok;
   };
 
-  public func onFeeChanged(self : TokenHandler, oldFee : Nat, newFee : Nat) : () {
+  public func onFeeChanged(self : TokenHandler, oldFee : Nat, newFee : Nat, ctx : Types.TokenHandlerContext) : () {
     self.data.thresholdChanged(newFee);
-    self.feeManager.onFeeChanged(self.data, oldFee, newFee, self.log);
-  };
-
-  /// Serializes the token handler data.
-  public func share(self : TokenHandler) : StableData = {
-    data = self.data;
-    creditManager = self.creditManager;
-    depositManager = self.depositManager;
-    feeManager = self.feeManager;
-    ledger = self.ledger;
-    withdrawalManager = self.withdrawalManager;
-    allowanceManager = self.allowanceManager;
-  };
-
-  /// Deserializes the token handler data.
-  public func unshare(self : TokenHandler, values : StableData) {
-    self.data.tree := values.data.tree;
-    self.data.depositsTree := values.data.depositsTree;
-    self.data.handlerPool := values.data.handlerPool;
-    self.data.lookupCount_ := values.data.lookupCount_;
-    self.data.size_ := values.data.size_;
-    self.data.locks_ := values.data.locks_;
-    self.data.credit_sum := values.data.credit_sum;
-    self.data.deposits_count := values.data.deposits_count;
-    self.data.deposit_sum := values.data.deposit_sum;
-    self.data.unusable_deposit.correct := values.data.unusable_deposit.correct;
-    self.data.unusable_deposit.sum := values.data.unusable_deposit.sum;
-    self.creditManager.pool := values.creditManager.pool;
-    self.depositManager.totalConsolidated := values.depositManager.totalConsolidated;
-    self.depositManager.paused := values.depositManager.paused;
-    self.depositManager.totalCredited := values.depositManager.totalCredited;
-    self.depositManager.underwayFunds := values.depositManager.underwayFunds;
-    self.feeManager.surcharge := values.feeManager.surcharge;
-    self.feeManager.outstandingFees := values.feeManager.outstandingFees;
-
-    self.ledger.fee := values.ledger.fee;
-    self.ledger.feeLock := values.ledger.feeLock;
-    self.ledger.ownPrincipal := values.ledger.ownPrincipal;
-
-    self.withdrawalManager.totalWithdrawn := values.withdrawalManager.totalWithdrawn;
-    self.withdrawalManager.lockedFunds := values.withdrawalManager.lockedFunds;
-    self.allowanceManager.totalCredited := values.allowanceManager.totalCredited;
+    self.feeManager.onFeeChanged(self.data, oldFee, newFee, ctx);
   };
 };

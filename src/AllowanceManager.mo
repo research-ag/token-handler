@@ -38,7 +38,6 @@ module {
     icrc84 : ICRC84Helper.Ledger,
     data : Data.Data<Principal>,
     feeManager : FeeManager.FeeManager,
-    log : (Principal, LogEvent) -> (),
     p : Principal,
     source : ICRC1.Account,
     creditAmount : Nat,
@@ -60,7 +59,7 @@ module {
       assert data.entry(p).changeCredit(creditAmount);
       data.changeHandlerPool(surcharge_);
 
-      log(
+      ctx.log(
         p,
         #allowanceDrawn {
           amount = creditAmount + surcharge_;

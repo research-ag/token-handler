@@ -23,7 +23,7 @@ do {
   ]);
 
   // update surcharge
-  handler.setSurcharge(2);
+  handler.setSurcharge(2, ctx);
   assert handler.surcharge() == 2;
   assert journal.hasEvents([
     #surchargeUpdated({ new = 2; old = 0 }),
@@ -67,7 +67,7 @@ do {
   // scenario 1: old_ledger_fee < deposit <= new_ledger_fee
   // consolidation should fail and credit should be reset
 
-  assert handler.debitUser(user1, 12);
+  assert handler.debitUser(user1, 12, ctx);
   assert journal.hasEvents([
     #debited(12)
   ]);
@@ -125,7 +125,7 @@ do {
     #consolidated({ credited = 14; deducted = 20; fee = 6 }),
   ]);
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };
 
 // Tests with triggerOnNotifications on
@@ -143,7 +143,7 @@ do {
   ]);
 
   // update surcharge
-  handler.setSurcharge(2);
+  handler.setSurcharge(2, ctx);
   assert handler.surcharge() == 2;
   assert journal.hasEvents([
     #surchargeUpdated({ new = 2; old = 0 }),
@@ -168,7 +168,7 @@ do {
     #consolidated({ credited = 3; deducted = 8; fee = 5 }),
   ]);
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };
 
 do {
@@ -208,7 +208,7 @@ do {
   ]);
   assert state() == (0, 15, 0);
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };
 
 // Multiple consolidations trigger
@@ -313,5 +313,5 @@ do {
     ]);
   };
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };

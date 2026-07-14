@@ -23,7 +23,7 @@ do {
   ]);
 
   // update surcharge
-  handler.setSurcharge(2);
+  handler.setSurcharge(2, ctx);
   assert handler.surcharge() == 2;
   assert journal.hasEvents([
     #surchargeUpdated({ new = 2; old = 0 }),
@@ -63,5 +63,5 @@ do {
   assert handler.state().credit == { pool = 4; total = 14 }; // not changed
   assert journal.hasEvents([]);
 
-  assert not handler.isFrozen();
+  assert not handler.isFrozen(ctx);
 };
