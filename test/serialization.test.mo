@@ -12,11 +12,11 @@ let user2 = Principal.fromBlob("2");
 
 do {
   let mock_ledger = MockLedger.MockLedger(DEBUG, "serialization src");
-  let (handler, journal, _) = Util.createHandler(mock_ledger, false);
+  let (handler, ctx, journal, _) = Util.createHandler(mock_ledger, false);
 
   // Build up some non-trivial state.
   ignore mock_ledger.fee_.stage_unlocked(?3);
-  ignore await* TokenHandler.fetchFee(handler);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   handler.setSurcharge(2);
   assert journal.hasEvents([
     #feeUpdated({ new = 3; old = 0; delta = 0 }),
@@ -24,9 +24,9 @@ do {
   ]);
 
   ignore mock_ledger.balance_.stage_unlocked(?10);
-  assert (await* TokenHandler.notify(handler, user1)) == ?(10, 5);
+  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(10, 5);
   ignore mock_ledger.balance_.stage_unlocked(?20);
-  assert (await* TokenHandler.notify(handler, user2)) == ?(20, 15);
+  assert (await* TokenHandler.notify(handler, user2, ctx)) == ?(20, 15);
   assert journal.hasEvents([
     #newDeposit({ creditInc = 5; depositInc = 10; ledgerFee = 3; surcharge = 2 }),
     #newDeposit({ creditInc = 15; depositInc = 20; ledgerFee = 3; surcharge = 2 }),
@@ -34,7 +34,7 @@ do {
 
   // Consolidate the largest deposit (user2).
   ignore mock_ledger.transfer_.stage_unlocked(? #Ok 0);
-  await* TokenHandler.trigger(handler, 1);
+  await* TokenHandler.trigger(handler, 1, ctx);
   assert journal.hasEvents([
     #consolidated({ credited = 17; deducted = 20; fee = 3 }),
   ]);

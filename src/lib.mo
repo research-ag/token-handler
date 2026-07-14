@@ -23,6 +23,7 @@ import FeeManager "FeeManager";
 import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
 import WithdrawalManager "WithdrawalManager";
+import TokenHandlerContext "TokenHandlerContext";
 
 module {
 
@@ -31,7 +32,6 @@ module {
   /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
   /// providing a comprehensive solution for handling ICRC-1 token transactions.
   public type TokenHandler = {
-    api : ICRC1.API;
     var isFrozen_ : Bool;
     ledger : ICRC84Helper.Ledger;
     data : Data.Data<Principal>;
@@ -60,7 +60,6 @@ module {
   };
 
   public type TokenHandlerOptions = {
-    ledgerApi : LedgerAPI;
     ownPrincipal : Principal;
     initialFee : Nat;
     triggerOnNotifications : Bool;
@@ -117,7 +116,6 @@ module {
     let withdrawalManager = WithdrawalManager.new();
 
     let self : TokenHandler = {
-      api = options.ledgerApi;
       var isFrozen_ = false;
       ledger;
       data;
@@ -172,9 +170,9 @@ module {
 
   /// Fetches and updates the fee from the ICRC1 ledger.
   /// Returns the new fee, or `null` if fetching is already in progress.
-  public func fetchFee(self : TokenHandler) : async* ?Nat {
+  public func fetchFee(self : TokenHandler, ctx : TokenHandlerContext.TokenHandlerContext) : async* ?Nat {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = await* ICRC84Helper.loadFee(self.ledger, self.api, func() = assertInvariant(self), func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee));
+    let ret = await* ICRC84Helper.loadFee(self.ledger, ctx.api, func() = assertInvariant(self), func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee));
     ignore assertInvariant(self);
     ret;
   };
@@ -245,7 +243,7 @@ module {
 
   /// Notifies of a deposit and schedules consolidation process.
   /// Returns the newly detected deposit and credit funds if successful, otherwise `null`.
-  public func notify(self : TokenHandler, p : Principal) : async* ?(Nat, Nat) {
+  public func notify(self : TokenHandler, p : Principal, ctx : TokenHandlerContext.TokenHandlerContext) : async* ?(Nat, Nat) {
     if (self.isFrozen_) return null;
     let ?result = await* DepositManager.notify(
       self.depositManager,
@@ -256,7 +254,7 @@ module {
       func(err) { freezeTokenHandler(self, err) },
       self.triggerOnNotifications,
       p,
-      self.api,
+      ctx.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     ) else return null;
@@ -271,6 +269,7 @@ module {
     source : ICRC1.Account,
     amount : Nat,
     expectedFee : ?Nat,
+    ctx : TokenHandlerContext.TokenHandlerContext,
   ) : async* AllowanceManager.DepositFromAllowanceResponse {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* AllowanceManager.depositFromAllowance(
@@ -283,7 +282,7 @@ module {
       source,
       amount,
       expectedFee,
-      self.api,
+      ctx.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
@@ -293,7 +292,7 @@ module {
 
   /// Triggers the processing deposits.
   /// n - desired number of potential consolidations.
-  public func trigger(self : TokenHandler, n : Nat) : async* () {
+  public func trigger(self : TokenHandler, n : Nat, ctx : TokenHandlerContext.TokenHandlerContext) : async* () {
     if (self.isFrozen_) return;
     await* DepositManager.trigger(
       self.depositManager,
@@ -302,7 +301,7 @@ module {
       self.feeManager,
       self.log,
       n,
-      self.api,
+      ctx.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
@@ -317,6 +316,7 @@ module {
     to : ICRC1.Account,
     amount : Nat,
     expectedFee : ?Nat,
+    ctx : TokenHandlerContext.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* WithdrawalManager.withdraw(
@@ -330,7 +330,7 @@ module {
       to,
       amount,
       expectedFee,
-      self.api,
+      ctx.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
@@ -347,6 +347,7 @@ module {
     to : ICRC1.Account,
     creditAmount : Nat,
     expectedFee : ?Nat,
+    ctx : TokenHandlerContext.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* WithdrawalManager.withdraw(
@@ -360,7 +361,7 @@ module {
       to,
       creditAmount,
       expectedFee,
-      self.api,
+      ctx.api,
       func() = assertInvariant(self),
       func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );

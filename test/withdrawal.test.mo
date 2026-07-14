@@ -10,11 +10,11 @@ let DEBUG = false;
 
 do {
   let mock_ledger = MockLedger.MockLedger(DEBUG, "withdrawal");
-  let (handler, journal, state) = Util.createHandler(mock_ledger, false);
+  let (handler, ctx, journal, state) = Util.createHandler(mock_ledger, false);
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?3);
-  ignore await* TokenHandler.fetchFee(handler);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   assert handler.ledgerFee() == 3;
   assert journal.hasEvents([
     #feeUpdated({ new = 3; old = 0; delta = 0 }),
@@ -29,7 +29,7 @@ do {
 
   // increase deposit again
   ignore mock_ledger.balance_.stage_unlocked(?20);
-  assert (await* TokenHandler.notify(handler, user1)) == ?(20, 15);
+  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(20, 15);
   assert state() == (20, 0, 1);
   assert journal.hasEvents([
     #newDeposit {creditInc = 15; depositInc = 20; ledgerFee = 3; surcharge = 2}
@@ -37,7 +37,7 @@ do {
 
   // trigger consolidation
   ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
-  await* TokenHandler.trigger(handler, 1);
+  await* TokenHandler.trigger(handler, 1, ctx);
   ignore mock_ledger.balance_.stage_unlocked(?0);
   assert state() == (0, 17, 0); // consolidation successful
   assert journal.hasEvents([
@@ -50,7 +50,7 @@ do {
 
   // update ledger fee
   ignore mock_ledger.fee_.stage_unlocked(?1);
-  ignore await* TokenHandler.fetchFee(handler);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 1; old = 3; delta = 0 }),
   ]);
@@ -58,7 +58,7 @@ do {
   // withdraw from credit (fee < amount <= credit)
   // should be successful
   ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
-  assert (await* TokenHandler.withdrawFromCredit(handler, user1, account, 5, null)) == #ok(42, 2);
+  assert (await* TokenHandler.withdrawFromCredit(handler, user1, account, 5, null, ctx)) == #ok(42, 2);
   assert handler.userCredit(user1) == 10;
   assert handler.handlerCredit() == 4;
   assert state() == (0, 14, 0);
@@ -71,21 +71,21 @@ do {
   // We are not staging a transfer_ response.
   // By doing so we assert that no call to transfer_ will happen.
   // Because of it did then we would get a pop from queue error.
-  assert (await* TokenHandler.withdrawFromCredit(handler, user1, account, 3, null)) == #err(#TooLowQuantity);
+  assert (await* TokenHandler.withdrawFromCredit(handler, user1, account, 3, null, ctx)) == #err(#TooLowQuantity);
   assert handler.userCredit(user1) == 10; // not changed
   assert state() == (0, 14, 0); // state unchanged
   assert journal.hasEvents([]);
 
   // withdraw from credit (credit < amount)
   // We are not staging a transfer_ response because no call will happen.
-  assert (await* TokenHandler.withdrawFromCredit(handler, user1, account, 100, null)) == #err(#InsufficientCredit);
+  assert (await* TokenHandler.withdrawFromCredit(handler, user1, account, 100, null, ctx)) == #err(#InsufficientCredit);
   assert state() == (0, 14, 0); // state unchanged
   assert journal.hasEvents([]);
 
   // increase fee while withdraw is being underway
   // withdraw should fail, fee should be updated
   ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 2 })); // the second call should not be executed
-  let f2 = async { await* TokenHandler.withdrawFromCredit(handler, user1, account, 5, null) };
+  let f2 = async { await* TokenHandler.withdrawFromCredit(handler, user1, account, 5, null, ctx) };
   assert (await f2) == #err(#BadFee { expected_fee = 4 });
   assert state() == (0, 14, 0); // state unchanged
 
@@ -105,7 +105,7 @@ do {
   // withdraw from pool (ledger_fee < amount <= pool_credit)
   // should be successful
   ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
-  assert (await* TokenHandler.withdrawFromPool(handler, account, 4, null)) == #ok(42, 2);
+  assert (await* TokenHandler.withdrawFromPool(handler, account, 4, null, ctx)) == #ok(42, 2);
   assert handler.poolCredit() == 6;
   assert state() == (0, 10, 0);
   assert journal.hasEvents([
@@ -115,14 +115,14 @@ do {
 
   // withdraw from pool (amount <= ledger_fee)
   // We are not staging a transfer_ response because no call will happen.
-  assert (await* TokenHandler.withdrawFromPool(handler, account, 2, null)) == #err(#TooLowQuantity);
+  assert (await* TokenHandler.withdrawFromPool(handler, account, 2, null, ctx)) == #err(#TooLowQuantity);
   assert handler.poolCredit() == 6; // not changed
   assert state() == (0, 10, 0); // state unchanged
   assert journal.hasEvents([]);
 
   // withdraw from pool (credit < amount)
   // We are not staging a transfer_ response because no call will happen.
-  assert (await* TokenHandler.withdrawFromPool(handler, account, 100, null)) == #err(#InsufficientCredit);
+  assert (await* TokenHandler.withdrawFromPool(handler, account, 100, null, ctx)) == #err(#InsufficientCredit);
   assert state() == (0, 10, 0); // state unchanged
   assert journal.hasEvents([]);
 

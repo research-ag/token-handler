@@ -11,6 +11,7 @@ import List "mo:core/List";
 import ICRC84 "mo:icrc-84";
 
 import TokenHandler "../src";
+import TokenHandlerContext "../src/TokenHandlerContext";
 
 persistent actor class Example() = self {
   // ensure compliance to ICRC84 standart.
@@ -26,6 +27,7 @@ persistent actor class Example() = self {
   type AssetInfo = {
     ledgerPrincipal : Principal;
     handler : TokenHandler.TokenHandler;
+    handlerCtx : TokenHandlerContext.TokenHandlerContext;
   };
 
   type StableAssetInfo = {
@@ -41,9 +43,8 @@ persistent actor class Example() = self {
     Runtime.trap("Not initialized");
   };
 
-  private func createTokenHandler(ledgerPrincipal : Principal) : TokenHandler.TokenHandler {
+  private func createTokenHandler() : TokenHandler.TokenHandler {
     TokenHandler.new({
-      ledgerApi = TokenHandler.buildLedgerApi(ledgerPrincipal);
       ownPrincipal = Principal.fromActor(self);
       initialFee = 0;
       triggerOnNotifications = true;
@@ -61,7 +62,10 @@ persistent actor class Example() = self {
       func(x) {
         let r = {
           ledgerPrincipal = x.ledgerPrincipal;
-          handler = createTokenHandler(x.ledgerPrincipal);
+          handler = createTokenHandler();
+          handlerCtx = TokenHandlerContext.new({
+            ledgerApi = TokenHandler.buildLedgerApi(x.ledgerPrincipal);
+          });
         };
         TokenHandler.unshare(r.handler, x.handler);
         r;
@@ -116,7 +120,7 @@ persistent actor class Example() = self {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
     let result = try {
-      await* TokenHandler.notify(assetInfo.handler, caller);
+      await* TokenHandler.notify(assetInfo.handler, caller, assetInfo.handlerCtx);
     } catch (err) {
       return #Err(#CallLedgerError({ message = Error.message(err) }));
     };
@@ -137,7 +141,7 @@ persistent actor class Example() = self {
   public shared ({ caller }) func icrc84_deposit(args : ICRC84.DepositArgs) : async ICRC84.DepositResponse {
     assertInitialized();
     let ?assetInfo = getAssetInfo(args.token) else throw Error.reject("Unknown token");
-    let res = await* TokenHandler.depositFromAllowance(assetInfo.handler, caller, args.from, args.amount, args.expected_fee);
+    let res = await* TokenHandler.depositFromAllowance(assetInfo.handler, caller, args.from, args.amount, args.expected_fee, assetInfo.handlerCtx);
     switch (res) {
       case (#ok(credit_inc, txid)) #Ok({
         txid;
@@ -168,7 +172,7 @@ persistent actor class Example() = self {
       case null {};
     };
 
-    let res = await* TokenHandler.withdrawFromCredit(assetInfo.handler, caller, args.to, args.amount, args.expected_fee);
+    let res = await* TokenHandler.withdrawFromCredit(assetInfo.handler, caller, args.to, args.amount, args.expected_fee, assetInfo.handlerCtx);
     switch (res) {
       case (#ok(txid, amount)) #Ok({ txid; amount });
       case (#err err) {
@@ -188,7 +192,7 @@ persistent actor class Example() = self {
     #seconds 60,
     func() : async () {
       for (asset in assets.values()) {
-        await* TokenHandler.trigger(asset.handler, 10);
+        await* TokenHandler.trigger(asset.handler, 10, asset.handlerCtx);
       };
     },
   );
@@ -223,7 +227,10 @@ persistent actor class Example() = self {
       assets,
       {
         ledgerPrincipal = ledger;
-        handler = createTokenHandler(ledger);
+        handler = createTokenHandler();
+        handlerCtx = TokenHandlerContext.new({
+          ledgerApi = TokenHandler.buildLedgerApi(ledger);
+        });
       },
     );
     #Ok(id);
