@@ -23,27 +23,11 @@ module {
     var outstandingFees : Nat;
   };
 
-  public func new(
-    ledger : ICRC84Helper.Ledger,
-    data : Data.Data<Principal>,
-    log : (Principal, LogEvent) -> (),
-  ) : FeeManager {
+  public func new() : FeeManager {
     let self : FeeManager = {
       var surcharge = 0;
       var outstandingFees = 0;
     };
-
-    let oldCallback = ledger.onFeeChanged;
-    ledger.onFeeChanged := func(old : Nat, new : Nat) {
-      oldCallback(old, new);
-      let delta = (new : Int - old) * data.depositsCount();
-      data.changeHandlerPool(-delta);
-      let sum = (self.outstandingFees : Int) + delta;
-      assert sum >= 0;
-      self.outstandingFees := Int.abs(sum);
-      log(Principal.fromBlob(""), #feeUpdated({ old; new; delta }));
-    };
-
     self;
   };
 
@@ -72,5 +56,14 @@ module {
     surcharge = self.surcharge;
     deposit = fee(self, ledger);
     outstandingFees = self.outstandingFees;
+  };
+
+  public func onFeeChanged(self : FeeManager, data : Data.Data<Principal>, old : Nat, new : Nat, log : (Principal, LogEvent) -> ()) {
+    let delta = (new : Int - old) * data.depositsCount();
+    data.changeHandlerPool(-delta);
+    let sum = (self.outstandingFees : Int) + delta;
+    assert sum >= 0;
+    self.outstandingFees := Int.abs(sum);
+    log(Principal.fromBlob(""), #feeUpdated({ old; new; delta }));
   };
 };

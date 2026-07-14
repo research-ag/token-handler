@@ -64,6 +64,8 @@ module {
     to : ICRC1.Account,
     creditAmount : Nat,
     userExpectedFee : ?Nat,
+    assertInvariant : () -> Bool,
+    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
   ) : async* WithdrawResponse {
     let noPrincipal = Principal.fromBlob("");
     let realFee = switch (p) {
@@ -94,7 +96,7 @@ module {
       case null creditAmount;
     };
 
-    let res = await* ICRC84Helper.send(icrc84, to, amountToSend);
+    let res = await* ICRC84Helper.send(icrc84, to, amountToSend, assertInvariant, onFeeChanged);
 
     switch (res) {
       case (#ok txid) {

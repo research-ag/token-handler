@@ -109,7 +109,7 @@ module {
   public func new(options : TokenHandlerOptions) : TokenHandler {
     let ledger = ICRC84Helper.Ledger(options.ledgerApi, options.ownPrincipal, options.initialFee);
     let data = Data.empty<Principal>();
-    let feeManager = FeeManager.new(ledger, data, options.log);
+    let feeManager = FeeManager.new();
     let creditManager = CreditManager.new();
     let depositManager = DepositManager.new();
     let allowanceManager = AllowanceManager.new();
@@ -127,16 +127,6 @@ module {
       triggerOnNotifications = options.triggerOnNotifications;
       ownPrincipal = options.ownPrincipal;
       log = options.log;
-    };
-
-    let oldCallback = ledger.onFeeChanged;
-    ledger.onFeeChanged := func(old, new) {
-      data.thresholdChanged(new);
-      oldCallback(old, new);
-    };
-
-    ledger.assertInvariant := func() : Bool {
-      assertInvariant(self);
     };
 
     self;
@@ -182,7 +172,7 @@ module {
   /// Returns the new fee, or `null` if fetching is already in progress.
   public func fetchFee(self : TokenHandler) : async* ?Nat {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = await* ICRC84Helper.loadFee(self.ledger);
+    let ret = await* ICRC84Helper.loadFee(self.ledger, func() = assertInvariant(self), func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee));
     ignore assertInvariant(self);
     ret;
   };
@@ -264,6 +254,8 @@ module {
       func(err) { freezeTokenHandler(self, err) },
       self.triggerOnNotifications,
       p,
+      func() = assertInvariant(self),
+      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     ) else return null;
     ignore assertInvariant(self);
     ?result;
@@ -288,6 +280,8 @@ module {
       source,
       amount,
       expectedFee,
+      func() = assertInvariant(self),
+      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
     ignore assertInvariant(self);
     ret;
@@ -304,6 +298,8 @@ module {
       self.feeManager,
       self.log,
       n,
+      func() = assertInvariant(self),
+      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
     ignore assertInvariant(self);
   };
@@ -329,6 +325,8 @@ module {
       to,
       amount,
       expectedFee,
+      func() = assertInvariant(self),
+      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
     ignore assertInvariant(self);
     ret;
@@ -356,6 +354,8 @@ module {
       to,
       creditAmount,
       expectedFee,
+      func() = assertInvariant(self),
+      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
     );
     ignore assertInvariant(self);
     ret;
@@ -376,6 +376,11 @@ module {
     let ok = assets == liabilities;
     if (not ok) freezeTokenHandler(self, "Invariant violation: assets != liabilities");
     ok;
+  };
+
+  func onFeeChanged(self : TokenHandler, oldFee : Nat, newFee : Nat) : () {
+    self.data.thresholdChanged(newFee);
+    self.feeManager.onFeeChanged(self.data, oldFee, newFee, self.log);
   };
 
   /// Serializes the token handler data.

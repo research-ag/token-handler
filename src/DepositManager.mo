@@ -83,8 +83,10 @@ module {
     triggerOnNotifications : Bool,
     p : Principal,
     entry : Entry.Entry<Principal>,
+    assertInvariant : () -> Bool,
+    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
   ) : async* ?(Nat, Nat) {
-    let #ok latestDeposit = await* ICRC84Helper.loadDeposit(icrc84, p) else return null;
+    let #ok latestDeposit = await* ICRC84Helper.loadDeposit(icrc84, p, assertInvariant) else return null;
 
     if (latestDeposit <= feeManager.fee(icrc84)) {
       return ?(0, 0);
@@ -122,7 +124,7 @@ module {
     if (triggerOnNotifications) {
       // schedule a canister self-call to initiate the consolidation
       // we need try-catch so that we don't trap if scheduling fails synchronously
-      try ignore async await* trigger(self, icrc84, data, feeManager, log, 1) catch (_) {};
+      try ignore async await* trigger(self, icrc84, data, feeManager, log, 1, assertInvariant, onFeeChanged) catch (_) {};
     };
     return ?(depositInc, creditInc);
   };
@@ -143,12 +145,14 @@ module {
     trap : (text : Text) -> (),
     triggerOnNotifications : Bool,
     p : Principal,
+    assertInvariant : () -> Bool,
+    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
   ) : async* ?(Nat, Nat) {
     if (self.paused) return null;
     let entry = data.entry(p);
     if (not entry.lock()) return null;
 
-    let ret = await* do_notify(self, icrc84, data, feeManager, log, trap, triggerOnNotifications, p, entry);
+    let ret = await* do_notify(self, icrc84, data, feeManager, log, trap, triggerOnNotifications, p, entry, assertInvariant, onFeeChanged);
 
     assert entry.unlock();
 
@@ -162,6 +166,8 @@ module {
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
     entry : Entry.Entry<Principal>,
+    assertInvariant : () -> Bool,
+    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
   ) : async* TransferResponse {
     // read deposit amount from registry and erase it
     // we will add it again if the consolidation fails
@@ -173,7 +179,7 @@ module {
     let consolidated : Nat = deposit - fee;
 
     // transfer funds to the main account
-    let res = await* ICRC84Helper.consolidate(icrc84, entry.key(), deposit);
+    let res = await* ICRC84Helper.consolidate(icrc84, entry.key(), deposit, assertInvariant, onFeeChanged);
 
     // process result
     switch (res) {
@@ -202,11 +208,13 @@ module {
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
     n : Nat,
+    assertInvariant : () -> Bool,
+    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
   ) : async* () {
     for (_ in Nat.range(0, n)) {
       let ?entry = data.getMaxEligibleDeposit(feeManager.ledgerFee(icrc84)) else return;
 
-      let result = await* consolidate(self, icrc84, feeManager, log, entry);
+      let result = await* consolidate(self, icrc84, feeManager, log, entry, assertInvariant, onFeeChanged);
 
       switch (result) {
         case (#err(#CallIcrc1LedgerError)) return;

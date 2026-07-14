@@ -50,6 +50,8 @@ module {
     source : ICRC1.Account,
     creditAmount : Nat,
     expectedFee : ?Nat,
+    assertInvariant : () -> Bool,
+    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
   ) : async* DepositFromAllowanceResponse {
     let surcharge_ = feeManager.surcharge;
     let fee = feeManager.fee(icrc84);
@@ -59,7 +61,7 @@ module {
       case (?f) if (f != fee) return #err(#BadFee { expected_fee = fee });
     };
 
-    let res = await* ICRC84Helper.draw(icrc84, p, source, creditAmount + fee);
+    let res = await* ICRC84Helper.draw(icrc84, p, source, creditAmount + fee, assertInvariant, onFeeChanged);
 
     if (res.isOk()) {
       self.totalCredited += creditAmount + surcharge_;
