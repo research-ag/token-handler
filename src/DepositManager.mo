@@ -6,6 +6,7 @@ import { Data; Entry } "Data";
 import FeeManager "FeeManager";
 import ICRC1 "icrc1-api"; // only needed for error types
 import ICRC84Helper "icrc84-helper";
+import Types "types";
 
 module {
 
@@ -24,29 +25,11 @@ module {
     #CallIcrc1LedgerError;
   };
 
-  public type LogEvent = {
-    #newDeposit : {
-      depositInc : Nat;
-      creditInc : Nat;
-      ledgerFee : Nat;
-      surcharge : Nat;
-    };
-    #depositInc : Nat;
-    #consolidated : {
-      deducted : Nat;
-      credited : Nat;
-      fee : Nat;
-    };
-  };
+  public type LogEvent = Types.DepositManagerLogEvent;
 
   public type TransferResponse = Result<Nat, ConsolidationError>;
 
-  public type DepositManager = {
-    var paused : Bool;
-    var totalConsolidated : Nat;
-    var totalCredited : Nat;
-    var underwayFunds : Nat;
-  };
+  public type DepositManager = Types.DepositManager;
 
   public func new() : DepositManager {
     {
@@ -83,11 +66,9 @@ module {
     triggerOnNotifications : Bool,
     p : Principal,
     entry : Entry.Entry<Principal>,
-    api : ICRC1.API,
-    assertInvariant : () -> Bool,
-    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
+    ctx : Types.TokenHandlerContext,
   ) : async* ?(Nat, Nat) {
-    let #ok latestDeposit = await* ICRC84Helper.loadDeposit(icrc84, p, api, assertInvariant) else return null;
+    let #ok latestDeposit = await* ICRC84Helper.loadDeposit(icrc84, p, ctx) else return null;
 
     if (latestDeposit <= feeManager.fee(icrc84)) {
       return ?(0, 0);
@@ -125,7 +106,7 @@ module {
     if (triggerOnNotifications) {
       // schedule a canister self-call to initiate the consolidation
       // we need try-catch so that we don't trap if scheduling fails synchronously
-      try ignore async await* trigger(self, icrc84, data, feeManager, log, 1, api, assertInvariant, onFeeChanged) catch (_) {};
+      try ignore async await* trigger(self, icrc84, data, feeManager, log, 1, ctx) catch (_) {};
     };
     return ?(depositInc, creditInc);
   };
@@ -146,15 +127,13 @@ module {
     trap : (text : Text) -> (),
     triggerOnNotifications : Bool,
     p : Principal,
-    api : ICRC1.API,
-    assertInvariant : () -> Bool,
-    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
+    ctx : Types.TokenHandlerContext,
   ) : async* ?(Nat, Nat) {
     if (self.paused) return null;
     let entry = data.entry(p);
     if (not entry.lock()) return null;
 
-    let ret = await* do_notify(self, icrc84, data, feeManager, log, trap, triggerOnNotifications, p, entry, api, assertInvariant, onFeeChanged);
+    let ret = await* do_notify(self, icrc84, data, feeManager, log, trap, triggerOnNotifications, p, entry, ctx);
 
     assert entry.unlock();
 
@@ -168,9 +147,7 @@ module {
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
     entry : Entry.Entry<Principal>,
-    api : ICRC1.API,
-    assertInvariant : () -> Bool,
-    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
+    ctx : Types.TokenHandlerContext,
   ) : async* TransferResponse {
     // read deposit amount from registry and erase it
     // we will add it again if the consolidation fails
@@ -182,7 +159,7 @@ module {
     let consolidated : Nat = deposit - fee;
 
     // transfer funds to the main account
-    let res = await* ICRC84Helper.consolidate(icrc84, entry.key(), deposit, api, assertInvariant, onFeeChanged);
+    let res = await* ICRC84Helper.consolidate(icrc84, entry.key(), deposit, ctx);
 
     // process result
     switch (res) {
@@ -211,14 +188,12 @@ module {
     feeManager : FeeManager.FeeManager,
     log : (Principal, LogEvent) -> (),
     n : Nat,
-    api : ICRC1.API,
-    assertInvariant : () -> Bool,
-    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
+    ctx : Types.TokenHandlerContext,
   ) : async* () {
     for (_ in Nat.range(0, n)) {
       let ?entry = data.getMaxEligibleDeposit(feeManager.ledgerFee(icrc84)) else return;
 
-      let result = await* consolidate(self, icrc84, feeManager, log, entry, api, assertInvariant, onFeeChanged);
+      let result = await* consolidate(self, icrc84, feeManager, log, entry, ctx);
 
       switch (result) {
         case (#err(#CallIcrc1LedgerError)) return;

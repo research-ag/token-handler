@@ -12,6 +12,7 @@ import ICRC84 "mo:icrc-84";
 
 import TokenHandler "../src";
 import TokenHandlerContext "../src/TokenHandlerContext";
+import Types "../src/types";
 
 persistent actor class Example() = self {
   // ensure compliance to ICRC84 standart.
@@ -27,7 +28,7 @@ persistent actor class Example() = self {
   type AssetInfo = {
     ledgerPrincipal : Principal;
     handler : TokenHandler.TokenHandler;
-    handlerCtx : TokenHandlerContext.TokenHandlerContext;
+    handlerCtx : Types.TokenHandlerContext;
   };
 
   type StableAssetInfo = {
@@ -60,12 +61,16 @@ persistent actor class Example() = self {
     assets := List.map<StableAssetInfo, AssetInfo>(
       assetsData,
       func(x) {
+        let handler = createTokenHandler();
         let r = {
           ledgerPrincipal = x.ledgerPrincipal;
-          handler = createTokenHandler();
-          handlerCtx = TokenHandlerContext.new({
-            ledgerApi = TokenHandler.buildLedgerApi(x.ledgerPrincipal);
-          });
+          handler;
+          handlerCtx = TokenHandlerContext.new(
+            handler,
+            {
+              ledgerApi = TokenHandler.buildLedgerApi(x.ledgerPrincipal);
+            },
+          );
         };
         TokenHandler.unshare(r.handler, x.handler);
         r;
@@ -222,15 +227,18 @@ persistent actor class Example() = self {
       if (Principal.equal(ledger, assetInfo.ledgerPrincipal)) return #Err(#AlreadyRegistered(i));
     };
     let id = assets.size();
-
+    let handler = createTokenHandler();
     List.add<AssetInfo>(
       assets,
       {
         ledgerPrincipal = ledger;
-        handler = createTokenHandler();
-        handlerCtx = TokenHandlerContext.new({
-          ledgerApi = TokenHandler.buildLedgerApi(ledger);
-        });
+        handler;
+        handlerCtx = TokenHandlerContext.new(
+          handler,
+          {
+            ledgerApi = TokenHandler.buildLedgerApi(ledger);
+          },
+        );
       },
     );
     #Ok(id);

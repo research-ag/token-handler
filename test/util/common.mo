@@ -2,12 +2,13 @@ import Principal "mo:core/Principal";
 
 import TokenHandler "../../src";
 import TokenHandlerContext "../../src/TokenHandlerContext";
+import Types "../../src/types";
 import TestJournal "test_journal";
 
 module {
   public func createHandler(ledger : TokenHandler.LedgerAPI, triggerOnNotifications : Bool) : (
     TokenHandler.TokenHandler,
-    TokenHandlerContext.TokenHandlerContext,
+    Types.TokenHandlerContext,
     TestJournal.TestJournal,
     () -> (Nat, Nat, Nat),
   ) {
@@ -20,9 +21,12 @@ module {
       log = journal.log;
     });
 
-    let ctx = TokenHandlerContext.new({
-      ledgerApi = ledger;
-    });
+    let ctx = TokenHandlerContext.new(
+      handler,
+      {
+        ledgerApi = ledger;
+      },
+    );
 
     func state() : (Nat, Nat, Nat) {
       let s = handler.state();

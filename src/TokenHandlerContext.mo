@@ -1,5 +1,6 @@
 import ICRC1 "icrc1-api";
-// import { type TokenHandler } "lib";
+import Types "types";
+import TokenHandler "lib";
 
 // A transient type for TokenHandler callbacks, shared functions, API
 module {
@@ -12,17 +13,11 @@ module {
     // log : (Principal, LogEvent) -> ();
   };
 
-  public type TokenHandlerContext = {
-    api : ICRC1.API;
-    // assertInvariant : () -> Bool;
-    // onFeeChanged : (oldFee : Nat, newFee : Nat) -> ();
-  };
-
-  public func new(/*tokenHandler : TokenHandler, */options : TokenHandlerContextOptions) : TokenHandlerContext {
+  public func new(handler : TokenHandler.TokenHandler, options : TokenHandlerContextOptions) : Types.TokenHandlerContext {
     {
       api = options.ledgerApi;
-      // assertInvariant = tokenHandler.assertInvariant;
-      // onFeeChanged = tokenHandler.onFeeChanged;
+      assertInvariant = func() : Bool = TokenHandler.assertInvariant(handler);
+      onFeeChanged = func(oldFee : Nat, newFee : Nat) = TokenHandler.onFeeChanged(handler, oldFee : Nat, newFee : Nat);
     };
   };
 

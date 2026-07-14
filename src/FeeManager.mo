@@ -4,12 +4,10 @@ import Principal "mo:core/Principal";
 
 import { Data } "Data";
 import ICRC84Helper "icrc84-helper";
+import Types "types";
 
 module {
-  public type LogEvent = {
-    #feeUpdated : { old : Nat; new : Nat; delta : Int };
-    #surchargeUpdated : { old : Nat; new : Nat };
-  };
+  public type LogEvent = Types.FeeManagerLogEvent;
 
   public type State = {
     ledger : Nat;
@@ -18,10 +16,7 @@ module {
     outstandingFees : Nat;
   };
 
-  public type FeeManager = {
-    var surcharge : Nat;
-    var outstandingFees : Nat;
-  };
+  public type FeeManager = Types.FeeManager;
 
   public func new() : FeeManager {
     let self : FeeManager = {

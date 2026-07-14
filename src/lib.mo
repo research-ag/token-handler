@@ -23,7 +23,7 @@ import FeeManager "FeeManager";
 import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
 import WithdrawalManager "WithdrawalManager";
-import TokenHandlerContext "TokenHandlerContext";
+import Types "types";
 
 module {
 
@@ -31,19 +31,7 @@ module {
   ///
   /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
   /// providing a comprehensive solution for handling ICRC-1 token transactions.
-  public type TokenHandler = {
-    var isFrozen_ : Bool;
-    ledger : ICRC84Helper.Ledger;
-    data : Data.Data<Principal>;
-    feeManager : FeeManager.FeeManager;
-    creditManager : CreditManager.CreditManager;
-    depositManager : DepositManager.DepositManager;
-    allowanceManager : AllowanceManager.AllowanceManager;
-    withdrawalManager : WithdrawalManager.WithdrawalManager;
-    triggerOnNotifications : Bool;
-    ownPrincipal : Principal;
-    log : (Principal, LogEvent) -> ();
-  };
+  public type TokenHandler = Types.TokenHandler;
 
   public type StableData = {
     data : Data.Data<Principal>;
@@ -55,9 +43,7 @@ module {
     allowanceManager : AllowanceManager.AllowanceManager;
   };
 
-  public type LogEvent = DepositManager.LogEvent or AllowanceManager.LogEvent or WithdrawalManager.LogEvent or CreditManager.LogEvent or FeeManager.LogEvent or {
-    #error : Text;
-  };
+  public type LogEvent = Types.LogEvent;
 
   public type TokenHandlerOptions = {
     ownPrincipal : Principal;
@@ -170,9 +156,9 @@ module {
 
   /// Fetches and updates the fee from the ICRC1 ledger.
   /// Returns the new fee, or `null` if fetching is already in progress.
-  public func fetchFee(self : TokenHandler, ctx : TokenHandlerContext.TokenHandlerContext) : async* ?Nat {
+  public func fetchFee(self : TokenHandler, ctx : Types.TokenHandlerContext) : async* ?Nat {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = await* ICRC84Helper.loadFee(self.ledger, ctx.api, func() = assertInvariant(self), func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee));
+    let ret = await* ICRC84Helper.loadFee(self.ledger, ctx);
     ignore assertInvariant(self);
     ret;
   };
@@ -243,7 +229,7 @@ module {
 
   /// Notifies of a deposit and schedules consolidation process.
   /// Returns the newly detected deposit and credit funds if successful, otherwise `null`.
-  public func notify(self : TokenHandler, p : Principal, ctx : TokenHandlerContext.TokenHandlerContext) : async* ?(Nat, Nat) {
+  public func notify(self : TokenHandler, p : Principal, ctx : Types.TokenHandlerContext) : async* ?(Nat, Nat) {
     if (self.isFrozen_) return null;
     let ?result = await* DepositManager.notify(
       self.depositManager,
@@ -254,9 +240,7 @@ module {
       func(err) { freezeTokenHandler(self, err) },
       self.triggerOnNotifications,
       p,
-      ctx.api,
-      func() = assertInvariant(self),
-      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
+      ctx,
     ) else return null;
     ignore assertInvariant(self);
     ?result;
@@ -269,7 +253,7 @@ module {
     source : ICRC1.Account,
     amount : Nat,
     expectedFee : ?Nat,
-    ctx : TokenHandlerContext.TokenHandlerContext,
+    ctx : Types.TokenHandlerContext,
   ) : async* AllowanceManager.DepositFromAllowanceResponse {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* AllowanceManager.depositFromAllowance(
@@ -282,9 +266,7 @@ module {
       source,
       amount,
       expectedFee,
-      ctx.api,
-      func() = assertInvariant(self),
-      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
+      ctx,
     );
     ignore assertInvariant(self);
     ret;
@@ -292,7 +274,7 @@ module {
 
   /// Triggers the processing deposits.
   /// n - desired number of potential consolidations.
-  public func trigger(self : TokenHandler, n : Nat, ctx : TokenHandlerContext.TokenHandlerContext) : async* () {
+  public func trigger(self : TokenHandler, n : Nat, ctx : Types.TokenHandlerContext) : async* () {
     if (self.isFrozen_) return;
     await* DepositManager.trigger(
       self.depositManager,
@@ -301,9 +283,7 @@ module {
       self.feeManager,
       self.log,
       n,
-      ctx.api,
-      func() = assertInvariant(self),
-      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
+      ctx,
     );
     ignore assertInvariant(self);
   };
@@ -316,7 +296,7 @@ module {
     to : ICRC1.Account,
     amount : Nat,
     expectedFee : ?Nat,
-    ctx : TokenHandlerContext.TokenHandlerContext,
+    ctx : Types.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* WithdrawalManager.withdraw(
@@ -330,9 +310,7 @@ module {
       to,
       amount,
       expectedFee,
-      ctx.api,
-      func() = assertInvariant(self),
-      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
+      ctx,
     );
     ignore assertInvariant(self);
     ret;
@@ -347,7 +325,7 @@ module {
     to : ICRC1.Account,
     creditAmount : Nat,
     expectedFee : ?Nat,
-    ctx : TokenHandlerContext.TokenHandlerContext,
+    ctx : Types.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* WithdrawalManager.withdraw(
@@ -361,9 +339,7 @@ module {
       to,
       creditAmount,
       expectedFee,
-      ctx.api,
-      func() = assertInvariant(self),
-      func(oldFee, newFee) = onFeeChanged(self, oldFee, newFee),
+      ctx,
     );
     ignore assertInvariant(self);
     ret;
@@ -386,7 +362,7 @@ module {
     ok;
   };
 
-  func onFeeChanged(self : TokenHandler, oldFee : Nat, newFee : Nat) : () {
+  public func onFeeChanged(self : TokenHandler, oldFee : Nat, newFee : Nat) : () {
     self.data.thresholdChanged(newFee);
     self.feeManager.onFeeChanged(self.data, oldFee, newFee, self.log);
   };

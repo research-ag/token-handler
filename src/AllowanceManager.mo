@@ -6,6 +6,7 @@ import ICRC84Helper "icrc84-helper";
 
 import { Data; Entry } "Data";
 import FeeManager "FeeManager";
+import Types "types";
 
 module {
   public type DepositFromAllowanceError = ICRC1.TransferFromError or {
@@ -14,21 +15,13 @@ module {
 
   public type DepositFromAllowanceResponse = R.Result<(credited : Nat, txid : Nat), DepositFromAllowanceError>;
 
-  public type LogEvent = {
-    #allowanceDrawn : {
-      amount : Nat;
-      credited : Nat;
-      surcharge : Nat;
-    };
-  };
+  public type LogEvent = Types.AllowanceManagerLogEvent;
 
   public type State = {
     totalCredited : Nat;
   };
 
-  public type AllowanceManager = {
-    var totalCredited : Nat;
-  };
+  public type AllowanceManager = Types.AllowanceManager;
 
   public func new() : AllowanceManager {
     {
@@ -50,9 +43,7 @@ module {
     source : ICRC1.Account,
     creditAmount : Nat,
     expectedFee : ?Nat,
-    api : ICRC1.API,
-    assertInvariant : () -> Bool,
-    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
+    ctx : Types.TokenHandlerContext,
   ) : async* DepositFromAllowanceResponse {
     let surcharge_ = feeManager.surcharge;
     let fee = feeManager.fee(icrc84);
@@ -62,7 +53,7 @@ module {
       case (?f) if (f != fee) return #err(#BadFee { expected_fee = fee });
     };
 
-    let res = await* ICRC84Helper.draw(icrc84, p, source, creditAmount + fee, api, assertInvariant, onFeeChanged);
+    let res = await* ICRC84Helper.draw(icrc84, p, source, creditAmount + fee, ctx);
 
     if (res.isOk()) {
       self.totalCredited += creditAmount + surcharge_;

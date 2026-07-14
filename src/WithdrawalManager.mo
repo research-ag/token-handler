@@ -6,6 +6,7 @@ import { Data; Entry } "Data";
 import FeeManager "FeeManager";
 import ICRC1 "icrc1-api";
 import ICRC84Helper "icrc84-helper";
+import Types "types";
 
 module {
 
@@ -22,20 +23,9 @@ module {
 
   public type WithdrawResponse = Result<(transactionIndex : Nat, withdrawnAmount : Nat), WithdrawError>;
 
-  public type LogEvent = {
-    #withdraw : {
-      to : ICRC1.Account;
-      amount : Nat;
-      withdrawn : Nat;
-      surcharge : Nat;
-    };
-    #locked : Int;
-  };
+  public type WithdrawalManager = Types.WithdrawalManager;
 
-  public type WithdrawalManager = {
-    var totalWithdrawn : Nat;
-    var lockedFunds : Nat;
-  };
+  public type LogEvent = Types.WithdrawalManagerLogEvent;
 
   public func new() : WithdrawalManager {
     {
@@ -64,9 +54,7 @@ module {
     to : ICRC1.Account,
     creditAmount : Nat,
     userExpectedFee : ?Nat,
-    api : ICRC1.API,
-    assertInvariant : () -> Bool,
-    onFeeChanged : (oldFee : Nat, newFee : Nat) -> (),
+    ctx : Types.TokenHandlerContext,
   ) : async* WithdrawResponse {
     let noPrincipal = Principal.fromBlob("");
     let realFee = switch (p) {
@@ -97,7 +85,7 @@ module {
       case null creditAmount;
     };
 
-    let res = await* ICRC84Helper.send(icrc84, to, amountToSend, api, assertInvariant, onFeeChanged);
+    let res = await* ICRC84Helper.send(icrc84, to, amountToSend, ctx);
 
     switch (res) {
       case (#ok txid) {

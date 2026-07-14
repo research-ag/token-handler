@@ -2,6 +2,7 @@ import ICRC84 "mo:icrc-84";
 
 import ICRC1 "icrc1-api";
 import ICRC1Agent "icrc1-agent";
+import Types "types";
 
 /// This module wraps around the icrc1-agent and further simplifies the arguments
 /// for all calls required for ICRC-84 support.
@@ -20,11 +21,7 @@ module {
 
   type DrawResult = ICRC1Agent.TransferFromResult;
 
-  public type Ledger = {
-    var ownPrincipal : Principal; // FIXME should not be mutable
-    var fee : Nat;
-    var feeLock : Bool;
-  };
+  public type Ledger = Types.Ledger;
 
   public func Ledger(ownPrincipal : Principal, initial_fee : Nat) : Ledger {
     {
@@ -36,47 +33,47 @@ module {
 
   public func fee(self : Ledger) : Nat = self.fee;
 
-  public func setFee(self : Ledger, newFee : Nat, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) {
-    ignore assertInvariant();
+  public func setFee(self : Ledger, newFee : Nat, ctx : Types.TokenHandlerContext) {
+    ignore ctx.assertInvariant();
     let oldFee = self.fee;
     if (newFee != oldFee) {
       self.fee := newFee;
-      onFeeChanged(oldFee, newFee);
+      ctx.onFeeChanged(oldFee, newFee);
     };
-    ignore assertInvariant();
+    ignore ctx.assertInvariant();
   };
 
-  public func loadFee(self : Ledger, api : ICRC1.API, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) : async* ?Nat {
-    ignore assertInvariant();
+  public func loadFee(self : Ledger, ctx : Types.TokenHandlerContext) : async* ?Nat {
+    ignore ctx.assertInvariant();
     if (self.feeLock) return null;
     self.feeLock := true;
     try {
-      let ret = switch (await* ICRC1Agent.fetchFee(api)) {
+      let ret = switch (await* ICRC1Agent.fetchFee(ctx.api)) {
         case (#ok(fee)) {
-          setFee(self, fee, assertInvariant, onFeeChanged);
+          setFee(self, fee, ctx);
           ?fee;
         };
         case _ null;
       };
-      ignore assertInvariant();
+      ignore ctx.assertInvariant();
       ret;
     } finally self.feeLock := false;
   };
 
-  func checkFee(self : Ledger, res : TransferResult or DrawResult, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) : () {
+  func checkFee(self : Ledger, res : TransferResult or DrawResult, ctx : Types.TokenHandlerContext) : () {
     switch (res) {
       case (#err(#BadFee { expected_fee })) {
-        setFee(self, expected_fee, assertInvariant, onFeeChanged);
+        setFee(self, expected_fee, ctx);
       };
       case _ {};
     };
   };
 
   /// Fetches actual deposit for a principal from the ICRC1 ledger.
-  public func loadDeposit(self : Ledger, p : Principal, api : ICRC1.API, assertInvariant : () -> Bool) : async* BalanceResult {
-    ignore assertInvariant();
+  public func loadDeposit(self : Ledger, p : Principal, ctx : Types.TokenHandlerContext) : async* BalanceResult {
+    ignore ctx.assertInvariant();
     await* ICRC1Agent.balance_of(
-      api,
+      ctx.api,
       {
         owner = self.ownPrincipal;
         subaccount = ?ICRC84.toSubaccount(p);
@@ -85,43 +82,41 @@ module {
   };
 
   // Amount is the amount to transfer out, amount - fee is received
-  func transfer(self : Ledger, from_subaccount : ?ICRC1.Subaccount, to : ICRC1.Account, amount : Nat, api : ICRC1.API, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) : async* TransferResult {
-    ignore assertInvariant();
+  func transfer(self : Ledger, from_subaccount : ?ICRC1.Subaccount, to : ICRC1.Account, amount : Nat, ctx : Types.TokenHandlerContext) : async* TransferResult {
+    ignore ctx.assertInvariant();
     assert amount >= self.fee;
-    let res = await* ICRC1Agent.transfer(api, from_subaccount, to, amount - self.fee, self.fee);
-    checkFee(self, res, assertInvariant, onFeeChanged);
+    let res = await* ICRC1Agent.transfer(ctx.api, from_subaccount, to, amount - self.fee, self.fee);
+    checkFee(self, res, ctx);
     res;
   };
 
   /// Consolidate funds into the main account
-  public func consolidate(self : Ledger, p : Principal, amount : Nat, api : ICRC1.API, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) : async* TransferResult {
-    ignore assertInvariant();
+  public func consolidate(self : Ledger, p : Principal, amount : Nat, ctx : Types.TokenHandlerContext) : async* TransferResult {
+    ignore ctx.assertInvariant();
     await* transfer(
       self,
       ?ICRC84.toSubaccount(p),
       { owner = self.ownPrincipal; subaccount = null },
       amount,
-      api,
-      assertInvariant,
-      onFeeChanged,
+      ctx,
     );
   };
 
   /// Send <amount> out from the main account, <amount> - fee_ will be received
-  public func send(self : Ledger, to : ICRC1.Account, amount : Nat, api : ICRC1.API, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) : async* TransferResult {
-    ignore assertInvariant();
-    await* transfer(self, null, to, amount, api, assertInvariant, onFeeChanged);
+  public func send(self : Ledger, to : ICRC1.Account, amount : Nat, ctx : Types.TokenHandlerContext) : async* TransferResult {
+    ignore ctx.assertInvariant();
+    await* transfer(self, null, to, amount, ctx);
   };
 
   /// Draw <amount> from an allowance into the main account
   /// <amount> is the amount including fees subtracted from the allowance
   /// <amount - fee will be received in the main account
-  public func draw(self : Ledger, p : Principal, from : ICRC1.Account, amount : Nat, api : ICRC1.API, assertInvariant : () -> Bool, onFeeChanged : (oldFee : Nat, newFee : Nat) -> ()) : async* DrawResult {
-    ignore assertInvariant();
+  public func draw(self : Ledger, p : Principal, from : ICRC1.Account, amount : Nat, ctx : Types.TokenHandlerContext) : async* DrawResult {
+    ignore ctx.assertInvariant();
     assert amount >= self.fee;
     let to = { owner = self.ownPrincipal; subaccount = null };
-    let res = await* ICRC1Agent.transfer_from(api, from, to, amount - self.fee, ?ICRC84.toSubaccount(p), self.fee);
-    checkFee(self, res, assertInvariant, onFeeChanged);
+    let res = await* ICRC1Agent.transfer_from(ctx.api, from, to, amount - self.fee, ?ICRC84.toSubaccount(p), self.fee);
+    checkFee(self, res, ctx);
     res;
   };
 };
