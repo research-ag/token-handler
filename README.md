@@ -38,6 +38,14 @@ mops install
 mops test
 ```
 
+### Formatting
+
+To format the code, run:
+
+```bash
+npx prettier --plugin prettier-plugin-motoko --write '**/*.{mo,json,md}'
+```
+
 ## Installation
 
 You need `mops` installed. In your project directory run:
@@ -68,13 +76,13 @@ A service can also support multiple tokens, but to do this it has to operate sep
 
 ### TokenHandler options
 
-| Property name | Type | Description |
-| --- | --- | --- |
-| ledgerApi | LedgerAPI | Object that represents the ledger API. |
-| ownPrincipal | Principal | Service principal. |
-| initialFee | Nat | Initial fee value. |
-| triggerOnNotifications | Bool | Flag that enables scheduling consolidation after a deposit notification. |
-| log | (Principal, LogEvent) -> () | Callback that is used to log events inside the token handler. |
+| Property name          | Type                        | Description                                                              |
+| ---------------------- | --------------------------- | ------------------------------------------------------------------------ |
+| ledgerApi              | LedgerAPI                   | Object that represents the ledger API.                                   |
+| ownPrincipal           | Principal                   | Service principal.                                                       |
+| initialFee             | Nat                         | Initial fee value.                                                       |
+| triggerOnNotifications | Bool                        | Flag that enables scheduling consolidation after a deposit notification. |
+| log                    | (Principal, LogEvent) -> () | Callback that is used to log events inside the token handler.            |
 
 ### Fees processing
 
@@ -82,12 +90,12 @@ Fees are made up of two components: the surcharge and the ledger fee.
 
 Depending on the operation, fees are calculated as follows:
 
-| Operation | Fee value |
-| --- | --- |
+| Operation                   | Fee value              |
+| --------------------------- | ---------------------- |
 | Deposit via direct transfer | surcharge + ledger_fee |
-| Deposit via an allowance | surcharge |
-| Withdrawal from credit | surcharge + ledger_fee |
-| Withdrawal from pool | ledger_fee |
+| Deposit via an allowance    | surcharge              |
+| Withdrawal from credit      | surcharge + ledger_fee |
+| Withdrawal from pool        | ledger_fee             |
 
 The difference between the fee for a specific operation within TokenHandler (which is greater than the ledger fee due to the surcharge) and the ledger fee for transactions is a benefit for the service and it is sent to the pool.
 
@@ -160,8 +168,8 @@ Minimal example (just the migration step):
 ```motoko
 import TokenHandler "mo:token-handler";
 
-let stableData : TokenHandler.StableData =
-  TokenHandler.migrateStableDataV1(oldStableData);
+let stableData : TokenHandler.StableData = TokenHandler.migrateStableDataV1(oldStableData);
+
 ```
 
 Typical upgrade pattern with stable variables:
@@ -172,21 +180,23 @@ import TokenHandler "mo:token-handler";
 (
   with migration = func(
     old : {
-      thData : TokenHandler.StableDataV1
+      thData : TokenHandler.StableDataV1;
     }
   ) : {
-    thData : TokenHandler.StableData
+    thData : TokenHandler.StableData;
   } = {
-      thData = TokenHandler.migrateStableDataV1(old.thData);
+    thData = TokenHandler.migrateStableDataV1(old.thData);
   }
 )
 persistent actor class MyClass() {
-    var thData : TokenHandler.StableData;
-    ....
+  var thData : TokenHandler.StableData;
+  ....;
 };
+
 ```
 
 Notes:
+
 - Only projects that store `TokenHandler.StableData` in stable memory are affected.
 - If you never persisted `TokenHandler.StableData`, you can ignore this migration.
 - Versions that introduce the new type are > 0.0.4.
@@ -195,13 +205,14 @@ Notes:
 
 We have the following modules:
 
-|Module|Description|
-|---|---|
-|icrc1-api|ICRC1 type and interface definitions|
-|icrc1-agent|Catches async errors, its functions never throw, simplified argument, no error inspection (pass-through), no retries|
-|icrc84-helper|Easy access to subaccounts with embedded principal, amount arguments have their fee application "reversed", catches BadFee errors, tracks fee changes, stateless except for fee value, no retries|
+| Module        | Description                                                                                                                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| icrc1-api     | ICRC1 type and interface definitions                                                                                                                                                              |
+| icrc1-agent   | Catches async errors, its functions never throw, simplified argument, no error inspection (pass-through), no retries                                                                              |
+| icrc84-helper | Easy access to subaccounts with embedded principal, amount arguments have their fee application "reversed", catches BadFee errors, tracks fee changes, stateless except for fee value, no retries |
 
 Dependency graph:
+
 ```mermaid
 flowchart TD
   A[icrc84-helper] --> B[icrc1-agent]

@@ -10,9 +10,9 @@ import List "mo:core/List";
 
 import ICRC84 "mo:icrc-84";
 
-import TokenHandler "../src";
-import TokenHandlerContext "../src/TokenHandlerContext";
-import Types "../src/types";
+import TokenHandler "mo:token-handler";
+import TokenHandlerContext "mo:token-handler/TokenHandlerContext";
+import Types "mo:token-handler/types";
 
 persistent actor class Example() = self {
   // ensure compliance to ICRC84 standart.

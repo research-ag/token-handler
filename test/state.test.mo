@@ -44,7 +44,7 @@ do {
   assert s1.users.total == 1;
 
   // consolidate
-  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 0);
+  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 0);
   await* TokenHandler.trigger(handler, 1, ctx);
   assert journal.hasEvents([
     #consolidated({ credited = 7; deducted = 10; fee = 3 }),
@@ -75,17 +75,22 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?20);
   assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(20, 20);
   assert journal.hasEvents([
-    #newDeposit({ creditInc = 20; depositInc = 20; ledgerFee = 0; surcharge = 0 }),
+    #newDeposit({
+      creditInc = 20;
+      depositInc = 20;
+      ledgerFee = 0;
+      surcharge = 0;
+    }),
   ]);
 
-  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 0);
+  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 0);
   await* TokenHandler.trigger(handler, 1, ctx);
   assert journal.hasEvents([
     #consolidated({ credited = 20; deducted = 20; fee = 0 }),
   ]);
 
   // withdraw 5 from the user's (consolidated) credit
-  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 1);
+  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 1);
   assert (await* TokenHandler.withdrawFromCredit(handler, user1, account, 5, null, ctx)) == #ok(1, 5);
   assert journal.hasEvents([
     #locked(5),

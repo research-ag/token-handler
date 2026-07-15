@@ -8,3 +8,10 @@
 ./dfx.json
 package-set.dhall
 vessel.dhall
+node_modules/
+package.json
+package-lock.json
+build/
+skills-lock.json
+.agents
+mops.lock

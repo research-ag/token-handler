@@ -18,7 +18,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?3);
-ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   assert handler.ledgerFee() == 3;
   assert journal.hasEvents([
     #feeUpdated({ new = 3; old = 0; delta = 0 }),
@@ -63,7 +63,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?5);
-ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   assert handler.ledgerFee() == 5;
   assert journal.hasEvents([
     #feeUpdated({ new = 5; old = 0; delta = 0 }),
@@ -79,7 +79,7 @@ ignore await* TokenHandler.fetchFee(handler, ctx);
 
   // increase fee while item still in queue (trigger did not run yet)
   ignore mock_ledger.fee_.stage_unlocked(?6);
-ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   assert state() == (6, 0, 1); // recalculation after fee update
   assert journal.hasEvents([
     #feeUpdated({ new = 6; old = 5; delta = 1 }),
@@ -100,7 +100,7 @@ ignore await* TokenHandler.fetchFee(handler, ctx);
   ignore mock_ledger.fee_.stage_unlocked(?10); // fee 6 -> 10
   let f1 = async { await* TokenHandler.notify(handler, user1, ctx) };
   assert state() == (7, 0, 1); // state from before
-ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 10; old = 6; delta = 4 }),
   ]);
@@ -122,7 +122,7 @@ ignore await* TokenHandler.fetchFee(handler, ctx);
   ignore mock_ledger.fee_.stage_unlocked(?15); // fee 10 -> 15
   let f2 = async { await* TokenHandler.notify(handler, user1, ctx) }; // would return ?(5, _) at old fee
   assert state() == (15, 0, 1); // state from before
-ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 15; old = 10; delta = 5 }),
   ]);
@@ -139,7 +139,7 @@ ignore await* TokenHandler.fetchFee(handler, ctx);
   ignore mock_ledger.fee_.stage_unlocked(?10); // fee 15 -> 10
   let f3 = async { await* TokenHandler.notify(handler, user1, ctx) };
   assert state() == (20, 0, 1); // state from before
-ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 10; old = 15; delta = -5 }),
   ]);
@@ -173,7 +173,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?5);
-ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* TokenHandler.fetchFee(handler, ctx);
   assert handler.ledgerFee() == 5;
   assert journal.hasEvents([
     #feeUpdated({ new = 5; old = 0; delta = 0 }),

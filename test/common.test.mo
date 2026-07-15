@@ -127,7 +127,12 @@ do {
   ignore mock_ledger.balance_.stage_unlocked(?16);
   assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(16, 1);
   assert journal.hasEvents([
-    #newDeposit({ creditInc = 1; depositInc = 16; ledgerFee = 0; surcharge = 15 }),
+    #newDeposit({
+      creditInc = 1;
+      depositInc = 16;
+      ledgerFee = 0;
+      surcharge = 15;
+    }),
   ]);
 
   let i = mock_ledger.transfer_.stage_unlocked(?(#Ok 0));

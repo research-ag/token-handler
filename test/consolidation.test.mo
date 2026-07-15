@@ -38,7 +38,7 @@ do {
     #newDeposit { creditInc = 5; depositInc = 10; ledgerFee = 3; surcharge = 2 },
   ]);
   assert state() == (10, 0, 1);
-  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 10 }));
+  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 10 }));
   await* TokenHandler.trigger(handler, 1, ctx);
   assert handler.userCredit(user1) == 5; // credit has not been corrected after consolidation
   assert state() == (10, 0, 1);
@@ -55,7 +55,7 @@ do {
     #depositInc(10),
   ]);
   assert state() == (20, 0, 1);
-  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 15 }));
+  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 15 }));
   await* TokenHandler.trigger(handler, 1, ctx);
   assert handler.userCredit(user1) == 15; // credit has not been corrected after consolidation
   assert state() == (20, 0, 1); // consolidation failed without updated deposit
@@ -75,7 +75,7 @@ do {
   assert handler.userCredit(user1) == 3; // initial credit
   assert journal.hasEvents([]);
   assert state() == (20, 0, 1);
-  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 100 }));
+  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 100 }));
   ignore mock_ledger.fee_.stage_unlocked(?100);
   let f1 = async { await* TokenHandler.trigger(handler, 1, ctx) };
   ignore await* TokenHandler.fetchFee(handler, ctx);
@@ -97,7 +97,7 @@ do {
   ]);
 
   assert state() == (20, 0, 1);
-  ignore mock_ledger.transfer_.stage_unlocked(? #Err(#BadFee { expected_fee = 6 }));
+  ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 6 }));
   ignore mock_ledger.fee_.stage_unlocked(?6);
   let f2 = async { await* TokenHandler.trigger(handler, 1, ctx) };
   ignore await* TokenHandler.fetchFee(handler, ctx);
@@ -114,7 +114,7 @@ do {
   //
   // We are only staging one transfer response, despite two trigger calls below.
   // We are thereby asserting that only the first trigger call will call transfer().
-  ignore mock_ledger.transfer_.stage_unlocked(? #Ok 42);
+  ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
   let f3 = async { await* TokenHandler.trigger(handler, 1, ctx) };
   let f4 = async { await* TokenHandler.trigger(handler, 1, ctx) };
   await f3;
@@ -152,7 +152,7 @@ do {
   // notify with balance > fee
   ignore mock_ledger.balance_.stage_unlocked(?8);
   // TODO try with null
-  let i = mock_ledger.transfer_.stage_unlocked(? #Ok 42);
+  let i = mock_ledger.transfer_.stage_unlocked(?#Ok 42);
   assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(8, 1);
   assert state() == (8, 0, 1);
   assert journal.hasEvents([
@@ -194,7 +194,12 @@ do {
   ignore ledger.balance_.stage_unlocked(?20);
   assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(20, 15); // (deposit, credit)
   assert journal.hasEvents([
-    #newDeposit({ creditInc = 15; depositInc = 20; ledgerFee = 5; surcharge = 0 }),
+    #newDeposit({
+      creditInc = 15;
+      depositInc = 20;
+      ledgerFee = 5;
+      surcharge = 0;
+    }),
   ]);
   assert state() == (20, 0, 1);
   ignore ledger.transfer_.stage_unlocked(null); // error response

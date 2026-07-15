@@ -16,6 +16,7 @@ tests were added.
 
 ```motoko
 consolidated = d.totalConsolidated - w.totalWithdrawn;
+
 ```
 
 **Problem:**
@@ -30,6 +31,7 @@ never `depositManager.totalConsolidated`). As soon as such credit is withdrawn,
 any subsequent call to `state()` traps.
 
 **Reproduction (see `test/detected_bugs.test.mo`, block "Bug 1"):**
+
 1. `depositFromAllowance` to credit a user 10 (no consolidation happens).
 2. `withdrawFromCredit` the full 10 (`totalWithdrawn` becomes 10).
 3. Call `handler.state()` → traps with `arithmetic overflow` at `lib.mo:206`.
@@ -64,6 +66,7 @@ if (latestDeposit == prevDeposit) return ?(0, 0);
 entry.setDeposit(latestDeposit);
 
 let depositInc = latestDeposit - prevDeposit : Nat;
+
 ```
 
 **Problem:**
@@ -79,6 +82,7 @@ Because the message traps, all its state changes are rolled back — including t
 handler gracefully and keep going" behaviour is never achieved.
 
 **Reproduction (see `test/detected_bugs.test.mo`, block "Bug 2"):**
+
 1. `notify` with balance 20 → tracked deposit becomes 20.
 2. `notify` again with a decreased balance 10 (still above the fee).
 3. The call traps with `arithmetic overflow` at `DepositManager.mo:98`.

@@ -149,7 +149,12 @@ module {
       let value = self.tree.get(compare, key);
       switch (value) {
         case (?v) ({ var inside = true; key_ = key; value = v; state = self });
-        case null ({ var inside = false; key_ = key; value = { var lock = false; var credit = 0; var deposit = 0 }; state = self });
+        case null ({
+          var inside = false;
+          key_ = key;
+          value = { var lock = false; var credit = 0; var deposit = 0 };
+          state = self;
+        });
       };
     };
 
@@ -181,7 +186,12 @@ module {
       if (updateUnusableDeposit(self, threshold)) return null;
       for (((deposit, key), value) in self.depositsTree.reverseEntries()) {
         if (deposit <= threshold) return null;
-        if (not value.lock) return ?{ var inside = true; key_ = key; value; state = self };
+        if (not value.lock) return ?{
+          var inside = true;
+          key_ = key;
+          value;
+          state = self;
+        };
       };
       return null;
     };

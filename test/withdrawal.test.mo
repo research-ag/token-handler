@@ -32,7 +32,12 @@ do {
   assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(20, 15);
   assert state() == (20, 0, 1);
   assert journal.hasEvents([
-    #newDeposit {creditInc = 15; depositInc = 20; ledgerFee = 3; surcharge = 2}
+    #newDeposit {
+      creditInc = 15;
+      depositInc = 20;
+      ledgerFee = 3;
+      surcharge = 2;
+    }
   ]);
 
   // trigger consolidation
@@ -85,14 +90,16 @@ do {
   // increase fee while withdraw is being underway
   // withdraw should fail, fee should be updated
   ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee { expected_fee = 2 })); // the second call should not be executed
-  let f2 = async { await* TokenHandler.withdrawFromCredit(handler, user1, account, 5, null, ctx) };
+  let f2 = async {
+    await* TokenHandler.withdrawFromCredit(handler, user1, account, 5, null, ctx);
+  };
   assert (await f2) == #err(#BadFee { expected_fee = 4 });
   assert state() == (0, 14, 0); // state unchanged
 
   assert journal.hasEvents([
     #locked(5),
     #feeUpdated({ new = 2; old = 1; delta = 0 }),
-    #locked(-5)
+    #locked(-5),
   ]);
 
   // debit user

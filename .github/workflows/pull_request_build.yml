@@ -32,6 +32,11 @@ jobs:
           mops --version
           $(mops toolchain bin moc) --version
 
+      - name: Prettier Check
+        run: |
+          npm install prettier prettier-plugin-motoko --no-save
+          npx prettier --plugin prettier-plugin-motoko --check '**/*.{mo,json,md}'
+
       - name: Run tests
         run: mops test
 

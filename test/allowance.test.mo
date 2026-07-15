@@ -30,13 +30,13 @@ do {
   ]);
 
   // deposit via allowance < amount + fee
-  ignore mock_ledger.transfer_from_.stage_unlocked(? #Err(#InsufficientAllowance({ allowance = 8 })));
+  ignore mock_ledger.transfer_from_.stage_unlocked(?#Err(#InsufficientAllowance({ allowance = 8 })));
   assert (await* TokenHandler.depositFromAllowance(handler, user1, user1_account, 4, null, ctx)) == #err(#InsufficientAllowance({ allowance = 8 }));
   assert state() == (0, 0, 0);
   assert journal.hasEvents([]);
 
   // deposit via allowance >= amount + fee
-  ignore mock_ledger.transfer_from_.stage_unlocked(? #Ok 42);
+  ignore mock_ledger.transfer_from_.stage_unlocked(?#Ok 42);
   assert (await* TokenHandler.depositFromAllowance(handler, user1, user1_account, 3, null, ctx)) == #ok(3, 42);
   assert handler.userCredit(user1) == 3;
   assert handler.state().credit == { pool = 2; total = 5 };
@@ -46,7 +46,7 @@ do {
 
   // deposit from allowance >= amount
   // caller principal != account owner
-  ignore mock_ledger.transfer_from_.stage_unlocked(? #Ok 42);
+  ignore mock_ledger.transfer_from_.stage_unlocked(?#Ok 42);
   assert (await* TokenHandler.depositFromAllowance(handler, user1, user2_account, 7, null, ctx)) == #ok(7, 42);
   assert handler.userCredit(user1) == 10;
   assert handler.state().credit == { pool = 4; total = 14 };
