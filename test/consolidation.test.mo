@@ -125,7 +125,7 @@ do {
     #consolidated({ credited = 14; deducted = 20; fee = 6 }),
   ]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };
 
 // Tests with triggerOnNotifications on
@@ -168,7 +168,7 @@ do {
     #consolidated({ credited = 3; deducted = 8; fee = 5 }),
   ]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };
 
 do {
@@ -208,7 +208,7 @@ do {
   ]);
   assert state() == (0, 15, 0);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };
 
 // Multiple consolidations trigger
@@ -313,5 +313,5 @@ do {
     ]);
   };
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };

@@ -35,12 +35,6 @@ module {
 
   public type LogEvent = Types.LogEvent;
 
-  public type TokenHandlerOptions = {
-    ownPrincipal : Principal;
-    initialFee : Nat;
-    triggerOnNotifications : Bool;
-  };
-
   public type State = {
     balance : {
       deposited : Nat;
@@ -81,51 +75,46 @@ module {
     |> ICRC1.apiFromService(_);
   };
 
-  public func new(options : TokenHandlerOptions) : TokenHandler {
-    let ledger = ICRC84Helper.Ledger(options.initialFee);
-    let data = Data.empty<Principal>();
-    let feeManager = FeeManager.new();
-    let creditManager = CreditManager.new();
-    let depositManager = DepositManager.new();
-    let allowanceManager = AllowanceManager.new();
-    let withdrawalManager = WithdrawalManager.new();
-
-    let self : TokenHandler = {
-      ledger;
-      data;
-      feeManager;
-      creditManager;
-      depositManager;
-      allowanceManager;
-      withdrawalManager;
-      var triggerOnNotifications = options.triggerOnNotifications;
-      ownPrincipal = options.ownPrincipal;
-    };
-
-    self;
+  public func new(
+    options : {
+      ownPrincipal : Principal;
+      initialFee : Nat;
+      triggerOnNotifications : Bool;
+    }
+  ) : TokenHandler = {
+    ledger = ICRC84Helper.Ledger(options.initialFee);
+    data = Data.empty<Principal>();
+    feeManager = FeeManager.new();
+    creditManager = CreditManager.new();
+    depositManager = DepositManager.new();
+    allowanceManager = AllowanceManager.new();
+    withdrawalManager = WithdrawalManager.new();
+    var triggerOnNotifications = options.triggerOnNotifications;
+    ownPrincipal = options.ownPrincipal;
+    var isFrozen_ = false;
   };
 
   /// Returns `true` when new notifications are paused.
   public func notificationsOnPause(self : TokenHandler) : Bool = self.depositManager.state(self.data).paused;
 
   /// Pause new notifications.
-  public func pauseNotifications(self : TokenHandler, ctx : Types.TokenHandlerContext) {
-    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+  public func pauseNotifications(self : TokenHandler) {
+    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     self.depositManager.pause(true);
   };
 
   /// Unpause new notifications.
-  public func unpauseNotifications(self : TokenHandler, ctx : Types.TokenHandlerContext) {
-    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+  public func unpauseNotifications(self : TokenHandler) {
+    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     self.depositManager.pause(false);
   };
 
   /// Checks if the TokenHandler is frozen.
-  public func isFrozen(self : TokenHandler, ctx : Types.TokenHandlerContext) : Bool = ctx.isFrozen_;
+  public func isFrozen(self : TokenHandler) : Bool = self.isFrozen_;
 
   /// Freezes the handler in case of unexpected errors and logs the error message to the journal.
   func freezeTokenHandler(self : TokenHandler, errorText : Text, ctx : Types.TokenHandlerContext) : () {
-    ctx.isFrozen_ := true;
+    self.isFrozen_ := true;
     ctx.log(self.ownPrincipal, #error(errorText));
   };
 
@@ -144,7 +133,7 @@ module {
   /// Fetches and updates the fee from the ICRC1 ledger.
   /// Returns the new fee, or `null` if fetching is already in progress.
   public func fetchFee(self : TokenHandler, ctx : Types.TokenHandlerContext) : async* ?Nat {
-    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* ICRC84Helper.loadFee(self.ledger, ctx);
     ignore ctx.assertInvariant();
     ret;
@@ -199,7 +188,7 @@ module {
   /// Adds amount to P’s credit.
   /// With checking the availability of sufficient funds.
   public func creditUser(self : TokenHandler, p : Principal, amount : Nat, ctx : Types.TokenHandlerContext) : Bool {
-    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = self.creditManager.creditUser(self.data, p, amount, ctx);
     ignore ctx.assertInvariant();
     ret;
@@ -208,7 +197,7 @@ module {
   /// Deducts amount from P’s credit.
   /// With checking the availability of sufficient funds in the pool.
   public func debitUser(self : TokenHandler, p : Principal, amount : Nat, ctx : Types.TokenHandlerContext) : Bool {
-    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = self.creditManager.debitUser(self.data, p, amount, ctx);
     ignore ctx.assertInvariant();
     ret;
@@ -217,7 +206,7 @@ module {
   /// Notifies of a deposit and schedules consolidation process.
   /// Returns the newly detected deposit and credit funds if successful, otherwise `null`.
   public func notify(self : TokenHandler, p : Principal, ctx : Types.TokenHandlerContext) : async* ?(Nat, Nat) {
-    if (ctx.isFrozen_) return null;
+    if (self.isFrozen_) return null;
     let ?result = await* DepositManager.notify(
       self.depositManager,
       self.ledger,
@@ -241,7 +230,7 @@ module {
     expectedFee : ?Nat,
     ctx : Types.TokenHandlerContext,
   ) : async* AllowanceManager.DepositFromAllowanceResponse {
-    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* AllowanceManager.depositFromAllowance(
       self.allowanceManager,
       self.ledger,
@@ -260,7 +249,7 @@ module {
   /// Triggers the processing deposits.
   /// n - desired number of potential consolidations.
   public func trigger(self : TokenHandler, n : Nat, ctx : Types.TokenHandlerContext) : async* () {
-    if (ctx.isFrozen_) return;
+    if (self.isFrozen_) return;
     await* DepositManager.trigger(
       self.depositManager,
       self.ledger,
@@ -282,7 +271,7 @@ module {
     expectedFee : ?Nat,
     ctx : Types.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
-    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* WithdrawalManager.withdraw(
       self.withdrawalManager,
       self.ledger,
@@ -310,7 +299,7 @@ module {
     expectedFee : ?Nat,
     ctx : Types.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
-    if (ctx.isFrozen_) Runtime.trap("The token handler is frozen");
+    if (self.isFrozen_) Runtime.trap("The token handler is frozen");
     let ret = await* WithdrawalManager.withdraw(
       self.withdrawalManager,
       self.ledger,

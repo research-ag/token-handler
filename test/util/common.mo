@@ -20,13 +20,7 @@ module {
       triggerOnNotifications;
     });
 
-    let ctx = TokenHandlerContext.new(
-      handler,
-      {
-        ledgerApi = ledger;
-        log = journal.log;
-      },
-    );
+    let ctx = TokenHandlerContext.new(handler, ledger, journal.log);
 
     func state() : (Nat, Nat, Nat) {
       let s = handler.state();

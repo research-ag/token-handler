@@ -79,5 +79,5 @@ do {
     #withdraw({ amount = 10; withdrawn = 10; surcharge = 0; to = account }),
   ]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };

@@ -126,5 +126,5 @@ do {
   assert state() == (0, 10, 0); // state unchanged
   assert journal.hasEvents([]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };

@@ -63,7 +63,7 @@ do {
   assert s2.users.locked == 0;
   assert s2.users.total == 1;
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };
 
 // Block B: withdrawal from consolidated credit updates flow/withdrawn fields.
@@ -105,5 +105,5 @@ do {
   assert s.users.locked == 0;
   assert s.users.total == 1;
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };

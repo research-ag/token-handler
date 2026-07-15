@@ -63,5 +63,5 @@ do {
   assert handler.state().credit == { pool = 4; total = 14 }; // not changed
   assert journal.hasEvents([]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };

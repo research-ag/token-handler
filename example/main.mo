@@ -31,12 +31,8 @@ persistent actor class Example() = self {
   transient let handlerCtxs : List.List<Types.TokenHandlerContext> = assets.map<AssetInfo, Types.TokenHandlerContext>(
     func(assetInfo) = TokenHandlerContext.new(
       assetInfo.handler,
-      {
-        ledgerApi = TokenHandler.buildLedgerApi(assetInfo.ledgerPrincipal);
-        log = func(p : Principal, event : TokenHandler.LogEvent) {
-          journal.add((Time.now(), p, event));
-        };
-      },
+      TokenHandler.buildLedgerApi(assetInfo.ledgerPrincipal),
+      func(p : Principal, event : TokenHandler.LogEvent) = journal.add((Time.now(), p, event)),
     )
   );
 
@@ -204,12 +200,8 @@ persistent actor class Example() = self {
     handlerCtxs.add(
       TokenHandlerContext.new(
         handler,
-        {
-          ledgerApi = TokenHandler.buildLedgerApi(ledger);
-          log = func(p : Principal, event : TokenHandler.LogEvent) {
-            journal.add((Time.now(), p, event));
-          };
-        },
+        TokenHandler.buildLedgerApi(ledger),
+        func(p : Principal, event : TokenHandler.LogEvent) = journal.add((Time.now(), p, event)),
       )
     );
     #Ok(id);

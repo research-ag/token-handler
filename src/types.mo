@@ -13,15 +13,15 @@ module {
     withdrawalManager : WithdrawalManager;
     allowanceManager : AllowanceManager;
     var triggerOnNotifications : Bool;
+    var isFrozen_ : Bool;
   };
 
   public type TokenHandlerContext = {
-    ownPrincipal : Principal;
     api : ICRC1.API;
+    ownPrincipal : Principal;
     assertInvariant : () -> Bool;
     onFeeChanged : (oldFee : Nat, newFee : Nat) -> ();
     log : (Principal, LogEvent) -> ();
-    var isFrozen_ : Bool;
   };
 
   public type Ledger = {

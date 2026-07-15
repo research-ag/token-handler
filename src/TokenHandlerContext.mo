@@ -5,18 +5,17 @@ import TokenHandler "lib";
 // A transient type for TokenHandler callbacks, shared functions, API
 module {
 
-  public type TokenHandlerContextOptions = {
-    ledgerApi : ICRC1.API;
-    log : (Principal, Types.LogEvent) -> ();
-  };
-
-  public func new(handler : TokenHandler.TokenHandler, options : TokenHandlerContextOptions) : Types.TokenHandlerContext {
+  public func new(
+    handler : TokenHandler.TokenHandler,
+    ledgerApi : ICRC1.API,
+    log : (Principal, Types.LogEvent) -> (),
+  ) : Types.TokenHandlerContext {
     let ctx = {
       ownPrincipal = handler.ownPrincipal;
-      api = options.ledgerApi;
-      assertInvariant = func() : Bool = TokenHandler.assertInvariant(handler, ctx);
-      onFeeChanged = func(oldFee : Nat, newFee : Nat) = TokenHandler.onFeeChanged(handler, oldFee : Nat, newFee : Nat, ctx);
-      log = options.log;
+      api = ledgerApi;
+      assertInvariant = func() : Bool = handler.assertInvariant(ctx);
+      onFeeChanged = func(oldFee : Nat, newFee : Nat) = handler.onFeeChanged(oldFee : Nat, newFee : Nat, ctx);
+      log = log;
       var isFrozen_ = false;
     };
     return ctx;

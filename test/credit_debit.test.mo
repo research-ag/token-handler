@@ -65,5 +65,5 @@ do {
   assert handler.creditUser(user1, 1, ctx) == false;
   assert journal.hasEvents([]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };

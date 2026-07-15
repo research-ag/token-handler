@@ -48,5 +48,5 @@ do {
   assert handler.userCredit(user1) == 10; // unchanged
   assert journal.hasEvents([]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };

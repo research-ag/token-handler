@@ -53,7 +53,7 @@ ignore await* TokenHandler.fetchFee(handler, ctx);
     #newDeposit { creditInc = 1; depositInc = 6; ledgerFee = 3; surcharge = 2 },
   ]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };
 
 // Race condition tests
@@ -163,7 +163,7 @@ ignore await* TokenHandler.fetchFee(handler, ctx);
   assert state() == (20, 0, 1); // state unchanged because deposit has not changed
   assert journal.hasEvents([]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };
 
 // Test credit inc from notify
@@ -197,7 +197,7 @@ ignore await* TokenHandler.fetchFee(handler, ctx);
     #depositInc(10),
   ]);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };
 
 // Test notifications pause
@@ -213,7 +213,7 @@ do {
   assert handler.notificationsOnPause() == false;
 
   // pause notifications
-  handler.pauseNotifications(ctx);
+  handler.pauseNotifications();
   assert handler.notificationsOnPause() == true;
 
   // notify with 0 balance
@@ -221,12 +221,12 @@ do {
   assert (await* TokenHandler.notify(handler, user1, ctx)) == null;
 
   // unpause notifications
-  handler.unpauseNotifications(ctx);
+  handler.unpauseNotifications();
   assert handler.notificationsOnPause() == false;
 
   // notify with 0 balance
   ignore mock_ledger.balance_.stage_unlocked(?0);
   assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(0, 0);
 
-  assert not handler.isFrozen(ctx);
+  assert not handler.isFrozen();
 };
