@@ -101,3 +101,77 @@ freezing the handler as the guard clearly intends.
 **Suggested fix:** make the guard actually stop execution, e.g. `return null`
 (or a dedicated result) right after invoking the freeze callback, instead of
 falling through into the `Nat` subtraction.
+
+---
+
+## Bug 3 — `consolidate()` traps (arithmetic overflow) when the ledger fee decreases during an in-flight consolidation
+
+**Location:** `src/DepositManager.mo`, function `consolidate` (the stale `fee`
+captured before the transfer `await`); the trap itself surfaces in
+`src/FeeManager.mo`, function `subtractFee`, line 46:
+
+```motoko
+// DepositManager.consolidate
+let fee = feeManager.ledgerFee(icrc84);           // captured BEFORE await
+let consolidated : Nat = deposit - fee;
+let res = await* ICRC84Helper.consolidate(icrc84, entry.key(), deposit, ctx);
+switch (res) {
+  case (#ok _) {
+    self.totalConsolidated += consolidated;
+    entry.setDeposit(0);
+    feeManager.subtractFee(fee);                  // uses STALE fee
+    ...
+  };
+  ...
+};
+```
+
+```motoko
+// FeeManager.subtractFee
+public func subtractFee(self : FeeManager, fee : Nat) {
+  self.outstandingFees -= fee;                    // Nat underflow -> trap
+};
+```
+
+**Problem:**
+`consolidate` reads the ledger fee into `fee` **before** awaiting the transfer.
+While the transfer message is in flight, a concurrent `fetchFee` can lower the
+ledger fee. That fee change runs `FeeManager.onFeeChanged`, which lowers
+`outstandingFees` for every still-queued deposit (the deposit being consolidated
+is still in the deposits tree, since `setDeposit(0)` has not been called yet).
+When the transfer then returns `#ok`, `consolidate` calls
+`feeManager.subtractFee(fee)` with the **stale, higher** fee. Since
+`outstandingFees` has already been reduced to reflect the new lower fee,
+`outstandingFees -= fee` underflows (`Nat`) and traps the whole message.
+
+Because the message traps, all of its effects are rolled back: the successful
+consolidation is effectively lost, and repeated attempts keep trapping under the
+same conditions.
+
+**Reproduction (see `test/detected_bugs.test.mo`, block "Bug 3"):**
+
+1. Set the ledger fee to 5.
+2. `notify` balance 20 → tracked deposit 20, `outstandingFees` = 5.
+3. Start a successful consolidation (transfer returns `#Ok`) but, while it is in
+   flight, `fetchFee` lowers the ledger fee to 3 (so `onFeeChanged` reduces
+   `outstandingFees` to 3).
+4. The consolidation success path calls `subtractFee(5)` while `outstandingFees`
+   is only 3 → traps with `arithmetic overflow`.
+
+Observed failure:
+
+```
+FAIL src/FeeManager.mo:46:5: execution error, arithmetic overflow
+-> 46 |     self.outstandingFees -= fee;
+```
+
+**Impact:** A ledger-fee decrease that races with a successful consolidation
+hard-traps the consolidation instead of completing it, and the trap rolls back
+the transfer bookkeeping. The mirror case (fee *increase*) does not trap but
+leaves `outstandingFees`/`handlerPool` skewed, because `consolidated` and the
+subtracted fee are likewise computed from the stale value.
+
+**Suggested fix:** re-read the current ledger fee after the transfer completes
+(or track the exact fee actually charged by the ledger for that transfer) and
+use that value for both `consolidated` and `subtractFee`, instead of the value
+captured before the `await`.

@@ -64,3 +64,42 @@
 //   ignore mock_ledger.balance_.stage_unlocked(?10);
 //   ignore (await* TokenHandler.notify(handler, user1, ctx));
 // };
+
+// // ---------------------------------------------------------------------------
+// // Bug 3: consolidate() traps with arithmetic overflow (outstandingFees
+// //        underflow) when the ledger fee DECREASES while a SUCCESSFUL
+// //        consolidation transfer is in flight.
+// //
+// //        consolidate() captures `fee = feeManager.ledgerFee(...)` BEFORE the
+// //        transfer await. If a concurrent fetchFee lowers the ledger fee, then
+// //        onFeeChanged() lowers `outstandingFees` accordingly. On the success
+// //        path consolidate() then calls `feeManager.subtractFee(fee)` with the
+// //        STALE (higher) fee, so `outstandingFees -= fee` underflows.
+// // Fails at: src/FeeManager.mo:46 (self.outstandingFees -= fee)
+// // ---------------------------------------------------------------------------
+// do {
+//   let mock_ledger = MockLedger.MockLedger(DEBUG, "bug3");
+//   let (handler, ctx, _journal, state) = Util.createHandler(mock_ledger, false);
+
+//   // ledger fee = 5, surcharge = 0.
+//   ignore mock_ledger.fee_.stage_unlocked(?5);
+//   ignore (await* TokenHandler.fetchFee(handler, ctx));
+//   assert handler.ledgerFee() == 5;
+
+//   // notify balance 20 -> credit 15, deposit 20, outstandingFees = 5.
+//   ignore mock_ledger.balance_.stage_unlocked(?20);
+//   assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(20, 15);
+//   assert state() == (20, 0, 1);
+
+//   // Start a successful consolidation, but decrease the ledger fee to 3 while
+//   // the transfer is in flight. onFeeChanged lowers outstandingFees 5 -> 3.
+//   ignore mock_ledger.transfer_.stage_unlocked(?#Ok 0);
+//   ignore mock_ledger.fee_.stage_unlocked(?3);
+//   let f = async { await* TokenHandler.trigger(handler, 1, ctx) };
+//   ignore (await* TokenHandler.fetchFee(handler, ctx));
+
+//   // BUG: consolidate() success path calls subtractFee(5) while outstandingFees
+//   // is only 3 -> arithmetic overflow trap at FeeManager.mo:46.
+//   await f;
+//   assert state() == (0, 15, 0);
+// };
