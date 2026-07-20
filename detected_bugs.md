@@ -112,25 +112,27 @@ captured before the transfer `await`); the trap itself surfaces in
 
 ```motoko
 // DepositManager.consolidate
-let fee = feeManager.ledgerFee(icrc84);           // captured BEFORE await
+let fee = feeManager.ledgerFee(icrc84); // captured BEFORE await
 let consolidated : Nat = deposit - fee;
 let res = await* ICRC84Helper.consolidate(icrc84, entry.key(), deposit, ctx);
 switch (res) {
   case (#ok _) {
     self.totalConsolidated += consolidated;
     entry.setDeposit(0);
-    feeManager.subtractFee(fee);                  // uses STALE fee
-    ...
+    feeManager.subtractFee(fee); // uses STALE fee
+    ...;
   };
-  ...
+  ...;
 };
+
 ```
 
 ```motoko
 // FeeManager.subtractFee
 public func subtractFee(self : FeeManager, fee : Nat) {
-  self.outstandingFees -= fee;                    // Nat underflow -> trap
+  self.outstandingFees -= fee; // Nat underflow -> trap
 };
+
 ```
 
 **Problem:**
@@ -167,7 +169,7 @@ FAIL src/FeeManager.mo:46:5: execution error, arithmetic overflow
 
 **Impact:** A ledger-fee decrease that races with a successful consolidation
 hard-traps the consolidation instead of completing it, and the trap rolls back
-the transfer bookkeeping. The mirror case (fee *increase*) does not trap but
+the transfer bookkeeping. The mirror case (fee _increase_) does not trap but
 leaves `outstandingFees`/`handlerPool` skewed, because `consolidated` and the
 subtracted fee are likewise computed from the stale value.
 
