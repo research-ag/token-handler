@@ -2,18 +2,12 @@ import Int "mo:core/Int";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
 
-import Data "Data";
+import { Data } "Data";
+import ICRC84Helper "icrc84-helper";
+import Types "types";
 
 module {
-  public type LogEvent = {
-    #feeUpdated : { old : Nat; new : Nat; delta : Int };
-    #surchargeUpdated : { old : Nat; new : Nat };
-  };
-
-  public type StableData = {
-    surcharge : Nat;
-    outstandingFees : Nat;
-  };
+  public type LogEvent = Types.FeeManagerLogEvent;
 
   public type State = {
     ledger : Nat;
@@ -22,63 +16,49 @@ module {
     outstandingFees : Nat;
   };
 
-  public class FeeManager(
-    ledger : {
-      fee : () -> Nat;
-      var onFeeChanged : (Nat, Nat) -> ();
-    },
-    data : Data.Data<Principal>,
-    log : (Principal, LogEvent) -> (),
-  ) {
-    var surcharge_ = 0;
+  public type FeeManager = Types.FeeManager;
 
-    var outstandingFees : Nat = 0;
-
-    let oldCallback = ledger.onFeeChanged;
-    ledger.onFeeChanged := func(old : Nat, new : Nat) {
-      oldCallback(old, new);
-      let delta = (new : Int - old) * data.depositsCount();
-      data.changeHandlerPool(-delta);
-      let sum = outstandingFees + delta;
-      assert sum >= 0;
-      outstandingFees := Int.abs(sum);
-      log(Principal.fromBlob(""), #feeUpdated({ old; new; delta }));
+  public func new() : FeeManager {
+    let self : FeeManager = {
+      var surcharge = 0;
+      var outstandingFees = 0;
     };
+    self;
+  };
 
-    public func fee() : Nat = ledgerFee() + surcharge_;
+  public func fee(self : FeeManager, ledger : ICRC84Helper.Ledger) : Nat = ledgerFee(self, ledger) + self.surcharge;
 
-    public func ledgerFee() : Nat = ledger.fee();
+  public func ledgerFee(self : FeeManager, ledger : ICRC84Helper.Ledger) : Nat {
+    ignore self;
+    ICRC84Helper.fee(ledger);
+  };
 
-    public func surcharge() : Nat = surcharge_;
+  public func setSurcharge(self : FeeManager, s : Nat, ctx : Types.TokenHandlerContext) {
+    ctx.log(Principal.fromBlob(""), #surchargeUpdated({ old = self.surcharge; new = s }));
+    self.surcharge := s;
+  };
 
-    public func setSurcharge(s : Nat) {
-      log(Principal.fromBlob(""), #surchargeUpdated({ old = surcharge_; new = s }));
-      surcharge_ := s;
-    };
+  public func addFee(self : FeeManager, ledger : ICRC84Helper.Ledger) {
+    self.outstandingFees += ledgerFee(self, ledger);
+  };
 
-    public func addFee() {
-      outstandingFees += ledgerFee();
-    };
+  public func subtractFee(self : FeeManager, fee : Nat) {
+    self.outstandingFees -= fee;
+  };
 
-    public func subtractFee(fee : Nat) {
-      outstandingFees -= fee;
-    };
+  public func state(self : FeeManager, ledger : ICRC84Helper.Ledger) : State = {
+    ledger = ledgerFee(self, ledger);
+    surcharge = self.surcharge;
+    deposit = fee(self, ledger);
+    outstandingFees = self.outstandingFees;
+  };
 
-    public func state() : State = {
-      ledger = ledgerFee();
-      surcharge = surcharge();
-      deposit = fee();
-      outstandingFees;
-    };
-
-    public func share() : StableData = {
-      surcharge = surcharge_;
-      outstandingFees;
-    };
-
-    public func unshare(data : StableData) {
-      surcharge_ := data.surcharge;
-      outstandingFees := data.outstandingFees;
-    };
+  public func onFeeChanged(self : FeeManager, data : Data.Data<Principal>, old : Nat, new : Nat, ctx : Types.TokenHandlerContext) {
+    let delta = (new : Int - old) * data.depositsCount();
+    data.changeHandlerPool(-delta);
+    let sum = (self.outstandingFees : Int) + delta;
+    assert sum >= 0;
+    self.outstandingFees := Int.abs(sum);
+    ctx.log(Principal.fromBlob(""), #feeUpdated({ old; new; delta }));
   };
 };
