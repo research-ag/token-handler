@@ -49,8 +49,12 @@ jobs:
 
       - name: Get didc
         run: |
-          release=$(curl --silent "https://api.github.com/repos/dfinity/candid/releases/latest" | awk -F\" '/tag_name/ { print $4 }')  	
-          curl -fsSL https://github.com/dfinity/candid/releases/download/$release/didc-linux64 > /home/runner/bin/didc
+          release=$(curl --silent "https://api.github.com/repos/dfinity/candid/releases/latest" | awk -F\" '/tag_name/ { print $4 }')
+          if [[ "$release" == didc-v* ]]; then
+            curl -fsSL "https://github.com/dfinity/candid/releases/download/$release/didc-x86_64-unknown-linux-gnu.tar.xz" | tar -xJ --strip-components=1 -C /home/runner/bin didc-x86_64-unknown-linux-gnu/didc
+          else
+            curl -fsSL "https://github.com/dfinity/candid/releases/download/$release/didc-linux64" > /home/runner/bin/didc
+          fi
           chmod +x /home/runner/bin/didc
           echo "/home/runner/bin" >> $GITHUB_PATH
 
