@@ -32,7 +32,7 @@ module {
   /// Key features include subaccount management, deposit notifications, credit registry, and withdrawal mechanisms,
   /// providing a comprehensive solution for handling ICRC-1 token transactions.
   public type TokenHandler = Types.TokenHandler;
-
+  public type TokenHandlerContext = Types.TokenHandlerContext;
   public type LogEvent = Types.LogEvent;
 
   public type State = {
