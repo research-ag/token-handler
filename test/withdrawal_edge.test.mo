@@ -15,7 +15,7 @@ do {
   let (handler, ctx, journal, _) = Util.createHandler(mock_ledger, false);
 
   ignore mock_ledger.fee_.stage_unlocked(?1);
-  ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* handler.fetchFee(ctx);
   handler.setSurcharge(2, ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 1; old = 0; delta = 0 }),
@@ -24,7 +24,7 @@ do {
 
   // Get consolidated credit for user1.
   ignore mock_ledger.balance_.stage_unlocked(?20);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(20, 17);
+  assert (await* handler.notify(user1, ctx)) == ?(20, 17);
   assert journal.hasEvents([
     #newDeposit({
       creditInc = 17;
@@ -34,7 +34,7 @@ do {
     }),
   ]);
   ignore mock_ledger.transfer_.stage_unlocked(?#Ok 0);
-  await* TokenHandler.trigger(handler, 1, ctx);
+  await* handler.trigger(1, ctx);
   assert journal.hasEvents([
     #consolidated({ credited = 19; deducted = 20; fee = 1 }),
   ]);
@@ -42,7 +42,7 @@ do {
 
   // Case C: generic transfer error on withdrawFromCredit -> credit refunded.
   ignore mock_ledger.transfer_.stage_unlocked(null); // triggers CallIcrc1LedgerError
-  assert (await* TokenHandler.withdrawFromCredit(handler, user1, account, 10, null, ctx)) == #err(#CallIcrc1LedgerError);
+  assert (await* handler.withdrawFromCredit(user1, account, 10, null, ctx)) == #err(#CallIcrc1LedgerError);
   assert handler.userCredit(user1) == 17; // refunded
   assert journal.hasEvents([
     #locked(10),
@@ -50,7 +50,7 @@ do {
   ]);
 
   // Case D: expectedFee mismatch on withdrawFromCredit -> no ledger call.
-  assert (await* TokenHandler.withdrawFromCredit(handler, user1, account, 10, ?100, ctx)) == #err(#BadFee({ expected_fee = 3 }));
+  assert (await* handler.withdrawFromCredit(user1, account, 10, ?100, ctx)) == #err(#BadFee({ expected_fee = 3 }));
   assert handler.userCredit(user1) == 17; // unchanged
   assert journal.hasEvents([]);
 
@@ -60,13 +60,13 @@ do {
   assert journal.hasEvents([#debited(17)]);
 
   // Case A: expectedFee mismatch on withdrawFromPool (fee = ledgerFee only).
-  assert (await* TokenHandler.withdrawFromPool(handler, account, 10, ?5, ctx)) == #err(#BadFee({ expected_fee = 1 }));
+  assert (await* handler.withdrawFromPool(account, 10, ?5, ctx)) == #err(#BadFee({ expected_fee = 1 }));
   assert handler.poolCredit() == 17; // unchanged
   assert journal.hasEvents([]);
 
   // Case B: BadFee from ledger on withdrawFromPool -> pool refunded, fee updated.
   ignore mock_ledger.transfer_.stage_unlocked(?#Err(#BadFee({ expected_fee = 3 })));
-  assert (await* TokenHandler.withdrawFromPool(handler, account, 10, null, ctx)) == #err(#BadFee({ expected_fee = 3 }));
+  assert (await* handler.withdrawFromPool(account, 10, null, ctx)) == #err(#BadFee({ expected_fee = 3 }));
   assert handler.poolCredit() == 17; // refunded
   assert handler.ledgerFee() == 3; // fee auto-updated
   assert journal.hasEvents([
@@ -77,7 +77,7 @@ do {
 
   // Case E: successful withdrawFromPool after the fee change.
   ignore mock_ledger.transfer_.stage_unlocked(?#Ok 42);
-  assert (await* TokenHandler.withdrawFromPool(handler, account, 10, null, ctx)) == #ok(42, 7);
+  assert (await* handler.withdrawFromPool(account, 10, null, ctx)) == #ok(42, 7);
   assert handler.poolCredit() == 7;
   assert journal.hasEvents([
     #locked(10),

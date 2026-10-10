@@ -18,7 +18,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?3);
-  ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* handler.fetchFee(ctx);
   assert handler.ledgerFee() == 3;
   assert journal.hasEvents([
     #feeUpdated({ new = 3; old = 0; delta = 0 }),
@@ -35,19 +35,19 @@ do {
 
   // notify with 0 balance
   ignore mock_ledger.balance_.stage_unlocked(?0);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(0, 0);
+  assert (await* handler.notify(user1, ctx)) == ?(0, 0);
   assert state() == (0, 0, 0);
   assert journal.hasEvents([]);
 
   // notify with balance <= fee
   ignore mock_ledger.balance_.stage_unlocked(?5);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(0, 0);
+  assert (await* handler.notify(user1, ctx)) == ?(0, 0);
   assert state() == (0, 0, 0);
   assert journal.hasEvents([]);
 
   // notify with balance > fee
   ignore mock_ledger.balance_.stage_unlocked(?6);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(6, 1);
+  assert (await* handler.notify(user1, ctx)) == ?(6, 1);
   assert state() == (6, 0, 1);
   assert journal.hasEvents([
     #newDeposit { creditInc = 1; depositInc = 6; ledgerFee = 3; surcharge = 2 },
@@ -63,7 +63,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?5);
-  ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* handler.fetchFee(ctx);
   assert handler.ledgerFee() == 5;
   assert journal.hasEvents([
     #feeUpdated({ new = 5; old = 0; delta = 0 }),
@@ -71,7 +71,7 @@ do {
 
   // notify with balance > fee
   ignore mock_ledger.balance_.stage_unlocked(?6);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(6, 1);
+  assert (await* handler.notify(user1, ctx)) == ?(6, 1);
   assert state() == (6, 0, 1);
   assert journal.hasEvents([
     #newDeposit { creditInc = 1; depositInc = 6; ledgerFee = 5; surcharge = 0 },
@@ -79,7 +79,7 @@ do {
 
   // increase fee while item still in queue (trigger did not run yet)
   ignore mock_ledger.fee_.stage_unlocked(?6);
-  ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* handler.fetchFee(ctx);
   assert state() == (6, 0, 1); // recalculation after fee update
   assert journal.hasEvents([
     #feeUpdated({ new = 6; old = 5; delta = 1 }),
@@ -87,7 +87,7 @@ do {
 
   // increase deposit again
   ignore mock_ledger.balance_.stage_unlocked(?7);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(1, 1);
+  assert (await* handler.notify(user1, ctx)) == ?(1, 1);
   assert state() == (7, 0, 1);
   assert journal.hasEvents([
     #depositInc(1),
@@ -98,9 +98,9 @@ do {
   // this means no new deposit has happened (latest = previous)
   ignore mock_ledger.balance_.stage_unlocked(?7);
   ignore mock_ledger.fee_.stage_unlocked(?10); // fee 6 -> 10
-  let f1 = async { await* TokenHandler.notify(handler, user1, ctx) };
+  let f1 = async { await* handler.notify(user1, ctx) };
   assert state() == (7, 0, 1); // state from before
-  ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* handler.fetchFee(ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 10; old = 6; delta = 4 }),
   ]);
@@ -110,7 +110,7 @@ do {
 
   // increase deposit again
   ignore mock_ledger.balance_.stage_unlocked(?15);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(8, 8);
+  assert (await* handler.notify(user1, ctx)) == ?(8, 8);
   assert state() == (15, 0, 1);
   assert journal.hasEvents([
     #depositInc(8),
@@ -120,9 +120,9 @@ do {
   // scenario 2: old_fee < previous <= new_fee < latest
   ignore mock_ledger.balance_.stage_unlocked(?20);
   ignore mock_ledger.fee_.stage_unlocked(?15); // fee 10 -> 15
-  let f2 = async { await* TokenHandler.notify(handler, user1, ctx) }; // would return ?(5, _) at old fee
+  let f2 = async { await* handler.notify(user1, ctx) }; // would return ?(5, _) at old fee
   assert state() == (15, 0, 1); // state from before
-  ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* handler.fetchFee(ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 15; old = 10; delta = 5 }),
   ]);
@@ -137,9 +137,9 @@ do {
   // new_fee < old_fee < previous == latest
   let i = mock_ledger.balance_.stage(?20);
   ignore mock_ledger.fee_.stage_unlocked(?10); // fee 15 -> 10
-  let f3 = async { await* TokenHandler.notify(handler, user1, ctx) };
+  let f3 = async { await* handler.notify(user1, ctx) };
   assert state() == (20, 0, 1); // state from before
-  ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* handler.fetchFee(ctx);
   assert journal.hasEvents([
     #feeUpdated({ new = 10; old = 15; delta = -5 }),
   ]);
@@ -152,9 +152,9 @@ do {
   // call multiple notify() simultaneously
   // only the first should return state, the rest should not be executed
   let j = mock_ledger.balance_.stage(?20);
-  let fut1 = async { await* TokenHandler.notify(handler, user1, ctx) };
-  let fut2 = async { await* TokenHandler.notify(handler, user1, ctx) };
-  let fut3 = async { await* TokenHandler.notify(handler, user1, ctx) };
+  let fut1 = async { await* handler.notify(user1, ctx) };
+  let fut2 = async { await* handler.notify(user1, ctx) };
+  let fut3 = async { await* handler.notify(user1, ctx) };
   assert (await fut2) == null; // should return null
   assert (await fut3) == null; // should return null
   mock_ledger.balance_.release(j); // let notify return
@@ -173,7 +173,7 @@ do {
 
   // update fee first time
   ignore mock_ledger.fee_.stage_unlocked(?5);
-  ignore await* TokenHandler.fetchFee(handler, ctx);
+  ignore await* handler.fetchFee(ctx);
   assert handler.ledgerFee() == 5;
   assert journal.hasEvents([
     #feeUpdated({ new = 5; old = 0; delta = 0 }),
@@ -181,7 +181,7 @@ do {
 
   // notify 1
   ignore mock_ledger.balance_.stage_unlocked(?7);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(7, 2);
+  assert (await* handler.notify(user1, ctx)) == ?(7, 2);
   assert handler.userCredit(user1) == 2;
   assert state() == (7, 0, 1);
   assert journal.hasEvents([
@@ -190,7 +190,7 @@ do {
 
   // notify 2
   ignore mock_ledger.balance_.stage_unlocked(?17);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(10, 10);
+  assert (await* handler.notify(user1, ctx)) == ?(10, 10);
   assert handler.userCredit(user1) == 12;
   assert state() == (17, 0, 1);
   assert journal.hasEvents([
@@ -207,7 +207,7 @@ do {
 
   // notify with 0 balance
   ignore mock_ledger.balance_.stage_unlocked(?0);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(0, 0);
+  assert (await* handler.notify(user1, ctx)) == ?(0, 0);
 
   // initial state
   assert handler.notificationsOnPause() == false;
@@ -218,7 +218,7 @@ do {
 
   // notify with 0 balance
   ignore mock_ledger.balance_.stage_unlocked(?0);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == null;
+  assert (await* handler.notify(user1, ctx)) == null;
 
   // unpause notifications
   handler.unpauseNotifications();
@@ -226,7 +226,7 @@ do {
 
   // notify with 0 balance
   ignore mock_ledger.balance_.stage_unlocked(?0);
-  assert (await* TokenHandler.notify(handler, user1, ctx)) == ?(0, 0);
+  assert (await* handler.notify(user1, ctx)) == ?(0, 0);
 
   assert not handler.isFrozen();
 };

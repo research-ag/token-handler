@@ -1,9 +1,9 @@
 [dependencies]
-core = "2.6.0"
+core = "2.6.2"
 icrc-84 = "0.1.4"
 token-handler = "../"
 # Replace with:
 # token-handler = "0.0.4"
 
 [toolchain]
-moc = "1.8.2"
+moc = "2.0.0"

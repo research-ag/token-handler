@@ -84,7 +84,7 @@ module {
       case null creditAmount;
     };
 
-    let res = await* ICRC84Helper.send(icrc84, to, amountToSend, ctx);
+    let res = await* icrc84.send(to, amountToSend, ctx);
 
     switch (res) {
       case (#ok txid) {

@@ -25,7 +25,7 @@ do {
 
   // Fund user1 credit via allowance (no consolidation needed).
   ignore mock_ledger.transfer_from_.stage_unlocked(?#Ok 1);
-  assert (await* TokenHandler.depositFromAllowance(handler, user1, user1_account, 100, null, ctx)) == #ok(100, 1);
+  assert (await* handler.depositFromAllowance(user1, user1_account, 100, null, ctx)) == #ok(100, 1);
   assert handler.userCredit(user1) == 100;
   assert journal.hasEvents([
     #allowanceDrawn { amount = 100; credited = 100; surcharge = 0 },

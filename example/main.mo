@@ -14,7 +14,7 @@ import TokenHandler "mo:token-handler";
 import TokenHandlerContext "mo:token-handler/TokenHandlerContext";
 import Types "mo:token-handler/types";
 
-persistent actor class Example() = self {
+actor class Example() = self {
   // ensure compliance to ICRC84 standart.
   // actor won't compile in case of type mismatch here
   transient let _ : ICRC84.ICRC84 = self;
@@ -46,13 +46,13 @@ persistent actor class Example() = self {
 
   public shared query func icrc84_supported_tokens() : async [Principal] {
     Array.tabulate<Principal>(
-      List.size(assets),
-      func(i) = List.at(assets, i).ledgerPrincipal,
+      assets.size(),
+      func(i) = assets.at(i).ledgerPrincipal,
     );
   };
 
   public shared query func icrc84_token_info(token : Principal) : async ICRC84.TokenInfo {
-    for ((i, assetInfo) in List.enumerate(assets)) {
+    for ((i, assetInfo) in assets.enumerate()) {
       if (Principal.equal(assetInfo.ledgerPrincipal, token)) {
         return {
           deposit_fee = assetInfo.handler.fee(#deposit);
@@ -72,24 +72,24 @@ persistent actor class Example() = self {
     },
   )]) {
     let ret : List.List<(Principal, { credit : Int; tracked_deposit : ?Nat })> = List.empty();
-    for (token in tokens.vals()) {
+    for (token in tokens.values()) {
       let ?assetInfo = getAssetInfo(token) else throw Error.reject("Unknown token");
       let credit = assetInfo.handler.userCredit(caller);
       if (credit > 0) {
         let tracked_deposit = assetInfo.handler.trackedDeposit(caller);
-        List.add(ret, (token, { credit; tracked_deposit }));
+        ret.add((token, { credit; tracked_deposit }));
       };
     };
-    List.toArray(ret);
+    ret.toArray();
   };
 
   public shared ({ caller }) func icrc84_notify(args : ICRC84.NotifyArgs) : async ICRC84.NotifyResponse {
     let ?assetIndex = getAssetIndex(args.token) else throw Error.reject("Unknown token");
     let assetInfo = assets.at(assetIndex);
     let result = try {
-      await* TokenHandler.notify(assetInfo.handler, caller, handlerCtxs.at(assetIndex));
+      await* assetInfo.handler.notify(caller, handlerCtxs.at(assetIndex));
     } catch (err) {
-      return #Err(#CallLedgerError({ message = Error.message(err) }));
+      return #Err(#CallLedgerError({ message = err.message() }));
     };
     switch (result) {
       case (?(deposit_inc, credit_inc)) {
@@ -108,7 +108,7 @@ persistent actor class Example() = self {
   public shared ({ caller }) func icrc84_deposit(args : ICRC84.DepositArgs) : async ICRC84.DepositResponse {
     let ?assetIndex = getAssetIndex(args.token) else throw Error.reject("Unknown token");
     let assetInfo = assets.at(assetIndex);
-    let res = await* TokenHandler.depositFromAllowance(assetInfo.handler, caller, args.from, args.amount, args.expected_fee, handlerCtxs.at(assetIndex));
+    let res = await* assetInfo.handler.depositFromAllowance(caller, args.from, args.amount, args.expected_fee, handlerCtxs.at(assetIndex));
     switch (res) {
       case (#ok(credit_inc, txid)) #Ok({
         txid;
@@ -133,13 +133,13 @@ persistent actor class Example() = self {
 
     switch (args.to.subaccount) {
       case (?subaccount) {
-        let bytes = Blob.toArray(subaccount);
+        let bytes = subaccount.toArray();
         if (bytes.size() != 32) throw Error.reject("Invalid subaccount");
       };
       case null {};
     };
 
-    let res = await* TokenHandler.withdrawFromCredit(assetInfo.handler, caller, args.to, args.amount, args.expected_fee, handlerCtxs.at(assetIndex));
+    let res = await* assetInfo.handler.withdrawFromCredit(caller, args.to, args.amount, args.expected_fee, handlerCtxs.at(assetIndex));
     switch (res) {
       case (#ok(txid, amount)) #Ok({ txid; amount });
       case (#err err) {
@@ -159,7 +159,7 @@ persistent actor class Example() = self {
     #seconds 60,
     func() : async () {
       for (i in assets.keys()) {
-        await* TokenHandler.trigger(assets.at(i).handler, 10, handlerCtxs.at(i));
+        await* assets.at(i).handler.trigger(10, handlerCtxs.at(i));
       };
     },
   );
@@ -182,13 +182,13 @@ persistent actor class Example() = self {
     #Err : { #AlreadyRegistered : Nat };
   } {
     // validate ledger
-    let canister = actor (Principal.toText(ledger)) : (actor { icrc1_metadata : () -> async [Any] });
+    let canister = actor (ledger.toText()) : (actor { icrc1_metadata : () -> async [Any] });
     try {
       ignore await canister.icrc1_metadata();
     } catch (err) {
       throw err;
     };
-    for ((i, assetInfo) in List.enumerate(assets)) {
+    for ((i, assetInfo) in assets.enumerate()) {
       if (Principal.equal(ledger, assetInfo.ledgerPrincipal)) return #Err(#AlreadyRegistered(i));
     };
     let id = assets.size();
