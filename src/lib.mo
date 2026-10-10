@@ -134,7 +134,7 @@ module {
   /// Returns the new fee, or `null` if fetching is already in progress.
   public func fetchFee(self : TokenHandler, ctx : Types.TokenHandlerContext) : async* ?Nat {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = await* ICRC84Helper.loadFee(self.ledger, ctx);
+    let ret = await* self.ledger.loadFee(ctx);
     ignore ctx.assertInvariant();
     ret;
   };
@@ -207,8 +207,7 @@ module {
   /// Returns the newly detected deposit and credit funds if successful, otherwise `null`.
   public func notify(self : TokenHandler, p : Principal, ctx : Types.TokenHandlerContext) : async* ?(Nat, Nat) {
     if (self.isFrozen_) return null;
-    let ?result = await* DepositManager.notify(
-      self.depositManager,
+    let ?result = await* self.depositManager.notify(
       self.ledger,
       self.data,
       self.feeManager,
@@ -231,8 +230,7 @@ module {
     ctx : Types.TokenHandlerContext,
   ) : async* AllowanceManager.DepositFromAllowanceResponse {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = await* AllowanceManager.depositFromAllowance(
-      self.allowanceManager,
+    let ret = await* self.allowanceManager.depositFromAllowance(
       self.ledger,
       self.data,
       self.feeManager,
@@ -250,8 +248,7 @@ module {
   /// n - desired number of potential consolidations.
   public func trigger(self : TokenHandler, n : Nat, ctx : Types.TokenHandlerContext) : async* () {
     if (self.isFrozen_) return;
-    await* DepositManager.trigger(
-      self.depositManager,
+    await* self.depositManager.trigger(
       self.ledger,
       self.data,
       self.feeManager,
@@ -272,8 +269,7 @@ module {
     ctx : Types.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = await* WithdrawalManager.withdraw(
-      self.withdrawalManager,
+    let ret = await* self.withdrawalManager.withdraw(
       self.ledger,
       self.data,
       self.creditManager,
@@ -300,8 +296,7 @@ module {
     ctx : Types.TokenHandlerContext,
   ) : async* WithdrawalManager.WithdrawResponse {
     if (self.isFrozen_) Runtime.trap("The token handler is frozen");
-    let ret = await* WithdrawalManager.withdraw(
-      self.withdrawalManager,
+    let ret = await* self.withdrawalManager.withdraw(
       self.ledger,
       self.data,
       self.creditManager,

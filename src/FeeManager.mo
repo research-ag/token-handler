@@ -30,7 +30,7 @@ module {
 
   public func ledgerFee(self : FeeManager, ledger : ICRC84Helper.Ledger) : Nat {
     ignore self;
-    ICRC84Helper.fee(ledger);
+    ledger.fee();
   };
 
   public func setSurcharge(self : FeeManager, s : Nat, ctx : Types.TokenHandlerContext) {

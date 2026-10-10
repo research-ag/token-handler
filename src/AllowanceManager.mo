@@ -52,7 +52,7 @@ module {
       case (?f) if (f != fee) return #err(#BadFee { expected_fee = fee });
     };
 
-    let res = await* ICRC84Helper.draw(icrc84, p, source, creditAmount + fee, ctx);
+    let res = await* icrc84.draw(p, source, creditAmount + fee, ctx);
 
     if (res.isOk()) {
       self.totalCredited += creditAmount + surcharge_;

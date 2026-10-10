@@ -1,31 +1,26 @@
 name: App build
-env:
-  dfx_version: 0.23.0
 on:
   pull_request:
     types: [synchronize, opened, reopened, ready_for_review, unlabeled]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Install dfx
-        uses: dfinity/setup-dfx@main
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
-          dfx-version: ${{ env.dfx_version }}
-
-      - name: Confirm dfx version
-        run: dfx --version
+          node-version: latest
 
       - name: Install mops
-        uses: ZenVoich/setup-mops@v1
+        uses: caffeinelabs/setup-mops@v1
 
       - name: Make sure moc is installed
-        run: mops toolchain bin moc || mops toolchain use moc latest
+        run: mops toolchain bin moc
 
       - name: Show mops & moc versions
         run: |
@@ -42,8 +37,10 @@ jobs:
 
       - name: Build example
         working-directory: ./example
-        run: dfx build --check
- 
+        run: |
+          mops install
+          $(mops toolchain bin moc) $(mops sources) main.mo --idl -o icrc84_example.wasm
+
       - name: Make bin directory
         run: mkdir -p /home/runner/bin
 
@@ -61,5 +58,4 @@ jobs:
       - name: Check did file of example
         working-directory: ./example
         run: |
-          didc check .dfx/local/canisters/icrc84_example/icrc84_example.did did/icrc-84.did
-
+          didc check icrc84_example.did did/icrc-84.did

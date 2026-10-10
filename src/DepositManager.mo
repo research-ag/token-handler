@@ -156,7 +156,7 @@ module {
     let consolidated : Nat = deposit - fee;
 
     // transfer funds to the main account
-    let res = await* ICRC84Helper.consolidate(icrc84, entry.key(), deposit, ctx);
+    let res = await* icrc84.consolidate(entry.key(), deposit, ctx);
 
     // process result
     switch (res) {
