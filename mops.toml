@@ -11,7 +11,7 @@ core = "2.6.2"
 icrc-84 = "0.1.4"
 
 [dev-dependencies]
-async-test = "0.0.5"
+async-test = "0.1.0"
 
 [toolchain]
 moc = "2.0.0"
